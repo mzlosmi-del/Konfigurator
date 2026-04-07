@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Configurator Widget</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 640px;
+      margin: 80px auto;
+      padding: 0 24px;
+      color: #111;
+      line-height: 1.6;
+    }
+    h1 { font-size: 1.25rem; font-weight: 600; margin-bottom: 8px; }
+    p  { color: #555; font-size: 0.9rem; margin-bottom: 16px; }
+    code, pre {
+      background: #f4f4f5;
+      border-radius: 5px;
+      font-family: monospace;
+      font-size: 0.85rem;
+    }
+    code { padding: 2px 6px; }
+    pre  { padding: 14px 16px; overflow-x: auto; }
+  </style>
+</head>
+<body>
+  <h1>Configurator Widget</h1>
+  <p>The widget bundle is available at:</p>
+  <pre><code id="url"></code></pre>
+  <p>Embed on any page:</p>
+  <pre>&lt;div
+  data-supabase-url="https://YOUR_PROJECT.supabase.co"
+  data-supabase-anon-key="YOUR_ANON_KEY"
+  data-product-id="PRODUCT_UUID"
+  data-tenant-id="TENANT_UUID"
+&gt;&lt;/div&gt;
+&lt;script src="<span id="script-src"></span>" async&gt;&lt;/script&gt;</pre>
+  <script>
+    const base = window.location.origin
+    document.getElementById('url').textContent       = base + '/widget.js'
+    document.getElementById('script-src').textContent = base + '/widget.js'
+  </script>
+</body>
+</html>
