@@ -10,6 +10,16 @@ import type {
   ProductCharacteristic,
 } from '@/types/database'
 
+// ─── Tenant resolution ────────────────────────────────────────────────────────
+// All inserts require tenant_id explicitly — RLS WITH CHECK enforces it matches
+// the authenticated user's tenant but will 403 if the field is missing entirely.
+
+async function getTenantId(): Promise<string> {
+  const { data, error } = await supabase.rpc('auth_tenant_id' as any)
+  if (error || !data) throw new Error('Could not resolve tenant. Are you logged in?')
+  return data as string
+}
+
 // ─── Products ────────────────────────────────────────────────────────────────
 
 export async function fetchProducts(): Promise<Product[]> {
@@ -35,9 +45,10 @@ export async function fetchProduct(id: string): Promise<Product> {
 export async function createProduct(
   input: Pick<Product, 'name' | 'description' | 'base_price' | 'currency'>
 ): Promise<Product> {
+  const tenant_id = await getTenantId()
   const { data, error } = await supabase
     .from('products')
-    .insert(input as any)
+    .insert({ ...input, tenant_id } as any)
     .select()
     .single()
   if (error) throw new Error(error.message)
@@ -78,9 +89,10 @@ export async function fetchCharacteristics(): Promise<Characteristic[]> {
 export async function createCharacteristic(
   input: Pick<Characteristic, 'name' | 'display_type'>
 ): Promise<Characteristic> {
+  const tenant_id = await getTenantId()
   const { data, error } = await supabase
     .from('characteristics')
-    .insert(input as any)
+    .insert({ ...input, tenant_id } as any)
     .select()
     .single()
   if (error) throw new Error(error.message)
