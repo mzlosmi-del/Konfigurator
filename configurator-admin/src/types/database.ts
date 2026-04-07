@@ -20,6 +20,7 @@ export interface Database {
           name: string
           slug: string
           plan: Plan
+          notification_email: string | null
           created_at: string
           updated_at: string
         }
