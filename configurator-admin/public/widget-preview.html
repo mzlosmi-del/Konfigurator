@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Widget Preview</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; background: #f9fafb; }
+    body {
+      display: flex;
+      justify-content: center;
+      padding: 24px 16px;
+      font-family: system-ui, sans-serif;
+    }
+    #mount {
+      width: 100%;
+      max-width: 640px;
+    }
+    #error {
+      display: none;
+      padding: 24px;
+      text-align: center;
+      color: #dc2626;
+      font-size: 13px;
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      border-radius: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div id="mount"></div>
+  <div id="error"></div>
+
+  <script>
+    // Read config from URL query params — set by the parent EmbedPanel iframe src
+    const params = new URLSearchParams(window.location.search);
+    const supabaseUrl  = params.get('supabase_url')  || '';
+    const anonKey      = params.get('anon_key')       || '';
+    const productId    = params.get('product_id')     || '';
+    const tenantId     = params.get('tenant_id')      || '';
+
+    function showError(msg) {
+      const el = document.getElementById('error');
+      el.textContent = msg;
+      el.style.display = 'block';
+    }
+
+    if (!supabaseUrl || !anonKey || !productId || !tenantId) {
+      showError('Missing configuration. Open this page from the admin Embed tab.');
+    } else {
+      const mount = document.getElementById('mount');
+      mount.setAttribute('data-supabase-url',      supabaseUrl);
+      mount.setAttribute('data-supabase-anon-key', anonKey);
+      mount.setAttribute('data-product-id',        productId);
+      mount.setAttribute('data-tenant-id',         tenantId);
+    }
+  </script>
+
+  <!--
+    Widget bundle served from the same origin.
+    It auto-discovers the #mount div via data-product-id / data-tenant-id and mounts.
+  -->
+  <script src="/widget.js"></script>
+</body>
+</html>
