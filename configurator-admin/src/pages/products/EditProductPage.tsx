@@ -10,11 +10,12 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Spinner } from '@/components/ui/spinner'
 import { ProductForm, productToFormValues, type ProductFormValues } from './components/ProductForm'
 import { CharacteristicsPanel } from './components/CharacteristicsPanel'
+import { VisualizationPanel } from './components/VisualizationPanel'
 import { EmbedPanel } from './components/EmbedPanel'
 import { useToast } from '@/hooks/useToast'
 import { Toaster } from '@/components/ui/toast'
 
-type Tab = 'details' | 'characteristics' | 'embed'
+type Tab = 'details' | 'characteristics' | 'visualization' | 'embed'
 
 const statusVariant: Record<Product['status'], 'success' | 'warning' | 'secondary'> = {
   published: 'success',
@@ -129,7 +130,7 @@ export function EditProductPage() {
       {/* Tabs */}
       <div className="px-6 pt-4">
         <div className="flex gap-1 border-b">
-          {(['details', 'characteristics'] as Tab[]).map(tab => (
+          {(['details', 'characteristics', 'visualization', 'embed'] as Tab[]).map(tab => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -174,6 +175,21 @@ export function EditProductPage() {
             </CardHeader>
             <CardContent>
               <CharacteristicsPanel productId={product.id} />
+            </CardContent>
+          </Card>
+        )}
+
+        {activeTab === 'visualization' && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Visualization assets</CardTitle>
+              <CardDescription>
+                Upload or link images and renders. Attach them to specific option values
+                so the product visual updates as customers configure.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <VisualizationPanel productId={product.id} />
             </CardContent>
           </Card>
         )}
