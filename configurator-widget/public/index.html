@@ -3,44 +3,32 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Configurator Widget</title>
+  <title>Configurator Widget CDN</title>
   <style>
-    body {
-      font-family: system-ui, -apple-system, sans-serif;
-      max-width: 640px;
-      margin: 80px auto;
-      padding: 0 24px;
-      color: #111;
-      line-height: 1.6;
-    }
-    h1 { font-size: 1.25rem; font-weight: 600; margin-bottom: 8px; }
-    p  { color: #555; font-size: 0.9rem; margin-bottom: 16px; }
-    code, pre {
-      background: #f4f4f5;
-      border-radius: 5px;
-      font-family: monospace;
-      font-size: 0.85rem;
-    }
-    code { padding: 2px 6px; }
-    pre  { padding: 14px 16px; overflow-x: auto; }
+    body { font-family: system-ui, sans-serif; max-width: 600px; margin: 60px auto; padding: 0 24px; color: #111; line-height: 1.6; }
+    h1 { font-size: 1.1rem; font-weight: 600; }
+    p  { color: #555; font-size: 0.875rem; }
+    .url { background: #f4f4f5; border-radius: 6px; padding: 10px 14px; font-family: monospace; font-size: 0.85rem; word-break: break-all; margin: 12px 0; }
+    pre { background: #f4f4f5; border-radius: 6px; padding: 14px; font-size: 0.8rem; overflow-x: auto; white-space: pre-wrap; }
   </style>
 </head>
 <body>
-  <h1>Configurator Widget</h1>
-  <p>The widget bundle is available at:</p>
-  <pre><code id="url"></code></pre>
-  <p>Embed on any page:</p>
-  <pre>&lt;div
-  data-supabase-url="https://YOUR_PROJECT.supabase.co"
-  data-supabase-anon-key="YOUR_ANON_KEY"
-  data-product-id="PRODUCT_UUID"
-  data-tenant-id="TENANT_UUID"
-&gt;&lt;/div&gt;
-&lt;script src="<span id="script-src"></span>" async&gt;&lt;/script&gt;</pre>
+  <h1>✓ Widget CDN is live</h1>
+  <p>The widget script is available at:</p>
+  <div class="url" id="widget-url"></div>
+  <p>Use it in your embed code:</p>
+  <pre id="snippet"></pre>
   <script>
-    const base = window.location.origin
-    document.getElementById('url').textContent       = base + '/widget.js'
-    document.getElementById('script-src').textContent = base + '/widget.js'
+    const url = window.location.origin + '/widget.js'
+    document.getElementById('widget-url').textContent = url
+    document.getElementById('snippet').textContent =
+      '<div\n' +
+      '  data-supabase-url="https://YOUR_PROJECT.supabase.co"\n' +
+      '  data-supabase-anon-key="YOUR_ANON_KEY"\n' +
+      '  data-product-id="PRODUCT_UUID"\n' +
+      '  data-tenant-id="TENANT_UUID"\n' +
+      '></div>\n' +
+      '<script src="' + url + '" async><\/script>'
   </script>
 </body>
 </html>
