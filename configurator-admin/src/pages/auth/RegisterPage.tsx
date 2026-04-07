@@ -1,10 +1,11 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { Boxes } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { useAuthContext } from '@/components/auth/AuthContext'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { FormField } from '@/components/ui/form-field'
@@ -33,7 +34,12 @@ function toSlug(name: string): string {
 
 export function RegisterPage() {
   const navigate = useNavigate()
+  const { session } = useAuthContext()
   const [serverError, setServerError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (session) navigate('/dashboard', { replace: true })
+  }, [session])
 
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -72,8 +78,7 @@ export function RegisterPage() {
       )
       return
     }
-
-    navigate('/dashboard')
+    // Navigation handled by useEffect once session updates
   }
 
   return (
