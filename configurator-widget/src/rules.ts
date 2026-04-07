@@ -21,6 +21,9 @@ export function evaluateRules(
   }
 
   for (const rule of rules) {
+    // Guard: skip inactive rules (DB query filters these, but be defensive)
+    if (!rule.is_active) continue
+
     const { characteristic_id, value_id } = rule.condition
 
     // Check if the condition is met

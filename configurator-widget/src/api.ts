@@ -42,49 +42,38 @@ export async function loadProductConfig(config: WidgetConfig): Promise<FullProdu
 
   const characteristicIds = (attachments ?? []).map((a: { characteristic_id: string }) => a.characteristic_id)
 
-  if (characteristicIds.length === 0) {
-    return {
-      product: product as ProductData,
-      characteristics: [],
-      assets: [],
-      rules: [],
-    }
-  }
+  // Load assets and rules in parallel with characteristic data.
+  // Do NOT return early when characteristicIds is empty — a product may have
+  // a default visualization asset with no configurable characteristics.
+  const [charResult, valuesResult, assetsResult, rulesResult] = await Promise.all([
+    characteristicIds.length > 0
+      ? sb.from('characteristics').select('id, name, display_type, sort_order').in('id', characteristicIds)
+      : Promise.resolve({ data: [], error: null }),
+    characteristicIds.length > 0
+      ? sb.from('characteristic_values')
+          .select('id, characteristic_id, label, price_modifier, sort_order')
+          .in('characteristic_id', characteristicIds)
+          .order('sort_order', { ascending: true })
+      : Promise.resolve({ data: [], error: null }),
+    sb.from('visualization_assets')
+      .select('id, characteristic_value_id, asset_type, url, is_default, sort_order')
+      .eq('product_id', config.productId)
+      .order('sort_order', { ascending: true }),
+    sb.from('configuration_rules')
+      .select('id, rule_type, condition, effect, is_active')
+      .eq('product_id', config.productId)
+      .eq('is_active', true),
+  ])
 
-  // 3. Characteristic metadata
-  const { data: charData, error: charError } = await sb
-    .from('characteristics')
-    .select('id, name, display_type, sort_order')
-    .in('id', characteristicIds)
+  if (charResult.error) throw new Error('Failed to load characteristic details')
+  if (valuesResult.error) throw new Error('Failed to load characteristic values')
+  if (assetsResult.error) throw new Error('Failed to load visualization assets')
+  if (rulesResult.error) throw new Error('Failed to load rules')
 
-  if (charError) throw new Error('Failed to load characteristic details')
-
-  // 4. All values for these characteristics
-  const { data: valuesData, error: valuesError } = await sb
-    .from('characteristic_values')
-    .select('id, characteristic_id, label, price_modifier, sort_order')
-    .in('characteristic_id', characteristicIds)
-    .order('sort_order', { ascending: true })
-
-  if (valuesError) throw new Error('Failed to load characteristic values')
-
-  // 5. Visualization assets for this product
-  const { data: assetsData, error: assetsError } = await sb
-    .from('visualization_assets')
-    .select('id, characteristic_value_id, asset_type, url, is_default, sort_order')
-    .eq('product_id', config.productId)
-    .order('sort_order', { ascending: true })
-
-  if (assetsError) throw new Error('Failed to load visualization assets')
-
-  // 6. Active rules for this product
-  const { data: rulesData, error: rulesError } = await sb
-    .from('configuration_rules')
-    .select('id, rule_type, condition, effect, is_active')
-    .eq('product_id', config.productId)
-    .eq('is_active', true)
-
-  if (rulesError) throw new Error('Failed to load rules')
+  const charData = charResult.data
+  const valuesData = valuesResult.data
+  const assetsData = assetsResult.data
+  const rulesData = rulesResult.data
 
   // Assemble characteristics with their values, in product attachment order
   const valuesByCharId: Record<string, CharacteristicValue[]> = {}
