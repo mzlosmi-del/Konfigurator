@@ -10,10 +10,11 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Spinner } from '@/components/ui/spinner'
 import { ProductForm, productToFormValues, type ProductFormValues } from './components/ProductForm'
 import { CharacteristicsPanel } from './components/CharacteristicsPanel'
+import { EmbedPanel } from './components/EmbedPanel'
 import { useToast } from '@/hooks/useToast'
 import { Toaster } from '@/components/ui/toast'
 
-type Tab = 'details' | 'characteristics'
+type Tab = 'details' | 'characteristics' | 'embed'
 
 const statusVariant: Record<Product['status'], 'success' | 'warning' | 'secondary'> = {
   published: 'success',
@@ -173,6 +174,20 @@ export function EditProductPage() {
             </CardHeader>
             <CardContent>
               <CharacteristicsPanel productId={product.id} />
+            </CardContent>
+          </Card>
+        )}
+
+        {activeTab === 'embed' && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Embed & share</CardTitle>
+              <CardDescription>
+                Get the embed code to place the configurator on your website.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <EmbedPanel product={product} />
             </CardContent>
           </Card>
         )}

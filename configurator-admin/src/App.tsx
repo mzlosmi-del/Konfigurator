@@ -11,6 +11,7 @@ import { EditProductPage } from '@/pages/products/EditProductPage'
 import { InquiriesPage } from '@/pages/inquiries/InquiriesPage'
 import { InquiryDetailPage } from '@/pages/inquiries/InquiryDetailPage'
 import { SettingsPage } from '@/pages/settings/SettingsPage'
+import { PreviewPage } from '@/pages/preview/PreviewPage'
 
 export function App() {
   return (
@@ -20,6 +21,7 @@ export function App() {
           {/* Public routes */}
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
+          <Route path="/preview/:productId" element={<PreviewPage />} />
 
           {/* Protected routes — require auth */}
           <Route element={<ProtectedRoute />}>
