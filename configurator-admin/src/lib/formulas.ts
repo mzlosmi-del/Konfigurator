@@ -32,7 +32,7 @@ export async function updateFormula(
 ): Promise<PricingFormula> {
   const { data, error } = await supabase
     .from('pricing_formulas')
-    .update(input as any)
+    .update(input as unknown as never)
     .eq('id', id)
     .select()
     .single()

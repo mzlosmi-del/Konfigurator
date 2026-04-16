@@ -12,6 +12,7 @@ import { InquiriesPage } from '@/pages/inquiries/InquiriesPage'
 import { InquiryDetailPage } from '@/pages/inquiries/InquiryDetailPage'
 import { SettingsPage } from '@/pages/settings/SettingsPage'
 import { PreviewPage } from '@/pages/preview/PreviewPage'
+import { LibraryPage } from '@/pages/library/LibraryPage'
 
 export function App() {
   return (
@@ -30,6 +31,7 @@ export function App() {
               <Route path="/products" element={<ProductsPage />} />
               <Route path="/products/new" element={<NewProductPage />} />
               <Route path="/products/:id/edit" element={<EditProductPage />} />
+              <Route path="/library" element={<LibraryPage />} />
               <Route path="/inquiries" element={<InquiriesPage />} />
               <Route path="/inquiries/:id" element={<InquiryDetailPage />} />
               <Route path="/settings" element={<SettingsPage />} />

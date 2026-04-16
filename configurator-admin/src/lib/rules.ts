@@ -32,7 +32,7 @@ export async function updateRule(
 ): Promise<ConfigurationRule> {
   const { data, error } = await supabase
     .from('configuration_rules')
-    .update(input as any)
+    .update(input as unknown as never)
     .eq('id', id)
     .select()
     .single()

@@ -214,6 +214,17 @@ export interface Database {
   }
 }
 
+// Typed shapes for configuration_rules JSONB columns
+export interface RuleCondition {
+  characteristic_id: string
+  value_id: string
+}
+export interface RuleEffect {
+  characteristic_id?: string
+  value_id?: string
+  price_modifier?: number
+}
+
 // Convenience row types
 export type Tenant = Database['public']['Tables']['tenants']['Row']
 export type Profile = Database['public']['Tables']['profiles']['Row']
@@ -222,7 +233,10 @@ export type Characteristic = Database['public']['Tables']['characteristics']['Ro
 export type CharacteristicValue = Database['public']['Tables']['characteristic_values']['Row']
 export type ProductCharacteristic = Database['public']['Tables']['product_characteristics']['Row']
 export type VisualizationAsset = Database['public']['Tables']['visualization_assets']['Row']
-export type ConfigurationRule = Database['public']['Tables']['configuration_rules']['Row']
+export type ConfigurationRule = Omit<
+  Database['public']['Tables']['configuration_rules']['Row'],
+  'condition' | 'effect'
+> & { condition: RuleCondition; effect: RuleEffect }
 export type Inquiry            = Database['public']['Tables']['inquiries']['Row']
 export type Quote              = Database['public']['Tables']['quotes']['Row']
 export type CharacteristicClass = Database['public']['Tables']['characteristic_classes']['Row']
