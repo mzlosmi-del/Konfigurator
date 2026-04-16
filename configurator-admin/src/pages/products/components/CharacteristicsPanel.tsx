@@ -1,138 +1,69 @@
 import { useEffect, useState } from 'react'
-import { Plus, Trash2, ChevronDown, ChevronRight, Tag } from 'lucide-react'
+import { Trash2, ChevronDown, ChevronRight, Tag } from 'lucide-react'
 import {
-  fetchCharacteristics,
-  fetchProductCharacteristics,
-  fetchValuesForCharacteristic,
-  attachCharacteristicToProduct,
-  detachCharacteristicFromProduct,
-  createCharacteristic,
   fetchClasses,
-  createClass,
-  setCharacteristicClass,
+  fetchProductClassesWithChars,
+  attachClassToProduct,
+  detachClassFromProduct,
+  type ProductClassWithChars,
 } from '@/lib/products'
-import type {
-  Characteristic,
-  CharacteristicValue,
-  CharacteristicClass,
-  ProductCharacteristic,
-} from '@/types/database'
+import type { CharacteristicClass } from '@/types/database'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
 import { Spinner } from '@/components/ui/spinner'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
-import { CharacteristicValuesEditor } from './CharacteristicValuesEditor'
 import { useToast } from '@/hooks/useToast'
 import { Toaster } from '@/components/ui/toast'
-import { useAuthContext } from '@/components/auth/AuthContext'
-
-type AttachedChar = ProductCharacteristic & { characteristic: Characteristic }
 
 interface Props {
   productId: string
 }
 
 export function CharacteristicsPanel({ productId }: Props) {
-  const { tenant } = useAuthContext()
   const { toasts, toast, dismiss } = useToast()
 
-  const [loading, setLoading]     = useState(true)
-  const [attached, setAttached]   = useState<AttachedChar[]>([])
-  const [library, setLibrary]     = useState<Characteristic[]>([])
-  const [classes, setClasses]     = useState<CharacteristicClass[]>([])
-  const [values, setValues]       = useState<Record<string, CharacteristicValue[]>>({})
-  const [expanded, setExpanded]   = useState<Record<string, boolean>>({})
+  const [loading, setLoading]             = useState(true)
+  const [assigned, setAssigned]           = useState<ProductClassWithChars[]>([])
+  const [allClasses, setAllClasses]       = useState<CharacteristicClass[]>([])
+  const [expanded, setExpanded]           = useState<Record<string, boolean>>({})
+  const [selectedClassId, setSelectedClassId] = useState('')
+  const [attaching, setAttaching]         = useState(false)
+  const [toDetach, setToDetach]           = useState<ProductClassWithChars | null>(null)
+  const [detaching, setDetaching]         = useState(false)
 
-  // Add existing characteristic
-  const [selectedCharId, setSelectedCharId] = useState('')
-  const [attaching, setAttaching]           = useState(false)
-
-  // Create new characteristic inline
-  const [showNewChar, setShowNewChar]       = useState(false)
-  const [newCharName, setNewCharName]       = useState('')
-  const [newCharType, setNewCharType]       = useState<Characteristic['display_type']>('select')
-  const [creatingChar, setCreatingChar]     = useState(false)
-
-  // Class management
-  const [showNewClass, setShowNewClass]     = useState(false)
-  const [newClassName, setNewClassName]     = useState('')
-  const [creatingClass, setCreatingClass]   = useState(false)
-
-  // Detach confirmation
-  const [toDetach, setToDetach]   = useState<AttachedChar | null>(null)
-  const [detaching, setDetaching] = useState(false)
-
-  useEffect(() => {
-    load()
-  }, [productId])
+  useEffect(() => { load() }, [productId])
 
   async function load() {
     setLoading(true)
     try {
-      const [attachedData, libData, classData] = await Promise.all([
-        fetchProductCharacteristics(productId),
-        fetchCharacteristics(),
+      const [assignedData, libData] = await Promise.all([
+        fetchProductClassesWithChars(productId),
         fetchClasses(),
       ])
-      setAttached(attachedData)
-      setLibrary(libData)
-      setClasses(classData)
-
-      const valMap: Record<string, CharacteristicValue[]> = {}
-      await Promise.all(
-        attachedData.map(async a => {
-          valMap[a.characteristic_id] = await fetchValuesForCharacteristic(a.characteristic_id)
-        })
-      )
-      setValues(valMap)
-
-      if (attachedData.length > 0) {
-        setExpanded({ [attachedData[0].characteristic_id]: true })
-      }
+      setAssigned(assignedData)
+      setAllClasses(libData)
+      if (assignedData.length > 0) setExpanded({ [assignedData[0].id]: true })
     } catch {
-      toast({ title: 'Failed to load characteristics', variant: 'destructive' })
+      toast({ title: 'Failed to load classes', variant: 'destructive' })
     } finally {
       setLoading(false)
     }
   }
 
-  const unattached = library.filter(c => !attached.some(a => a.characteristic_id === c.id))
+  const unassigned = allClasses.filter(c => !assigned.some(a => a.id === c.id))
 
   async function handleAttach() {
-    if (!selectedCharId) return
+    if (!selectedClassId) return
     setAttaching(true)
     try {
-      await attachCharacteristicToProduct(productId, selectedCharId, attached.length)
-      const vals = await fetchValuesForCharacteristic(selectedCharId)
+      await attachClassToProduct(productId, selectedClassId, assigned.length)
       await load()
-      setValues(prev => ({ ...prev, [selectedCharId]: vals }))
-      setExpanded(prev => ({ ...prev, [selectedCharId]: true }))
-      setSelectedCharId('')
+      setExpanded(prev => ({ ...prev, [selectedClassId]: true }))
+      setSelectedClassId('')
     } catch {
-      toast({ title: 'Failed to attach characteristic', variant: 'destructive' })
+      toast({ title: 'Failed to add class', variant: 'destructive' })
     } finally {
       setAttaching(false)
-    }
-  }
-
-  async function handleCreateAndAttach() {
-    if (!newCharName.trim()) return
-    setCreatingChar(true)
-    try {
-      const created = await createCharacteristic({ name: newCharName.trim(), display_type: newCharType })
-      setLibrary(prev => [...prev, created])
-      await attachCharacteristicToProduct(productId, created.id, attached.length)
-      setValues(prev => ({ ...prev, [created.id]: [] }))
-      await load()
-      setExpanded(prev => ({ ...prev, [created.id]: true }))
-      setNewCharName('')
-      setNewCharType('select')
-      setShowNewChar(false)
-    } catch {
-      toast({ title: 'Failed to create characteristic', variant: 'destructive' })
-    } finally {
-      setCreatingChar(false)
     }
   }
 
@@ -140,62 +71,18 @@ export function CharacteristicsPanel({ productId }: Props) {
     if (!toDetach) return
     setDetaching(true)
     try {
-      await detachCharacteristicFromProduct(productId, toDetach.characteristic_id)
-      setAttached(prev => prev.filter(a => a.characteristic_id !== toDetach.characteristic_id))
+      await detachClassFromProduct(productId, toDetach.id)
+      setAssigned(prev => prev.filter(a => a.id !== toDetach.id))
       setToDetach(null)
     } catch {
-      toast({ title: 'Failed to remove characteristic', variant: 'destructive' })
+      toast({ title: 'Failed to remove class', variant: 'destructive' })
     } finally {
       setDetaching(false)
     }
   }
 
-  async function handleCreateClass() {
-    if (!newClassName.trim()) return
-    setCreatingClass(true)
-    try {
-      const created = await createClass({ name: newClassName.trim() })
-      setClasses(prev => [...prev, created])
-      setNewClassName('')
-      setShowNewClass(false)
-      toast({ title: `Class "${created.name}" created` })
-    } catch {
-      toast({ title: 'Failed to create class', variant: 'destructive' })
-    } finally {
-      setCreatingClass(false)
-    }
-  }
-
-  async function handleAssignClass(charId: string, classId: string) {
-    try {
-      await setCharacteristicClass(charId, classId === '' ? null : classId)
-      setLibrary(prev => prev.map(c => c.id === charId ? { ...c, class_id: classId === '' ? null : classId } : c))
-      setAttached(prev => prev.map(a =>
-        a.characteristic_id === charId
-          ? { ...a, characteristic: { ...a.characteristic, class_id: classId === '' ? null : classId } }
-          : a
-      ))
-    } catch {
-      toast({ title: 'Failed to assign class', variant: 'destructive' })
-    }
-  }
-
-  function toggleExpand(charId: string) {
-    setExpanded(prev => ({ ...prev, [charId]: !prev[charId] }))
-  }
-
-  // Group attached characteristics by class
-  const grouped: { class: CharacteristicClass | null; items: AttachedChar[] }[] = []
-  const usedClassIds = new Set<string | null>()
-
-  for (const a of attached) {
-    const classId = a.characteristic.class_id ?? null
-    if (!usedClassIds.has(classId)) {
-      usedClassIds.add(classId)
-      const cls = classes.find(c => c.id === classId) ?? null
-      grouped.push({ class: cls, items: [] })
-    }
-    grouped.find(g => (g.class?.id ?? null) === classId)!.items.push(a)
+  function toggleExpand(classId: string) {
+    setExpanded(prev => ({ ...prev, [classId]: !prev[classId] }))
   }
 
   if (loading) {
@@ -205,166 +92,88 @@ export function CharacteristicsPanel({ productId }: Props) {
   return (
     <div className="space-y-4">
 
-      {/* ── Class manager ─────────────────────────────────────────────── */}
-      <div className="rounded-lg border bg-muted/10 px-4 py-3 space-y-2">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-sm font-medium">
-            <Tag className="h-4 w-4 text-muted-foreground" />
-            Classes
-          </div>
-          {!showNewClass && (
-            <button
-              type="button"
-              onClick={() => setShowNewClass(true)}
-              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <Plus className="h-3 w-3" /> New class
-            </button>
+      {/* ── Assigned classes ──────────────────────────────────────────────── */}
+      {assigned.length === 0 ? (
+        <p className="text-sm text-muted-foreground py-2">
+          No classes assigned yet. Add a class below to define what customers can configure.
+          {allClasses.length === 0 && (
+            <> Go to the <span className="font-medium">Library</span> to create classes and characteristics first.</>
           )}
-        </div>
-
-        {classes.length === 0 && !showNewClass && (
-          <p className="text-xs text-muted-foreground">No classes yet. Create one to group characteristics.</p>
-        )}
-
-        {classes.length > 0 && (
-          <div className="flex flex-wrap gap-1.5">
-            {classes.map(c => (
-              <span
-                key={c.id}
-                className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
-              >
-                {c.name}
-              </span>
-            ))}
-          </div>
-        )}
-
-        {showNewClass && (
-          <div className="flex gap-2 items-center pt-1">
-            <Input
-              placeholder="Class name (e.g. Dimensions, Material)"
-              value={newClassName}
-              onChange={e => setNewClassName(e.target.value)}
-              autoFocus
-              className="text-sm flex-1"
-            />
-            <Button size="sm" onClick={handleCreateClass} loading={creatingClass} disabled={!newClassName.trim()}>
-              Create
-            </Button>
-            <Button size="sm" variant="ghost" onClick={() => { setShowNewClass(false); setNewClassName('') }}>
-              Cancel
-            </Button>
-          </div>
-        )}
-      </div>
-
-      {/* ── Attached characteristics grouped by class ─────────────────── */}
-      {attached.length === 0 ? (
-        <p className="text-sm text-muted-foreground py-2">No characteristics yet. Add one below.</p>
+        </p>
       ) : (
-        <div className="space-y-4">
-          {grouped.map(group => (
-            <div key={group.class?.id ?? 'unclassified'}>
-              {/* Class header (only when classes exist) */}
-              {classes.length > 0 && (
-                <div className="flex items-center gap-2 mb-2">
-                  <Tag className="h-3.5 w-3.5 text-muted-foreground" />
-                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                    {group.class?.name ?? 'Unclassified'}
-                  </span>
-                  <div className="flex-1 border-t" />
+        <div className="space-y-2">
+          {assigned.map(cls => (
+            <div key={cls.id} className="rounded-lg border bg-card overflow-hidden">
+              {/* Header */}
+              <div
+                className="flex items-center gap-2 px-4 py-3 cursor-pointer hover:bg-muted/30 transition-colors"
+                onClick={() => toggleExpand(cls.id)}
+              >
+                {expanded[cls.id]
+                  ? <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
+                  : <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />}
+                <Tag className="h-4 w-4 text-muted-foreground shrink-0" />
+                <span className="font-medium text-sm flex-1">{cls.name}</span>
+                <span className="text-xs text-muted-foreground px-2 py-0.5 rounded bg-muted">
+                  {cls.characteristics.length} characteristic{cls.characteristics.length !== 1 ? 's' : ''}
+                </span>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 text-destructive hover:text-destructive ml-1"
+                  onClick={e => { e.stopPropagation(); setToDetach(cls) }}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+
+              {/* Characteristics list */}
+              {expanded[cls.id] && (
+                <div className="px-4 pb-3 pt-1 border-t bg-muted/10">
+                  {cls.characteristics.length === 0 ? (
+                    <p className="text-xs text-muted-foreground py-2">
+                      No characteristics in this class yet. Add some in the Library.
+                    </p>
+                  ) : (
+                    <div className="space-y-1 pt-1">
+                      {cls.characteristics.map(char => (
+                        <div
+                          key={char.id}
+                          className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm bg-background border"
+                        >
+                          <span className="flex-1 font-medium">{char.name}</span>
+                          <span className="text-xs text-muted-foreground capitalize px-1.5 py-0.5 rounded bg-muted">
+                            {char.display_type}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
-
-              <div className="space-y-2">
-                {group.items.map(a => (
-                  <div key={a.characteristic_id} className="rounded-lg border bg-card overflow-hidden">
-                    {/* Header row */}
-                    <div
-                      className="flex items-center gap-2 px-4 py-3 cursor-pointer hover:bg-muted/30 transition-colors"
-                      onClick={() => toggleExpand(a.characteristic_id)}
-                    >
-                      {expanded[a.characteristic_id]
-                        ? <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
-                        : <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />}
-                      <span className="font-medium text-sm flex-1">{a.characteristic.name}</span>
-                      <span className="text-xs text-muted-foreground capitalize px-2 py-0.5 rounded bg-muted">
-                        {a.characteristic.display_type}
-                      </span>
-                      <span className="text-xs text-muted-foreground">
-                        {(values[a.characteristic_id] ?? []).length} values
-                      </span>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 text-destructive hover:text-destructive ml-1"
-                        onClick={e => { e.stopPropagation(); setToDetach(a) }}
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-
-                    {/* Expanded */}
-                    {expanded[a.characteristic_id] && (
-                      <div className="px-4 pb-4 pt-2 border-t bg-muted/10 space-y-3">
-                        {/* Assign class */}
-                        {classes.length > 0 && (
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs text-muted-foreground w-12">Class</span>
-                            <Select
-                              value={a.characteristic.class_id ?? ''}
-                              onChange={e => handleAssignClass(a.characteristic_id, e.target.value)}
-                              className="text-xs h-7 py-0"
-                            >
-                              <option value="">Unclassified</option>
-                              {classes.map(c => (
-                                <option key={c.id} value={c.id}>{c.name}</option>
-                              ))}
-                            </Select>
-                          </div>
-                        )}
-
-                        {/* Values editor */}
-                        {tenant && (
-                          <CharacteristicValuesEditor
-                            characteristicId={a.characteristic_id}
-                            tenantId={tenant.id}
-                            values={values[a.characteristic_id] ?? []}
-                            onChange={updated =>
-                              setValues(prev => ({ ...prev, [a.characteristic_id]: updated }))
-                            }
-                          />
-                        )}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
             </div>
           ))}
         </div>
       )}
 
-      {/* ── Add existing characteristic ────────────────────────────────── */}
-      {unattached.length > 0 && !showNewChar && (
-        <div className="flex gap-2 items-end">
-          <div className="flex-1">
-            <Select
-              value={selectedCharId}
-              onChange={e => setSelectedCharId(e.target.value)}
-            >
-              <option value="">Add existing characteristic…</option>
-              {unattached.map(c => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </Select>
-          </div>
+      {/* ── Add class ─────────────────────────────────────────────────────── */}
+      {unassigned.length > 0 && (
+        <div className="flex gap-2 items-center">
+          <Select
+            value={selectedClassId}
+            onChange={e => setSelectedClassId(e.target.value)}
+            className="flex-1"
+          >
+            <option value="">Add a class…</option>
+            {unassigned.map(c => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </Select>
           <Button
             size="sm"
             variant="outline"
             onClick={handleAttach}
-            disabled={!selectedCharId}
+            disabled={!selectedClassId}
             loading={attaching}
           >
             Add
@@ -372,55 +181,15 @@ export function CharacteristicsPanel({ productId }: Props) {
         </div>
       )}
 
-      {/* ── Create new characteristic ──────────────────────────────────── */}
-      {showNewChar ? (
-        <div className="rounded-lg border p-4 space-y-3 bg-muted/20">
-          <p className="text-sm font-medium">New characteristic</p>
-          <div className="flex gap-2">
-            <Input
-              placeholder="Name (e.g. Material, Size, Width)"
-              value={newCharName}
-              onChange={e => setNewCharName(e.target.value)}
-              autoFocus
-              className="flex-1"
-            />
-            <Select
-              value={newCharType}
-              onChange={e => setNewCharType(e.target.value as Characteristic['display_type'])}
-              className="w-36"
-            >
-              <option value="select">Select</option>
-              <option value="radio">Radio</option>
-              <option value="swatch">Swatch</option>
-              <option value="toggle">Toggle</option>
-              <option value="number">Number input</option>
-            </Select>
-          </div>
-          <div className="flex gap-2">
-            <Button size="sm" onClick={handleCreateAndAttach} loading={creatingChar} disabled={!newCharName.trim()}>
-              Create & add
-            </Button>
-            <Button size="sm" variant="ghost" onClick={() => { setShowNewChar(false); setNewCharName('') }}>
-              Cancel
-            </Button>
-          </div>
-        </div>
-      ) : (
-        <button
-          type="button"
-          onClick={() => setShowNewChar(true)}
-          className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
-        >
-          <Plus className="h-4 w-4" />
-          Create new characteristic
-        </button>
+      {unassigned.length === 0 && allClasses.length > 0 && assigned.length === allClasses.length && (
+        <p className="text-xs text-muted-foreground">All library classes are already assigned to this product.</p>
       )}
 
       <ConfirmDialog
         open={!!toDetach}
         onOpenChange={open => !open && setToDetach(null)}
-        title="Remove characteristic?"
-        description={`Remove "${toDetach?.characteristic.name}" from this product? The characteristic and its values will not be deleted from your library.`}
+        title="Remove class from product?"
+        description={`Remove class "${toDetach?.name}" from this product? The class and its characteristics remain in the Library.`}
         confirmLabel="Remove"
         onConfirm={handleDetach}
         loading={detaching}
