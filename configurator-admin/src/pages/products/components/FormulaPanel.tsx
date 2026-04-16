@@ -190,6 +190,7 @@ export function FormulaPanel({ productId }: Props) {
                     onChange={node => setEditFormulas(prev => ({ ...prev, [f.id]: node }))}
                     characteristics={characteristics}
                     valuesMap={valuesMap}
+                    isRoot
                   />
                 </div>
                 {isDirty && (
@@ -227,6 +228,7 @@ export function FormulaPanel({ productId }: Props) {
               onChange={setNewFormula}
               characteristics={characteristics}
               valuesMap={valuesMap}
+              isRoot
             />
           </div>
           <div className="flex gap-2 justify-end">
