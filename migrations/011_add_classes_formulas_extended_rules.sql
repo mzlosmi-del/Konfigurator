@@ -32,6 +32,10 @@ CREATE TRIGGER characteristic_classes_updated_at
 
 ALTER TABLE public.characteristic_classes ENABLE ROW LEVEL SECURITY;
 
+-- Add class_id to characteristics BEFORE the anon policy that references it
+ALTER TABLE public.characteristics
+  ADD COLUMN class_id uuid REFERENCES public.characteristic_classes(id) ON DELETE SET NULL;
+
 CREATE POLICY "characteristic_classes: tenant admin full access"
   ON public.characteristic_classes FOR ALL
   TO authenticated
@@ -51,10 +55,6 @@ CREATE POLICY "characteristic_classes: anon reads via published product"
         AND  p.status = 'published'
     )
   );
-
--- Link characteristics to classes (optional — NULL = unclassified)
-ALTER TABLE public.characteristics
-  ADD COLUMN class_id uuid REFERENCES public.characteristic_classes(id) ON DELETE SET NULL;
 
 
 -- =============================================================================
