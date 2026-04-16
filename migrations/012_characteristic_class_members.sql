@@ -6,7 +6,6 @@
 -- classes and classes remain independent grouping concepts.
 -- =============================================================================
 
--- 1. Create junction table
 CREATE TABLE public.characteristic_class_members (
   class_id          uuid NOT NULL REFERENCES public.characteristic_classes(id) ON DELETE CASCADE,
   characteristic_id uuid NOT NULL REFERENCES public.characteristics(id)        ON DELETE CASCADE,
@@ -19,7 +18,7 @@ CREATE INDEX idx_ccm_char_id  ON public.characteristic_class_members(characteris
 
 ALTER TABLE public.characteristic_class_members ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "characteristic_class_members: tenant admin full access"
+CREATE POLICY "ccm: tenant admin full access"
   ON public.characteristic_class_members FOR ALL
   TO authenticated
   USING (
@@ -35,26 +34,40 @@ CREATE POLICY "characteristic_class_members: tenant admin full access"
     )
   );
 
-CREATE POLICY "characteristic_class_members: anon reads via published product"
+CREATE POLICY "ccm: anon reads via published product"
   ON public.characteristic_class_members FOR SELECT
   TO anon
   USING (
     EXISTS (
       SELECT 1
-      FROM   public.characteristics c
-      JOIN   public.product_characteristics pc ON pc.characteristic_id = c.id
-      JOIN   public.products p                 ON p.id = pc.product_id
-      WHERE  c.id = characteristic_id
-        AND  p.status = 'published'
+      FROM public.product_classes pc
+      JOIN public.products p ON p.id = pc.product_id
+      WHERE pc.class_id = class_id
+        AND p.status = 'published'
     )
   );
 
--- 2. Migrate existing one-to-many data into the junction table
+-- Migrate existing one-to-many data
 INSERT INTO public.characteristic_class_members (class_id, characteristic_id)
-  SELECT class_id, id
-  FROM   public.characteristics
-  WHERE  class_id IS NOT NULL
+  SELECT class_id, id FROM public.characteristics WHERE class_id IS NOT NULL
 ON CONFLICT DO NOTHING;
 
--- 3. Drop the old FK column
-ALTER TABLE public.characteristics DROP COLUMN class_id;
+-- Replace the old policy on characteristic_classes (which referenced
+-- characteristics.class_id) with one using the new product_classes path
+DROP POLICY IF EXISTS "characteristic_classes: anon reads via published product" ON public.characteristic_classes;
+
+CREATE POLICY "characteristic_classes: anon reads via published product"
+  ON public.characteristic_classes FOR SELECT
+  TO anon
+  USING (
+    EXISTS (
+      SELECT 1
+      FROM public.product_classes pc
+      JOIN public.products p ON p.id = pc.product_id
+      WHERE pc.class_id = id
+        AND p.status = 'published'
+    )
+  );
+
+-- Now safe to drop
+ALTER TABLE public.characteristics DROP COLUMN IF EXISTS class_id;
