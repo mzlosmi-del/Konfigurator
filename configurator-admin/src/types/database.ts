@@ -10,6 +10,7 @@ export type DisplayType = 'select' | 'radio' | 'swatch' | 'toggle'
 export type AssetType = 'image' | 'render' | '3d_model'
 export type RuleType = 'hide_value' | 'disable_value' | 'price_override'
 export type InquiryStatus = 'new' | 'read' | 'replied' | 'closed'
+export type QuoteStatus = 'sent' | 'expired'
 
 export interface Database {
   public: {
@@ -142,6 +143,21 @@ export interface Database {
         Insert: Omit<Database['public']['Tables']['inquiries']['Row'], 'id' | 'created_at' | 'updated_at'> & { id?: string }
         Update: Partial<Database['public']['Tables']['inquiries']['Insert']>
       }
+      quotes: {
+        Row: {
+          id: string
+          inquiry_id: string
+          tenant_id: string
+          pdf_url: string | null
+          expires_at: string | null
+          status: QuoteStatus
+          sent_at: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: Omit<Database['public']['Tables']['quotes']['Row'], 'created_at' | 'updated_at' | 'sent_at'> & { id?: string; sent_at?: string }
+        Update: Partial<Database['public']['Tables']['quotes']['Insert']>
+      }
     }
     Functions: {
       auth_tenant_id: {
@@ -166,3 +182,4 @@ export type ProductCharacteristic = Database['public']['Tables']['product_charac
 export type VisualizationAsset = Database['public']['Tables']['visualization_assets']['Row']
 export type ConfigurationRule = Database['public']['Tables']['configuration_rules']['Row']
 export type Inquiry = Database['public']['Tables']['inquiries']['Row']
+export type Quote   = Database['public']['Tables']['quotes']['Row']
