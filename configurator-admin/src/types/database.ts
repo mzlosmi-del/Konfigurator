@@ -234,12 +234,17 @@ export interface Database {
 // Typed shapes for configuration_rules JSONB columns
 export interface RuleCondition {
   characteristic_id: string
-  value_id: string
+  // Select-type condition: characteristic has value_id selected
+  value_id?: string
+  // Numeric condition: characteristic input compared against a threshold
+  numeric_op?: 'gt' | 'gte' | 'lt' | 'lte' | 'eq'
+  numeric_value?: number
 }
 export interface RuleEffect {
   characteristic_id?: string
-  value_id?: string
-  price_modifier?: number
+  value_id?: string          // target value for select-type characteristics
+  price_modifier?: number    // price_override amount
+  numeric_value?: number     // set_value_default / set_value_locked on numeric chars
 }
 
 // Convenience row types

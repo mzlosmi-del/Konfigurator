@@ -2,7 +2,7 @@ import { h } from 'preact'
 import { useState, useEffect, useMemo } from 'preact/hooks'
 import type { FullProductConfig, Selection, NumericInputs, WidgetConfig, ConfigLineItem } from '../types'
 import { loadProductConfig } from '../api'
-import { evaluateRules, calculatePrice, sanitizeSelection, applyDefaultValues } from '../rules'
+import { evaluateRules, calculatePrice, sanitizeSelection, applyDefaultValues, applyNumericDefaults } from '../rules'
 import { calculateFormulaTotal } from '../formulaEngine'
 import { Visualization } from './Visualization'
 import { CharacteristicInput } from './CharacteristicInput'
@@ -38,10 +38,12 @@ export function Widget({ config }: Props) {
         }
 
         // Apply initial rules (set_value_default / locked)
-        const initialEffect = evaluateRules(data.rules, initial)
-        const withDefaults  = applyDefaultValues(initial, initialEffect)
-        const sanitized     = sanitizeSelection(withDefaults, initialEffect)
+        const initialEffect      = evaluateRules(data.rules, initial, {})
+        const withDefaults       = applyDefaultValues(initial, initialEffect)
+        const sanitized          = sanitizeSelection(withDefaults, initialEffect)
+        const numericDefaults    = applyNumericDefaults({}, initialEffect)
         setSelection(sanitized)
+        setNumericInputs(numericDefaults)
       })
       .catch(err => {
         setState({ phase: 'error', message: err.message })
@@ -65,10 +67,10 @@ export function Widget({ config }: Props) {
   // ── Derived state ───────────────────────────────────────────────────────────
   const ruleEffect = useMemo(() => {
     if (state.phase !== 'ready') {
-      return { hiddenValues: new Set<string>(), disabledValues: new Set<string>(), priceOverrides: {}, defaultValues: {}, lockedValues: {} }
+      return { hiddenValues: new Set<string>(), disabledValues: new Set<string>(), priceOverrides: {}, defaultValues: {}, lockedValues: {}, defaultNumericValues: {}, lockedNumericValues: {} }
     }
-    return evaluateRules(state.data.rules, selection)
-  }, [state, selection])
+    return evaluateRules(state.data.rules, selection, numericInputs)
+  }, [state, selection, numericInputs])
 
   const totalPrice = useMemo(() => {
     if (state.phase !== 'ready') return 0

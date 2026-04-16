@@ -40,11 +40,17 @@ export interface VisualizationAsset {
 export interface ConfigurationRule {
   id: string
   rule_type: 'hide_value' | 'disable_value' | 'price_override' | 'set_value_default' | 'set_value_locked'
-  condition: { characteristic_id: string; value_id: string }
+  condition: {
+    characteristic_id: string
+    value_id?: string
+    numeric_op?: 'gt' | 'gte' | 'lt' | 'lte' | 'eq'
+    numeric_value?: number
+  }
   effect: {
     characteristic_id?: string
     value_id?: string
     price_modifier?: number
+    numeric_value?: number
   }
   is_active: boolean
 }

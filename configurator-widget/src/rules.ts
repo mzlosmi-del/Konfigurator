@@ -1,34 +1,53 @@
-import type { ConfigurationRule, Selection } from './types'
+import type { ConfigurationRule, Selection, NumericInputs } from './types'
 
 export interface RuleEffect {
-  hiddenValues:   Set<string>              // value IDs that should be hidden
-  disabledValues: Set<string>              // value IDs that should be disabled
-  priceOverrides: Record<string, number>   // charId → override modifier
-  defaultValues:  Record<string, string>   // charId → valueId (customer may override)
-  lockedValues:   Record<string, string>   // charId → valueId (customer cannot override)
+  hiddenValues:         Set<string>              // value IDs that should be hidden
+  disabledValues:       Set<string>              // value IDs that should be disabled
+  priceOverrides:       Record<string, number>   // charId → override modifier
+  defaultValues:        Record<string, string>   // charId → valueId (customer may override)
+  lockedValues:         Record<string, string>   // charId → valueId (customer cannot override)
+  defaultNumericValues: Record<string, number>   // charId → number (customer may override)
+  lockedNumericValues:  Record<string, number>   // charId → number (customer cannot override)
 }
 
 /**
- * Evaluate all active rules against the current selection.
- * Rules are single-condition: IF char=value THEN effect.
+ * Evaluate all active rules against the current selection and numeric inputs.
  */
 export function evaluateRules(
   rules: ConfigurationRule[],
-  selection: Selection
+  selection: Selection,
+  numericInputs: NumericInputs = {}
 ): RuleEffect {
   const result: RuleEffect = {
-    hiddenValues:   new Set(),
-    disabledValues: new Set(),
-    priceOverrides: {},
-    defaultValues:  {},
-    lockedValues:   {},
+    hiddenValues:         new Set(),
+    disabledValues:       new Set(),
+    priceOverrides:       {},
+    defaultValues:        {},
+    lockedValues:         {},
+    defaultNumericValues: {},
+    lockedNumericValues:  {},
   }
 
   for (const rule of rules) {
     if (!rule.is_active) continue
 
-    const { characteristic_id, value_id } = rule.condition
-    if (selection[characteristic_id] !== value_id) continue
+    const { characteristic_id, value_id, numeric_op, numeric_value } = rule.condition
+
+    let conditionMet = false
+    if (numeric_op !== undefined && numeric_value !== undefined) {
+      const inputVal = numericInputs[characteristic_id] ?? 0
+      switch (numeric_op) {
+        case 'gt':  conditionMet = inputVal >  numeric_value; break
+        case 'gte': conditionMet = inputVal >= numeric_value; break
+        case 'lt':  conditionMet = inputVal <  numeric_value; break
+        case 'lte': conditionMet = inputVal <= numeric_value; break
+        case 'eq':  conditionMet = inputVal === numeric_value; break
+      }
+    } else if (value_id !== undefined) {
+      conditionMet = selection[characteristic_id] === value_id
+    }
+
+    if (!conditionMet) continue
 
     switch (rule.rule_type) {
       case 'hide_value':
@@ -47,14 +66,22 @@ export function evaluateRules(
         break
 
       case 'set_value_default':
-        if (rule.effect.characteristic_id && rule.effect.value_id) {
-          result.defaultValues[rule.effect.characteristic_id] = rule.effect.value_id
+        if (rule.effect.characteristic_id) {
+          if (rule.effect.value_id) {
+            result.defaultValues[rule.effect.characteristic_id] = rule.effect.value_id
+          } else if (rule.effect.numeric_value !== undefined) {
+            result.defaultNumericValues[rule.effect.characteristic_id] = rule.effect.numeric_value
+          }
         }
         break
 
       case 'set_value_locked':
-        if (rule.effect.characteristic_id && rule.effect.value_id) {
-          result.lockedValues[rule.effect.characteristic_id] = rule.effect.value_id
+        if (rule.effect.characteristic_id) {
+          if (rule.effect.value_id) {
+            result.lockedValues[rule.effect.characteristic_id] = rule.effect.value_id
+          } else if (rule.effect.numeric_value !== undefined) {
+            result.lockedNumericValues[rule.effect.characteristic_id] = rule.effect.numeric_value
+          }
         }
         break
     }
@@ -100,14 +127,12 @@ export function sanitizeSelection(
 ): Selection {
   const next = { ...selection }
 
-  // Remove hidden/disabled selections
   for (const [charId, valueId] of Object.entries(next)) {
     if (effect.hiddenValues.has(valueId) || effect.disabledValues.has(valueId)) {
       delete next[charId]
     }
   }
 
-  // Apply locked values (forced, overrides whatever user selected)
   for (const [charId, valueId] of Object.entries(effect.lockedValues)) {
     next[charId] = valueId
   }
@@ -118,7 +143,6 @@ export function sanitizeSelection(
 /**
  * Apply default values from rules to selection.
  * Only sets a default if the characteristic has no current selection.
- * Does NOT override user selections.
  */
 export function applyDefaultValues(
   selection: Selection,
@@ -128,6 +152,23 @@ export function applyDefaultValues(
   for (const [charId, valueId] of Object.entries(effect.defaultValues)) {
     if (!next[charId]) {
       next[charId] = valueId
+    }
+  }
+  return next
+}
+
+/**
+ * Apply default numeric values from rules to numeric inputs.
+ * Only sets a default if the characteristic has no current input.
+ */
+export function applyNumericDefaults(
+  numericInputs: NumericInputs,
+  effect: RuleEffect
+): NumericInputs {
+  const next = { ...numericInputs }
+  for (const [charId, value] of Object.entries(effect.defaultNumericValues)) {
+    if (!(charId in next)) {
+      next[charId] = value
     }
   }
   return next
