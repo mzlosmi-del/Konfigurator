@@ -1,5 +1,12 @@
 import { useEffect, useState } from 'react'
-import { Plus, Trash2, ChevronDown, ChevronRight, Tag } from 'lucide-react'
+import {
+  DndContext,
+  useDraggable,
+  useDroppable,
+  DragOverlay,
+} from '@dnd-kit/core'
+import type { DragEndEvent, DragStartEvent } from '@dnd-kit/core'
+import { Plus, Trash2, ChevronDown, ChevronRight, GripVertical, Tag } from 'lucide-react'
 import {
   fetchCharacteristics,
   createCharacteristic,
@@ -8,7 +15,9 @@ import {
   fetchClasses,
   createClass,
   deleteClass,
-  setCharacteristicClass,
+  fetchAllMemberships,
+  addCharacteristicToClass,
+  removeCharacteristicFromClass,
   fetchValuesForCharacteristic,
 } from '@/lib/products'
 import type { Characteristic, CharacteristicClass, CharacteristicValue } from '@/types/database'
@@ -24,31 +33,243 @@ import { useToast } from '@/hooks/useToast'
 import { Toaster } from '@/components/ui/toast'
 import { useAuthContext } from '@/components/auth/AuthContext'
 
+// ─── DroppableClass card ─────────────────────────────────────────────────────
+
+interface DroppableClassProps {
+  cls: CharacteristicClass
+  memberIds: string[]
+  characteristics: Characteristic[]
+  onRemoveMember: (classId: string, charId: string) => void
+  onDeleteClass: (cls: CharacteristicClass) => void
+}
+
+function DroppableClass({ cls, memberIds, characteristics, onRemoveMember, onDeleteClass }: DroppableClassProps) {
+  const { setNodeRef, isOver } = useDroppable({ id: cls.id })
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={[
+        'rounded-lg border bg-card p-3 transition-all min-h-[80px] flex flex-col gap-2',
+        isOver ? 'ring-2 ring-primary border-primary bg-primary/5' : '',
+      ].join(' ')}
+    >
+      {/* Header */}
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <Tag className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+          <span className="text-sm font-medium truncate">{cls.name}</span>
+          <span className="text-xs text-muted-foreground shrink-0">
+            ({memberIds.length})
+          </span>
+        </div>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-6 w-6 text-destructive hover:text-destructive shrink-0"
+          onClick={() => onDeleteClass(cls)}
+        >
+          <Trash2 className="h-3 w-3" />
+        </Button>
+      </div>
+
+      {/* Member chips */}
+      {memberIds.length === 0 ? (
+        <p className="text-xs text-muted-foreground italic">
+          {isOver ? 'Drop here to add' : 'Drag characteristics here'}
+        </p>
+      ) : (
+        <div className="flex flex-wrap gap-1.5">
+          {memberIds.map(charId => {
+            const char = characteristics.find(c => c.id === charId)
+            if (!char) return null
+            return (
+              <span
+                key={charId}
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-primary/10 text-primary font-medium"
+              >
+                {char.name}
+                <button
+                  type="button"
+                  onClick={() => onRemoveMember(cls.id, charId)}
+                  className="hover:text-destructive transition-colors"
+                  aria-label={`Remove ${char.name} from ${cls.name}`}
+                >
+                  ×
+                </button>
+              </span>
+            )
+          })}
+          {isOver && (
+            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs border border-dashed border-primary text-primary">
+              + drop here
+            </span>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── DraggableChar row ────────────────────────────────────────────────────────
+
+interface DraggableCharProps {
+  char: Characteristic
+  classesForChar: CharacteristicClass[]
+  values: CharacteristicValue[]
+  expanded: boolean
+  onToggleExpand: () => void
+  onRename: (name: string) => void
+  onChangeType: (type: Characteristic['display_type']) => void
+  onDelete: () => void
+  tenantId: string
+  onValuesChange: (updated: CharacteristicValue[]) => void
+}
+
+function DraggableChar({
+  char,
+  classesForChar,
+  values,
+  expanded,
+  onToggleExpand,
+  onRename,
+  onChangeType,
+  onDelete,
+  tenantId,
+  onValuesChange,
+}: DraggableCharProps) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: char.id })
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={[
+        'rounded-lg border bg-card overflow-hidden transition-opacity',
+        isDragging ? 'opacity-40' : '',
+      ].join(' ')}
+    >
+      {/* Row */}
+      <div className="flex items-center gap-2 px-2 py-2.5">
+        {/* Drag handle */}
+        <button
+          type="button"
+          className="touch-none cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground shrink-0"
+          {...attributes}
+          {...listeners}
+          aria-label="Drag to assign to class"
+        >
+          <GripVertical className="h-4 w-4" />
+        </button>
+
+        {/* Expand toggle */}
+        <button
+          type="button"
+          onClick={onToggleExpand}
+          className="text-muted-foreground hover:text-foreground transition-colors shrink-0"
+        >
+          {expanded
+            ? <ChevronDown className="h-4 w-4" />
+            : <ChevronRight className="h-4 w-4" />}
+        </button>
+
+        {/* Editable name */}
+        <input
+          className="flex-1 bg-transparent text-sm font-medium outline-none focus:ring-0 min-w-0"
+          defaultValue={char.name}
+          onBlur={e => onRename(e.target.value)}
+        />
+
+        {/* Type selector */}
+        <Select
+          value={char.display_type}
+          onChange={e => onChangeType(e.target.value as Characteristic['display_type'])}
+          className="text-xs h-7 py-0 w-32 shrink-0"
+        >
+          <option value="select">Select</option>
+          <option value="radio">Radio</option>
+          <option value="swatch">Swatch</option>
+          <option value="toggle">Toggle</option>
+          <option value="number">Number</option>
+        </Select>
+
+        {/* Class membership tags */}
+        <div className="flex gap-1 flex-wrap max-w-[160px] shrink-0">
+          {classesForChar.length === 0 ? (
+            <span className="text-xs text-muted-foreground italic">no class</span>
+          ) : (
+            classesForChar.map(cls => (
+              <span
+                key={cls.id}
+                className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-muted text-muted-foreground"
+              >
+                {cls.name}
+              </span>
+            ))
+          )}
+        </div>
+
+        {/* Value count */}
+        <span className="text-xs text-muted-foreground shrink-0 w-14 text-right">
+          {values.length} val{values.length !== 1 ? 's' : ''}
+        </span>
+
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7 text-destructive hover:text-destructive shrink-0"
+          onClick={onDelete}
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+        </Button>
+      </div>
+
+      {/* Expanded: values editor */}
+      {expanded && (
+        <div className="px-4 pb-4 pt-2 border-t bg-muted/10">
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
+            Values
+          </p>
+          <CharacteristicValuesEditor
+            characteristicId={char.id}
+            tenantId={tenantId}
+            values={values}
+            onChange={onValuesChange}
+          />
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Main page ────────────────────────────────────────────────────────────────
+
 export function LibraryPage() {
   const { tenant } = useAuthContext()
   const { toasts, toast, dismiss } = useToast()
 
-  const [loading, setLoading]           = useState(true)
-  const [characteristics, setChars]     = useState<Characteristic[]>([])
-  const [classes, setClasses]           = useState<CharacteristicClass[]>([])
-  const [values, setValues]             = useState<Record<string, CharacteristicValue[]>>({})
-  const [expanded, setExpanded]         = useState<Record<string, boolean>>({})
+  const [loading, setLoading]             = useState(true)
+  const [characteristics, setChars]       = useState<Characteristic[]>([])
+  const [classes, setClasses]             = useState<CharacteristicClass[]>([])
+  // classId → charId[]
+  const [memberships, setMemberships]     = useState<Record<string, string[]>>({})
+  const [values, setValues]               = useState<Record<string, CharacteristicValue[]>>({})
+  const [expanded, setExpanded]           = useState<Record<string, boolean>>({})
+  const [activeCharId, setActiveCharId]   = useState<string | null>(null)
 
   // New characteristic form
-  const [showNewChar, setShowNewChar]   = useState(false)
-  const [newName, setNewName]           = useState('')
-  const [newType, setNewType]           = useState<Characteristic['display_type']>('select')
-  const [newClassId, setNewClassId]     = useState('')
-  const [creatingChar, setCreatingChar] = useState(false)
+  const [showNewChar, setShowNewChar]     = useState(false)
+  const [newName, setNewName]             = useState('')
+  const [newType, setNewType]             = useState<Characteristic['display_type']>('select')
+  const [creatingChar, setCreatingChar]   = useState(false)
 
   // New class form
-  const [showNewClass, setShowNewClass] = useState(false)
-  const [newClassName, setNewClassName] = useState('')
+  const [showNewClass, setShowNewClass]   = useState(false)
+  const [newClassName, setNewClassName]   = useState('')
   const [creatingClass, setCreatingClass] = useState(false)
 
   // Delete confirmations
-  const [toDelete, setToDelete]         = useState<Characteristic | null>(null)
-  const [deleting, setDeleting]         = useState(false)
+  const [toDelete, setToDelete]           = useState<Characteristic | null>(null)
+  const [deleting, setDeleting]           = useState(false)
   const [toDeleteClass, setToDeleteClass] = useState<CharacteristicClass | null>(null)
   const [deletingClass, setDeletingClass] = useState(false)
 
@@ -57,9 +278,23 @@ export function LibraryPage() {
   async function load() {
     setLoading(true)
     try {
-      const [chars, cls] = await Promise.all([fetchCharacteristics(), fetchClasses()])
+      const [chars, cls, allMemberships] = await Promise.all([
+        fetchCharacteristics(),
+        fetchClasses(),
+        fetchAllMemberships(),
+      ])
       setChars(chars)
       setClasses(cls)
+
+      // Build classId → charId[] map
+      const memberMap: Record<string, string[]> = {}
+      for (const m of allMemberships) {
+        if (!memberMap[m.class_id]) memberMap[m.class_id] = []
+        memberMap[m.class_id].push(m.characteristic_id)
+      }
+      setMemberships(memberMap)
+
+      // Load values for all chars
       const valMap: Record<string, CharacteristicValue[]> = {}
       await Promise.all(chars.map(async c => {
         valMap[c.id] = await fetchValuesForCharacteristic(c.id)
@@ -76,6 +311,42 @@ export function LibraryPage() {
     setExpanded(prev => ({ ...prev, [id]: !prev[id] }))
   }
 
+  // ── DnD handlers ────────────────────────────────────────────────────────────
+
+  function handleDragStart({ active }: DragStartEvent) {
+    setActiveCharId(active.id as string)
+  }
+
+  async function handleDragEnd({ active, over }: DragEndEvent) {
+    setActiveCharId(null)
+    if (!over) return
+    const charId  = active.id as string
+    const classId = over.id as string
+    // Guard: already a member
+    if (memberships[classId]?.includes(charId)) return
+    try {
+      await addCharacteristicToClass(classId, charId)
+      setMemberships(prev => ({
+        ...prev,
+        [classId]: [...(prev[classId] ?? []), charId],
+      }))
+    } catch {
+      toast({ title: 'Failed to add characteristic to class', variant: 'destructive' })
+    }
+  }
+
+  async function handleRemoveMember(classId: string, charId: string) {
+    try {
+      await removeCharacteristicFromClass(classId, charId)
+      setMemberships(prev => ({
+        ...prev,
+        [classId]: (prev[classId] ?? []).filter(id => id !== charId),
+      }))
+    } catch {
+      toast({ title: 'Failed to remove characteristic from class', variant: 'destructive' })
+    }
+  }
+
   // ── Characteristic CRUD ──────────────────────────────────────────────────────
 
   async function handleCreateChar() {
@@ -83,11 +354,11 @@ export function LibraryPage() {
     setCreatingChar(true)
     try {
       const created = await createCharacteristic({ name: newName.trim(), display_type: newType })
-      if (newClassId) await setCharacteristicClass(created.id, newClassId)
-      const withClass = { ...created, class_id: newClassId || null }
-      setChars(prev => [...prev, withClass])
+      setChars(prev => [...prev, created])
       setValues(prev => ({ ...prev, [created.id]: [] }))
-      setNewName(''); setNewType('select'); setNewClassId(''); setShowNewChar(false)
+      setNewName('')
+      setNewType('select')
+      setShowNewChar(false)
     } catch {
       toast({ title: 'Failed to create characteristic', variant: 'destructive' })
     } finally {
@@ -114,21 +385,20 @@ export function LibraryPage() {
     }
   }
 
-  async function handleChangeClass(char: Characteristic, classId: string) {
-    try {
-      await setCharacteristicClass(char.id, classId || null)
-      setChars(prev => prev.map(c => c.id === char.id ? { ...c, class_id: classId || null } : c))
-    } catch {
-      toast({ title: 'Failed to update class', variant: 'destructive' })
-    }
-  }
-
   async function handleDeleteChar() {
     if (!toDelete) return
     setDeleting(true)
     try {
       await deleteCharacteristic(toDelete.id)
       setChars(prev => prev.filter(c => c.id !== toDelete.id))
+      // Remove from all class memberships
+      setMemberships(prev => {
+        const next = { ...prev }
+        for (const classId of Object.keys(next)) {
+          next[classId] = next[classId].filter(id => id !== toDelete.id)
+        }
+        return next
+      })
       setToDelete(null)
     } catch {
       toast({ title: 'Failed to delete characteristic', variant: 'destructive' })
@@ -145,7 +415,9 @@ export function LibraryPage() {
     try {
       const created = await createClass({ name: newClassName.trim() })
       setClasses(prev => [...prev, created])
-      setNewClassName(''); setShowNewClass(false)
+      setMemberships(prev => ({ ...prev, [created.id]: [] }))
+      setNewClassName('')
+      setShowNewClass(false)
     } catch {
       toast({ title: 'Failed to create class', variant: 'destructive' })
     } finally {
@@ -159,8 +431,11 @@ export function LibraryPage() {
     try {
       await deleteClass(toDeleteClass.id)
       setClasses(prev => prev.filter(c => c.id !== toDeleteClass.id))
-      // Unassign characteristics that belonged to this class
-      setChars(prev => prev.map(c => c.class_id === toDeleteClass.id ? { ...c, class_id: null } : c))
+      setMemberships(prev => {
+        const next = { ...prev }
+        delete next[toDeleteClass.id]
+        return next
+      })
       setToDeleteClass(null)
     } catch {
       toast({ title: 'Failed to delete class', variant: 'destructive' })
@@ -169,13 +444,13 @@ export function LibraryPage() {
     }
   }
 
-  // ── Group characteristics by class ──────────────────────────────────────────
+  // ── Derived ──────────────────────────────────────────────────────────────────
 
-  const unclassified = characteristics.filter(c => !c.class_id)
-  const byClass = classes.map(cls => ({
-    cls,
-    items: characteristics.filter(c => c.class_id === cls.id),
-  }))
+  const activeChar = activeCharId ? characteristics.find(c => c.id === activeCharId) : null
+
+  function classesForChar(charId: string): CharacteristicClass[] {
+    return classes.filter(cls => memberships[cls.id]?.includes(charId))
+  }
 
   if (loading) {
     return <div className="flex justify-center py-20"><Spinner /></div>
@@ -185,265 +460,175 @@ export function LibraryPage() {
     <div className="animate-fade-in">
       <PageHeader
         title="Characteristic Library"
-        description="Manage all characteristics and classes available across your products."
+        description="Manage all characteristics and classes. Drag a characteristic onto a class card to assign it."
       />
 
-      <div className="p-6 space-y-6 max-w-4xl">
+      <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+        <div className="p-6 space-y-6 max-w-5xl">
 
-        {/* ── Classes ──────────────────────────────────────────────────────── */}
-        <Card>
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Tag className="h-4 w-4 text-muted-foreground" />
-                  Classes
-                </CardTitle>
-                <CardDescription className="mt-1">
-                  Group related characteristics into named sections.
-                </CardDescription>
-              </div>
-              {!showNewClass && (
-                <Button size="sm" variant="outline" onClick={() => setShowNewClass(true)}>
-                  <Plus className="h-4 w-4" />
-                  New class
-                </Button>
-              )}
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {classes.length === 0 && !showNewClass && (
-              <p className="text-sm text-muted-foreground">No classes yet.</p>
-            )}
-
-            {classes.length > 0 && (
-              <div className="space-y-1.5">
-                {classes.map(cls => (
-                  <div
-                    key={cls.id}
-                    className="flex items-center justify-between rounded-md border bg-muted/20 px-3 py-2"
-                  >
-                    <div className="flex items-center gap-2">
-                      <span
-                        className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary"
-                      >
-                        {cls.name}
-                      </span>
-                      <span className="text-xs text-muted-foreground">
-                        {characteristics.filter(c => c.class_id === cls.id).length} characteristics
-                      </span>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 text-destructive hover:text-destructive"
-                      onClick={() => setToDeleteClass(cls)}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {showNewClass && (
-              <div className="flex gap-2 items-center pt-1">
-                <Input
-                  placeholder="Class name (e.g. Dimensions, Material)"
-                  value={newClassName}
-                  onChange={e => setNewClassName(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter') handleCreateClass() }}
-                  autoFocus
-                  className="text-sm flex-1"
-                />
-                <Button size="sm" onClick={handleCreateClass} loading={creatingClass} disabled={!newClassName.trim()}>
-                  Create
-                </Button>
-                <Button size="sm" variant="ghost" onClick={() => { setShowNewClass(false); setNewClassName('') }}>
-                  Cancel
-                </Button>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* ── Characteristics ───────────────────────────────────────────────── */}
-        <Card>
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="text-base">Characteristics</CardTitle>
-                <CardDescription className="mt-1">
-                  Define the configurable options customers can choose from.
-                </CardDescription>
-              </div>
-              {!showNewChar && (
-                <Button size="sm" variant="outline" onClick={() => setShowNewChar(true)}>
-                  <Plus className="h-4 w-4" />
-                  New characteristic
-                </Button>
-              )}
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
-
-            {/* New characteristic form */}
-            {showNewChar && (
-              <div className="rounded-lg border p-4 space-y-3 bg-muted/10">
-                <p className="text-sm font-medium">New characteristic</p>
-                <div className="flex gap-2">
-                  <Input
-                    placeholder="Name (e.g. Material, Width)"
-                    value={newName}
-                    onChange={e => setNewName(e.target.value)}
-                    onKeyDown={e => { if (e.key === 'Enter') handleCreateChar() }}
-                    autoFocus
-                    className="flex-1"
-                  />
-                  <Select
-                    value={newType}
-                    onChange={e => setNewType(e.target.value as Characteristic['display_type'])}
-                    className="w-36"
-                  >
-                    <option value="select">Select</option>
-                    <option value="radio">Radio</option>
-                    <option value="swatch">Swatch</option>
-                    <option value="toggle">Toggle</option>
-                    <option value="number">Number input</option>
-                  </Select>
-                  {classes.length > 0 && (
-                    <Select
-                      value={newClassId}
-                      onChange={e => setNewClassId(e.target.value)}
-                      className="w-40"
-                    >
-                      <option value="">No class</option>
-                      {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                    </Select>
-                  )}
+          {/* ── Classes ───────────────────────────────────────────────────── */}
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Tag className="h-4 w-4 text-muted-foreground" />
+                    Classes
+                  </CardTitle>
+                  <CardDescription className="mt-1">
+                    Group characteristics into named sections. Assign classes to products.
+                  </CardDescription>
                 </div>
-                <div className="flex gap-2">
-                  <Button size="sm" onClick={handleCreateChar} loading={creatingChar} disabled={!newName.trim()}>
+                {!showNewClass && (
+                  <Button size="sm" variant="outline" onClick={() => setShowNewClass(true)}>
+                    <Plus className="h-4 w-4 mr-1" />
+                    New class
+                  </Button>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent>
+              {classes.length === 0 && !showNewClass && (
+                <p className="text-sm text-muted-foreground mb-3">No classes yet.</p>
+              )}
+
+              {classes.length > 0 && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-3">
+                  {classes.map(cls => (
+                    <DroppableClass
+                      key={cls.id}
+                      cls={cls}
+                      memberIds={memberships[cls.id] ?? []}
+                      characteristics={characteristics}
+                      onRemoveMember={handleRemoveMember}
+                      onDeleteClass={setToDeleteClass}
+                    />
+                  ))}
+                </div>
+              )}
+
+              {showNewClass && (
+                <div className="flex gap-2 items-center pt-1">
+                  <Input
+                    placeholder="Class name (e.g. Dimensions, Material)"
+                    value={newClassName}
+                    onChange={e => setNewClassName(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') handleCreateClass() }}
+                    autoFocus
+                    className="flex-1 text-sm"
+                  />
+                  <Button size="sm" onClick={handleCreateClass} loading={creatingClass} disabled={!newClassName.trim()}>
                     Create
                   </Button>
-                  <Button size="sm" variant="ghost" onClick={() => { setShowNewChar(false); setNewName('') }}>
+                  <Button size="sm" variant="ghost" onClick={() => { setShowNewClass(false); setNewClassName('') }}>
                     Cancel
                   </Button>
                 </div>
-              </div>
-            )}
+              )}
+            </CardContent>
+          </Card>
 
-            {characteristics.length === 0 && !showNewChar && (
-              <p className="text-sm text-muted-foreground">No characteristics yet.</p>
-            )}
-
-            {/* Render by class groups, then unclassified */}
-            {[...byClass.filter(g => g.items.length > 0), ...(unclassified.length > 0 ? [{ cls: null, items: unclassified }] : [])].map(group => (
-              <div key={group.cls?.id ?? 'unclassified'}>
-                {/* Group header — only show when classes exist */}
-                {classes.length > 0 && (
-                  <div className="flex items-center gap-2 mb-2">
-                    <Tag className="h-3.5 w-3.5 text-muted-foreground" />
-                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                      {group.cls?.name ?? 'Unclassified'}
-                    </span>
-                    <div className="flex-1 border-t" />
-                  </div>
-                )}
-
-                <div className="space-y-1.5">
-                  {group.items.map(char => (
-                    <div key={char.id} className="rounded-lg border bg-card overflow-hidden">
-                      {/* Row */}
-                      <div className="flex items-center gap-2 px-3 py-2.5">
-                        <button
-                          type="button"
-                          onClick={() => toggleExpand(char.id)}
-                          className="text-muted-foreground hover:text-foreground transition-colors shrink-0"
-                        >
-                          {expanded[char.id]
-                            ? <ChevronDown className="h-4 w-4" />
-                            : <ChevronRight className="h-4 w-4" />}
-                        </button>
-
-                        {/* Editable name */}
-                        <input
-                          className="flex-1 bg-transparent text-sm font-medium outline-none focus:ring-0 min-w-0"
-                          defaultValue={char.name}
-                          onBlur={e => handleRenameChar(char, e.target.value)}
-                        />
-
-                        {/* Type selector */}
-                        <Select
-                          value={char.display_type}
-                          onChange={e => handleChangeType(char, e.target.value as Characteristic['display_type'])}
-                          className="text-xs h-7 py-0 w-32"
-                        >
-                          <option value="select">Select</option>
-                          <option value="radio">Radio</option>
-                          <option value="swatch">Swatch</option>
-                          <option value="toggle">Toggle</option>
-                          <option value="number">Number input</option>
-                        </Select>
-
-                        {/* Class selector */}
-                        {classes.length > 0 && (
-                          <Select
-                            value={char.class_id ?? ''}
-                            onChange={e => handleChangeClass(char, e.target.value)}
-                            className="text-xs h-7 py-0 w-36"
-                          >
-                            <option value="">No class</option>
-                            {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                          </Select>
-                        )}
-
-                        {/* Value count badge */}
-                        <span className="text-xs text-muted-foreground shrink-0 w-16 text-right">
-                          {(values[char.id] ?? []).length} values
-                        </span>
-
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7 text-destructive hover:text-destructive shrink-0"
-                          onClick={() => setToDelete(char)}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
-
-                      {/* Expanded: values editor */}
-                      {expanded[char.id] && tenant && (
-                        <div className="px-4 pb-4 pt-2 border-t bg-muted/10">
-                          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
-                            Values
-                          </p>
-                          <CharacteristicValuesEditor
-                            characteristicId={char.id}
-                            tenantId={tenant.id}
-                            values={values[char.id] ?? []}
-                            onChange={updated =>
-                              setValues(prev => ({ ...prev, [char.id]: updated }))
-                            }
-                          />
-                        </div>
-                      )}
-                    </div>
-                  ))}
+          {/* ── Characteristics pool ──────────────────────────────────────── */}
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-base">Characteristics</CardTitle>
+                  <CardDescription className="mt-1">
+                    Drag a characteristic onto a class card above to assign it.
+                  </CardDescription>
                 </div>
+                {!showNewChar && (
+                  <Button size="sm" variant="outline" onClick={() => setShowNewChar(true)}>
+                    <Plus className="h-4 w-4 mr-1" />
+                    New characteristic
+                  </Button>
+                )}
               </div>
-            ))}
-          </CardContent>
-        </Card>
-      </div>
+            </CardHeader>
+            <CardContent className="space-y-3">
+
+              {/* New characteristic form */}
+              {showNewChar && (
+                <div className="rounded-lg border p-4 space-y-3 bg-muted/10">
+                  <p className="text-sm font-medium">New characteristic</p>
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="Name (e.g. Material, Width)"
+                      value={newName}
+                      onChange={e => setNewName(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') handleCreateChar() }}
+                      autoFocus
+                      className="flex-1"
+                    />
+                    <Select
+                      value={newType}
+                      onChange={e => setNewType(e.target.value as Characteristic['display_type'])}
+                      className="w-36"
+                    >
+                      <option value="select">Select</option>
+                      <option value="radio">Radio</option>
+                      <option value="swatch">Swatch</option>
+                      <option value="toggle">Toggle</option>
+                      <option value="number">Number</option>
+                    </Select>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button size="sm" onClick={handleCreateChar} loading={creatingChar} disabled={!newName.trim()}>
+                      Create
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => { setShowNewChar(false); setNewName('') }}>
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {characteristics.length === 0 && !showNewChar && (
+                <p className="text-sm text-muted-foreground">No characteristics yet.</p>
+              )}
+
+              <div className="space-y-1.5">
+                {characteristics.map(char => (
+                  <DraggableChar
+                    key={char.id}
+                    char={char}
+                    classesForChar={classesForChar(char.id)}
+                    values={values[char.id] ?? []}
+                    expanded={!!expanded[char.id]}
+                    onToggleExpand={() => toggleExpand(char.id)}
+                    onRename={name => handleRenameChar(char, name)}
+                    onChangeType={type => handleChangeType(char, type)}
+                    onDelete={() => setToDelete(char)}
+                    tenantId={tenant?.id ?? ''}
+                    onValuesChange={updated => setValues(prev => ({ ...prev, [char.id]: updated }))}
+                  />
+                ))}
+              </div>
+
+            </CardContent>
+          </Card>
+
+        </div>
+
+        {/* Drag overlay — ghost following cursor */}
+        <DragOverlay>
+          {activeChar && (
+            <div className="rounded-lg border bg-card shadow-lg px-3 py-2.5 flex items-center gap-2 opacity-90 max-w-xs">
+              <GripVertical className="h-4 w-4 text-muted-foreground shrink-0" />
+              <span className="text-sm font-medium truncate">{activeChar.name}</span>
+              <span className="text-xs text-muted-foreground capitalize ml-1">{activeChar.display_type}</span>
+            </div>
+          )}
+        </DragOverlay>
+      </DndContext>
 
       {/* Confirm delete characteristic */}
       <ConfirmDialog
         open={!!toDelete}
         onOpenChange={open => !open && setToDelete(null)}
         title="Delete characteristic?"
-        description={`Delete "${toDelete?.name}"? This will also remove it from any products it's attached to.`}
+        description={`Delete "${toDelete?.name}"? This removes it from all classes and products.`}
         confirmLabel="Delete"
         onConfirm={handleDeleteChar}
         loading={deleting}
@@ -454,7 +639,7 @@ export function LibraryPage() {
         open={!!toDeleteClass}
         onOpenChange={open => !open && setToDeleteClass(null)}
         title="Delete class?"
-        description={`Delete class "${toDeleteClass?.name}"? Characteristics in this class will become unclassified.`}
+        description={`Delete class "${toDeleteClass?.name}"? Characteristics in this class will remain in the library, unassigned from this class.`}
         confirmLabel="Delete"
         onConfirm={handleDeleteClass}
         loading={deletingClass}

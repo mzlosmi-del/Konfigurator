@@ -81,11 +81,19 @@ export interface Database {
         Insert: Omit<Database['public']['Tables']['characteristic_classes']['Row'], 'id' | 'created_at' | 'updated_at'> & { id?: string }
         Update: Partial<Database['public']['Tables']['characteristic_classes']['Insert']>
       }
+      characteristic_class_members: {
+        Row: {
+          class_id: string
+          characteristic_id: string
+          sort_order: number
+        }
+        Insert: { class_id: string; characteristic_id: string; sort_order?: number }
+        Update: Partial<Database['public']['Tables']['characteristic_class_members']['Insert']>
+      }
       characteristics: {
         Row: {
           id: string
           tenant_id: string
-          class_id: string | null
           name: string
           display_type: DisplayType
           sort_order: number
@@ -170,6 +178,15 @@ export interface Database {
         Insert: Omit<Database['public']['Tables']['inquiries']['Row'], 'id' | 'created_at' | 'updated_at'> & { id?: string }
         Update: Partial<Database['public']['Tables']['inquiries']['Insert']>
       }
+      product_classes: {
+        Row: {
+          product_id: string
+          class_id: string
+          sort_order: number
+        }
+        Insert: { product_id: string; class_id: string; sort_order?: number }
+        Update: Partial<Database['public']['Tables']['product_classes']['Insert']>
+      }
       pricing_formulas: {
         Row: {
           id: string
@@ -239,5 +256,7 @@ export type ConfigurationRule = Omit<
 > & { condition: RuleCondition; effect: RuleEffect }
 export type Inquiry            = Database['public']['Tables']['inquiries']['Row']
 export type Quote              = Database['public']['Tables']['quotes']['Row']
-export type CharacteristicClass = Database['public']['Tables']['characteristic_classes']['Row']
-export type PricingFormula     = Database['public']['Tables']['pricing_formulas']['Row']
+export type CharacteristicClass  = Database['public']['Tables']['characteristic_classes']['Row']
+export type ClassMember          = Database['public']['Tables']['characteristic_class_members']['Row']
+export type ProductClass         = Database['public']['Tables']['product_classes']['Row']
+export type PricingFormula       = Database['public']['Tables']['pricing_formulas']['Row']

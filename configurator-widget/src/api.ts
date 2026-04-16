@@ -32,18 +32,47 @@ export async function loadProductConfig(config: WidgetConfig): Promise<FullProdu
     throw new Error('Product not found or not published')
   }
 
-  // 2. Attached characteristics (ordered)
-  const { data: attachments, error: attachError } = await sb
-    .from('product_characteristics')
-    .select('characteristic_id, sort_order, is_required')
+  // 2. Product's assigned classes (ordered)
+  const { data: productClasses, error: pcError } = await sb
+    .from('product_classes')
+    .select('class_id, sort_order')
     .eq('product_id', config.productId)
     .order('sort_order', { ascending: true })
 
-  if (attachError) throw new Error('Failed to load characteristics')
+  if (pcError) throw new Error('Failed to load product classes')
 
-  const characteristicIds = (attachments ?? []).map((a: { characteristic_id: string }) => a.characteristic_id)
+  const classIds = (productClasses ?? []).map((pc: { class_id: string }) => pc.class_id)
 
-  // Load assets and rules in parallel with characteristic data.
+  // 3. Characteristic IDs via class memberships (ordered within each class)
+  const { data: members, error: memberError } = classIds.length > 0
+    ? await sb.from('characteristic_class_members')
+        .select('characteristic_id, class_id, sort_order')
+        .in('class_id', classIds)
+        .order('sort_order', { ascending: true })
+    : { data: [], error: null }
+
+  if (memberError) throw new Error('Failed to load class memberships')
+
+  // Deduplicate: a characteristic can be in multiple classes — show it once
+  // Order: by class sort_order first, then by characteristic sort_order within class
+  const classOrder: Record<string, number> = {}
+  for (const pc of productClasses ?? []) classOrder[(pc as any).class_id] = (pc as any).sort_order
+
+  const seen = new Set<string>()
+  const orderedCharIds: string[] = []
+  const sortedMembers = [...(members ?? [])].sort(
+    (a: any, b: any) => (classOrder[a.class_id] ?? 0) - (classOrder[b.class_id] ?? 0) || a.sort_order - b.sort_order
+  )
+  for (const m of sortedMembers as any[]) {
+    if (!seen.has(m.characteristic_id)) {
+      seen.add(m.characteristic_id)
+      orderedCharIds.push(m.characteristic_id)
+    }
+  }
+
+  const characteristicIds = orderedCharIds
+
+  // Load assets, rules and formulas in parallel with characteristic data.
   // Do NOT return early when characteristicIds is empty — a product may have
   // a default visualization asset with no configurable characteristics.
   const [charResult, valuesResult, assetsResult, rulesResult, formulasResult] = await Promise.all([
@@ -83,26 +112,19 @@ export async function loadProductConfig(config: WidgetConfig): Promise<FullProdu
   const rulesData    = rulesResult.data
   const formulasData = formulasResult.data
 
-  // Assemble characteristics with their values, in product attachment order
+  // Assemble characteristics with their values, in class-then-member order
   const valuesByCharId: Record<string, CharacteristicValue[]> = {}
   for (const v of (valuesData ?? []) as (CharacteristicValue & { characteristic_id: string })[]) {
     if (!valuesByCharId[v.characteristic_id]) valuesByCharId[v.characteristic_id] = []
     valuesByCharId[v.characteristic_id].push(v)
   }
 
-  // Sort characteristics by their attachment order
-  const attachmentOrder: Record<string, number> = {}
-  for (const a of attachments ?? []) {
-    attachmentOrder[(a as { characteristic_id: string; sort_order: number }).characteristic_id] =
-      (a as { characteristic_id: string; sort_order: number }).sort_order
-  }
+  const charById: Record<string, Characteristic> = {}
+  for (const c of (charData ?? []) as Characteristic[]) charById[c.id] = c
 
-  const characteristics: Characteristic[] = ((charData ?? []) as Characteristic[])
-    .sort((a, b) => (attachmentOrder[a.id] ?? 0) - (attachmentOrder[b.id] ?? 0))
-    .map(c => ({
-      ...c,
-      values: valuesByCharId[c.id] ?? [],
-    }))
+  const characteristics: Characteristic[] = orderedCharIds
+    .filter(id => charById[id])
+    .map(id => ({ ...charById[id], values: valuesByCharId[id] ?? [] }))
 
   return {
     product: product as ProductData,
