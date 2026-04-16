@@ -92,7 +92,7 @@ export async function updateClass(
 ): Promise<CharacteristicClass> {
   const { data, error } = await supabase
     .from('characteristic_classes')
-    .update(input as any)
+    .update(input as unknown as never)
     .eq('id', id)
     .select()
     .single()
@@ -108,7 +108,7 @@ export async function deleteClass(id: string): Promise<void> {
 export async function setCharacteristicClass(charId: string, classId: string | null): Promise<void> {
   const { error } = await supabase
     .from('characteristics')
-    .update({ class_id: classId } as any)
+    .update({ class_id: classId } as unknown as never)
     .eq('id', charId)
   if (error) throw new Error(error.message)
 }
