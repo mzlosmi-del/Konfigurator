@@ -99,64 +99,116 @@ interface Template {
   build: (firstSelectCharId: string, firstValueId: string, firstNumberCharId: string) => FormulaNode
 }
 
-const TEMPLATES: Template[] = [
+interface TemplateGroup {
+  group: string
+  items: Template[]
+}
+
+const TEMPLATE_GROUPS: TemplateGroup[] = [
   {
-    label: 'Add fixed amount',
-    description: 'base price + X',
-    build: () => ({ type: 'add', left: { type: 'base_price' }, right: { type: 'number', value: 0 } }),
-  },
-  {
-    label: 'Multiply base',
-    description: 'base price × X',
-    build: () => ({ type: 'multiply', left: { type: 'base_price' }, right: { type: 'number', value: 1 } }),
-  },
-  {
-    label: 'Add if value selected',
-    description: 'IF [char] = value THEN base + X ELSE base',
-    build: (charId, valueId) => ({
-      type: 'if',
-      condition: { type: 'is_selected', char_id: charId, value_id: valueId },
-      then: { type: 'add', left: { type: 'base_price' }, right: { type: 'number', value: 0 } },
-      else_node: { type: 'base_price' },
-    }),
-  },
-  {
-    label: 'Add if input > N',
-    description: 'IF [numeric input] > N THEN base + X ELSE base',
-    build: (_c, _v, numCharId) => ({
-      type: 'if',
-      condition: { type: 'gt', left: { type: 'input', char_id: numCharId }, right: { type: 'number', value: 0 } },
-      then: { type: 'add', left: { type: 'base_price' }, right: { type: 'number', value: 0 } },
-      else_node: { type: 'base_price' },
-    }),
-  },
-  {
-    label: 'Add if A or B selected',
-    description: 'IF (A = v1 OR B = v2) THEN base + X ELSE base',
-    build: (charId, valueId) => ({
-      type: 'if',
-      condition: {
-        type: 'or',
-        left:  { type: 'is_selected', char_id: charId, value_id: valueId },
-        right: { type: 'is_selected', char_id: charId, value_id: valueId },
+    group: 'Simple (no condition)',
+    items: [
+      {
+        label: 'Base price + fixed amount',
+        description: 'base price + X',
+        build: () => ({ type: 'add', left: { type: 'base_price' }, right: { type: 'number', value: 0 } }),
       },
-      then: { type: 'add', left: { type: 'base_price' }, right: { type: 'number', value: 0 } },
-      else_node: { type: 'base_price' },
-    }),
+      {
+        label: 'Base price × percentage',
+        description: 'base price × X',
+        build: () => ({ type: 'multiply', left: { type: 'base_price' }, right: { type: 'number', value: 1 } }),
+      },
+      {
+        label: 'Base price × input',
+        description: 'base price × numeric characteristic',
+        build: (_c, _v, numCharId) => ({
+          type: 'multiply',
+          left: { type: 'base_price' },
+          right: { type: 'input', char_id: numCharId },
+        }),
+      },
+      {
+        label: 'Base price × input × input',
+        description: 'base price × Width × Height (two numeric inputs)',
+        build: (_c, _v, numCharId) => ({
+          type: 'multiply',
+          left: { type: 'multiply', left: { type: 'base_price' }, right: { type: 'input', char_id: numCharId } },
+          right: { type: 'input', char_id: numCharId },
+        }),
+      },
+      {
+        label: 'Base price + modifier',
+        description: 'base price + price modifier of a characteristic',
+        build: (charId) => ({
+          type: 'add',
+          left: { type: 'base_price' },
+          right: { type: 'modifier', char_id: charId },
+        }),
+      },
+    ],
   },
   {
-    label: 'Add if A and B selected',
-    description: 'IF (A = v1 AND B = v2) THEN base + X ELSE base',
-    build: (charId, valueId) => ({
-      type: 'if',
-      condition: {
-        type: 'and',
-        left:  { type: 'is_selected', char_id: charId, value_id: valueId },
-        right: { type: 'is_selected', char_id: charId, value_id: valueId },
+    group: 'Conditional (IF / THEN / ELSE)',
+    items: [
+      {
+        label: 'Add amount if value selected',
+        description: 'IF [char] = value THEN base + X ELSE base',
+        build: (charId, valueId) => ({
+          type: 'if',
+          condition: { type: 'is_selected', char_id: charId, value_id: valueId },
+          then: { type: 'add', left: { type: 'base_price' }, right: { type: 'number', value: 0 } },
+          else_node: { type: 'base_price' },
+        }),
       },
-      then: { type: 'add', left: { type: 'base_price' }, right: { type: 'number', value: 0 } },
-      else_node: { type: 'base_price' },
-    }),
+      {
+        label: 'Multiply base if value selected',
+        description: 'IF [char] = value THEN base × X ELSE base',
+        build: (charId, valueId) => ({
+          type: 'if',
+          condition: { type: 'is_selected', char_id: charId, value_id: valueId },
+          then: { type: 'multiply', left: { type: 'base_price' }, right: { type: 'number', value: 1 } },
+          else_node: { type: 'base_price' },
+        }),
+      },
+      {
+        label: 'Add amount if input > N',
+        description: 'IF [numeric input] > N THEN base + X ELSE base',
+        build: (_c, _v, numCharId) => ({
+          type: 'if',
+          condition: { type: 'gt', left: { type: 'input', char_id: numCharId }, right: { type: 'number', value: 0 } },
+          then: { type: 'add', left: { type: 'base_price' }, right: { type: 'number', value: 0 } },
+          else_node: { type: 'base_price' },
+        }),
+      },
+      {
+        label: 'Add if A or B selected',
+        description: 'IF (A = v1 OR B = v2) THEN base + X ELSE base',
+        build: (charId, valueId) => ({
+          type: 'if',
+          condition: {
+            type: 'or',
+            left:  { type: 'is_selected', char_id: charId, value_id: valueId },
+            right: { type: 'is_selected', char_id: charId, value_id: valueId },
+          },
+          then: { type: 'add', left: { type: 'base_price' }, right: { type: 'number', value: 0 } },
+          else_node: { type: 'base_price' },
+        }),
+      },
+      {
+        label: 'Add if A and B selected',
+        description: 'IF (A = v1 AND B = v2) THEN base + X ELSE base',
+        build: (charId, valueId) => ({
+          type: 'if',
+          condition: {
+            type: 'and',
+            left:  { type: 'is_selected', char_id: charId, value_id: valueId },
+            right: { type: 'is_selected', char_id: charId, value_id: valueId },
+          },
+          then: { type: 'add', left: { type: 'base_price' }, right: { type: 'number', value: 0 } },
+          else_node: { type: 'base_price' },
+        }),
+      },
+    ],
   },
 ]
 
@@ -291,21 +343,36 @@ export function FormulaBuilder({ node, onChange, characteristics, valuesMap, isR
 
         {/* Templates */}
         {characteristics.length > 0 && (
-          <div className="space-y-1.5">
+          <div className="space-y-3">
             <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Quick templates</p>
-            <div className="flex flex-wrap gap-1.5">
-              {TEMPLATES.map(tpl => (
-                <button
-                  key={tpl.label}
-                  type="button"
-                  title={tpl.description}
-                  onClick={() => onChange(tpl.build(firstCharId, firstValueId, firstNumId))}
-                  className="px-2.5 py-1 rounded border border-input bg-background text-xs hover:bg-muted transition-colors"
-                >
-                  {tpl.label}
-                </button>
-              ))}
-            </div>
+            {TEMPLATE_GROUPS.map(grp => {
+              const visibleItems = grp.group.includes('Simple')
+                ? grp.items.filter(t => {
+                    // hide numeric templates when no numeric chars exist
+                    const needsNum = t.label.toLowerCase().includes('input')
+                    return needsNum ? numberChars.length > 0 : true
+                  })
+                : grp.items
+              if (visibleItems.length === 0) return null
+              return (
+                <div key={grp.group} className="space-y-1">
+                  <p className="text-xs text-muted-foreground">{grp.group}</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {visibleItems.map(tpl => (
+                      <button
+                        key={tpl.label}
+                        type="button"
+                        title={tpl.description}
+                        onClick={() => onChange(tpl.build(firstCharId, firstValueId, firstNumId))}
+                        className="px-2.5 py-1 rounded border border-input bg-background text-xs hover:bg-muted transition-colors"
+                      >
+                        {tpl.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )
+            })}
           </div>
         )}
 
@@ -353,13 +420,13 @@ export function FormulaBuilder({ node, onChange, characteristics, valuesMap, isR
         <div className="space-y-1.5">
           <div className="flex items-center gap-2 flex-wrap">
             {typeSelector}
-            <span className="text-xs text-muted-foreground">of characteristic:</span>
+            <span className="text-xs text-muted-foreground">→</span>
+            <CharPicker
+              value={node.char_id}
+              chars={selectChars}
+              onChange={v => onChange({ type: 'modifier', char_id: v })}
+            />
           </div>
-          <CharPicker
-            value={node.char_id}
-            chars={selectChars}
-            onChange={v => onChange({ type: 'modifier', char_id: v })}
-          />
         </div>
       )
     }
@@ -370,13 +437,13 @@ export function FormulaBuilder({ node, onChange, characteristics, valuesMap, isR
         <div className="space-y-1.5">
           <div className="flex items-center gap-2 flex-wrap">
             {typeSelector}
-            <span className="text-xs text-muted-foreground">characteristic:</span>
+            <span className="text-xs text-muted-foreground">→</span>
+            <CharPicker
+              value={node.char_id}
+              chars={numberChars}
+              onChange={v => onChange({ type: 'input', char_id: v })}
+            />
           </div>
-          <CharPicker
-            value={node.char_id}
-            chars={numberChars}
-            onChange={v => onChange({ type: 'input', char_id: v })}
-          />
         </div>
       )
     }
@@ -384,36 +451,48 @@ export function FormulaBuilder({ node, onChange, characteristics, valuesMap, isR
     // ── is_selected ───────────────────────────────────────────────────────────
     if (node.type === 'is_selected') {
       return (
-        <div className="space-y-2">
+        <div className="space-y-1.5">
           <div className="flex items-center gap-2 flex-wrap">
             {typeSelector}
-          </div>
-          <div className="space-y-1">
-            <p className="text-xs text-muted-foreground">Characteristic:</p>
+            <span className="text-xs text-muted-foreground">→</span>
             <CharPicker
               value={node.char_id}
               chars={selectChars}
               onChange={v => onChange({ type: 'is_selected', char_id: v, value_id: '' })}
             />
+            {node.char_id && (
+              <>
+                <span className="text-xs font-bold text-muted-foreground">=</span>
+                <ValuePicker
+                  charId={node.char_id}
+                  value={node.value_id}
+                  valuesMap={valuesMap}
+                  onChange={v => onChange({ ...node, value_id: v })}
+                />
+              </>
+            )}
           </div>
-          {node.char_id && (
-            <div className="space-y-1">
-              <p className="text-xs text-muted-foreground">Value:</p>
-              <ValuePicker
-                charId={node.char_id}
-                value={node.value_id}
-                valuesMap={valuesMap}
-                onChange={v => onChange({ ...node, value_id: v })}
-              />
-            </div>
-          )}
         </div>
       )
     }
 
     // ── Binary ops ────────────────────────────────────────────────────────────
     if (isBinaryNode(node)) {
-      const isLogical = node.type === 'and' || node.type === 'or'
+      const [leftLabel, rightLabel] = ((): [string, string] => {
+        switch (node.type) {
+          case 'add':
+          case 'subtract':    return ['Start with', 'Adjustment']
+          case 'multiply':
+          case 'divide':      return ['Base', 'Factor']
+          case 'gt':
+          case 'gte':
+          case 'lt':
+          case 'lte':
+          case 'eq':          return ['Characteristic value', 'Compare to']
+          case 'and':
+          case 'or':          return ['First condition', 'Second condition']
+        }
+      })()
       return (
         <div className="space-y-2">
           <div className="flex items-center gap-2">
@@ -421,7 +500,7 @@ export function FormulaBuilder({ node, onChange, characteristics, valuesMap, isR
           </div>
           <div className="border-l-2 border-muted pl-3 space-y-2">
             <div className="space-y-1">
-              <p className="text-xs text-muted-foreground font-medium">{isLogical ? 'First condition' : 'Left'}</p>
+              <p className="text-xs text-muted-foreground font-medium">{leftLabel}</p>
               <FormulaBuilder
                 node={node.left}
                 onChange={left => onChange({ ...node, left } as FormulaNode)}
@@ -434,7 +513,7 @@ export function FormulaBuilder({ node, onChange, characteristics, valuesMap, isR
               </span>
             </div>
             <div className="space-y-1">
-              <p className="text-xs text-muted-foreground font-medium">{isLogical ? 'Second condition' : 'Right'}</p>
+              <p className="text-xs text-muted-foreground font-medium">{rightLabel}</p>
               <FormulaBuilder
                 node={node.right}
                 onChange={right => onChange({ ...node, right } as FormulaNode)}
