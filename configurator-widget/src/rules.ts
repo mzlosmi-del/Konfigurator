@@ -1,9 +1,11 @@
 import type { ConfigurationRule, Selection } from './types'
 
 export interface RuleEffect {
-  hiddenValues: Set<string>   // value IDs that should be hidden
-  disabledValues: Set<string> // value IDs that should be disabled
-  priceOverrides: Record<string, number> // charId → override modifier
+  hiddenValues:   Set<string>              // value IDs that should be hidden
+  disabledValues: Set<string>              // value IDs that should be disabled
+  priceOverrides: Record<string, number>   // charId → override modifier
+  defaultValues:  Record<string, string>   // charId → valueId (customer may override)
+  lockedValues:   Record<string, string>   // charId → valueId (customer cannot override)
 }
 
 /**
@@ -15,31 +17,46 @@ export function evaluateRules(
   selection: Selection
 ): RuleEffect {
   const result: RuleEffect = {
-    hiddenValues: new Set(),
+    hiddenValues:   new Set(),
     disabledValues: new Set(),
     priceOverrides: {},
+    defaultValues:  {},
+    lockedValues:   {},
   }
 
   for (const rule of rules) {
-    // Guard: skip inactive rules (DB query filters these, but be defensive)
     if (!rule.is_active) continue
 
     const { characteristic_id, value_id } = rule.condition
-
-    // Check if the condition is met
     if (selection[characteristic_id] !== value_id) continue
 
-    if (rule.rule_type === 'hide_value' && rule.effect.value_id) {
-      result.hiddenValues.add(rule.effect.value_id)
-    }
+    switch (rule.rule_type) {
+      case 'hide_value':
+        if (rule.effect.value_id) result.hiddenValues.add(rule.effect.value_id)
+        break
 
-    if (rule.rule_type === 'disable_value' && rule.effect.value_id) {
-      result.disabledValues.add(rule.effect.value_id)
-    }
+      case 'disable_value':
+        if (rule.effect.value_id) result.disabledValues.add(rule.effect.value_id)
+        break
 
-    if (rule.rule_type === 'price_override' && rule.effect.price_modifier !== undefined) {
-      const targetCharId = rule.effect.characteristic_id ?? characteristic_id
-      result.priceOverrides[targetCharId] = rule.effect.price_modifier
+      case 'price_override':
+        if (rule.effect.price_modifier !== undefined) {
+          const targetCharId = rule.effect.characteristic_id ?? characteristic_id
+          result.priceOverrides[targetCharId] = rule.effect.price_modifier
+        }
+        break
+
+      case 'set_value_default':
+        if (rule.effect.characteristic_id && rule.effect.value_id) {
+          result.defaultValues[rule.effect.characteristic_id] = rule.effect.value_id
+        }
+        break
+
+      case 'set_value_locked':
+        if (rule.effect.characteristic_id && rule.effect.value_id) {
+          result.lockedValues[rule.effect.characteristic_id] = rule.effect.value_id
+        }
+        break
     }
   }
 
@@ -61,7 +78,6 @@ export function calculatePrice(
     const selectedValueId = selection[char.id]
     if (!selectedValueId) continue
 
-    // Check for a price override on this characteristic
     if (char.id in priceOverrides) {
       total += priceOverrides[char.id]
       continue
@@ -75,16 +91,43 @@ export function calculatePrice(
 }
 
 /**
- * Auto-deselect any values that became hidden/disabled after a selection change.
+ * Auto-deselect values that became hidden/disabled after a selection change.
+ * Also enforce locked values (override selection if rule demands a specific value).
  */
 export function sanitizeSelection(
   selection: Selection,
   effect: RuleEffect
 ): Selection {
   const next = { ...selection }
+
+  // Remove hidden/disabled selections
   for (const [charId, valueId] of Object.entries(next)) {
     if (effect.hiddenValues.has(valueId) || effect.disabledValues.has(valueId)) {
       delete next[charId]
+    }
+  }
+
+  // Apply locked values (forced, overrides whatever user selected)
+  for (const [charId, valueId] of Object.entries(effect.lockedValues)) {
+    next[charId] = valueId
+  }
+
+  return next
+}
+
+/**
+ * Apply default values from rules to selection.
+ * Only sets a default if the characteristic has no current selection.
+ * Does NOT override user selections.
+ */
+export function applyDefaultValues(
+  selection: Selection,
+  effect: RuleEffect
+): Selection {
+  const next = { ...selection }
+  for (const [charId, valueId] of Object.entries(effect.defaultValues)) {
+    if (!next[charId]) {
+      next[charId] = valueId
     }
   }
   return next

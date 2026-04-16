@@ -163,6 +163,42 @@ export const WIDGET_STYLES = `
   .cw-modifier.positive { color: #059669; }
   .cw-modifier.negative { color: #dc2626; }
 
+  /* Number input */
+  .cw-number-input {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 14px;
+    color: #1a1a1a;
+    background: #fff;
+  }
+  .cw-number-input:focus { outline: 2px solid #2563eb; outline-offset: 1px; }
+  .cw-number-input.locked { background: #f9fafb; color: #6b7280; cursor: not-allowed; }
+
+  /* Locked value display */
+  .cw-locked-value {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    font-size: 14px;
+  }
+  .cw-locked-label { font-weight: 500; color: #374151; }
+  .cw-locked-badge {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #6b7280;
+    background: #e5e7eb;
+    padding: 2px 6px;
+    border-radius: 4px;
+  }
+
   /* ── Price bar ──────────────────────────────────── */
   .cw-price-bar {
     display: flex;

@@ -23,7 +23,7 @@ export interface CharacteristicValue {
 export interface Characteristic {
   id: string
   name: string
-  display_type: 'select' | 'radio' | 'swatch' | 'toggle'
+  display_type: 'select' | 'radio' | 'swatch' | 'toggle' | 'number'
   sort_order: number
   values: CharacteristicValue[]
 }
@@ -39,7 +39,7 @@ export interface VisualizationAsset {
 
 export interface ConfigurationRule {
   id: string
-  rule_type: 'hide_value' | 'disable_value' | 'price_override'
+  rule_type: 'hide_value' | 'disable_value' | 'price_override' | 'set_value_default' | 'set_value_locked'
   condition: { characteristic_id: string; value_id: string }
   effect: {
     characteristic_id?: string
@@ -49,15 +49,39 @@ export interface ConfigurationRule {
   is_active: boolean
 }
 
+// ── Formula AST ─────────────────────────────────────────────────────────────
+export type FormulaNode =
+  | { type: 'number'; value: number }
+  | { type: 'base_price' }
+  | { type: 'modifier'; char_id: string }
+  | { type: 'input'; char_id: string }
+  | { type: 'is_selected'; char_id: string; value_id: string }
+  | { type: 'add' | 'subtract' | 'multiply' | 'divide'; left: FormulaNode; right: FormulaNode }
+  | { type: 'gt' | 'gte' | 'lt' | 'lte' | 'eq'; left: FormulaNode; right: FormulaNode }
+  | { type: 'and' | 'or'; left: FormulaNode; right: FormulaNode }
+  | { type: 'if'; condition: FormulaNode; then: FormulaNode; else_node: FormulaNode }
+
+export interface PricingFormula {
+  id: string
+  name: string
+  formula: FormulaNode
+  is_active: boolean
+  sort_order: number
+}
+
 export interface FullProductConfig {
   product: ProductData
   characteristics: Characteristic[]
   assets: VisualizationAsset[]
   rules: ConfigurationRule[]
+  formulas: PricingFormula[]
 }
 
-// Selected state: charId → valueId
+// Selected state: charId → valueId (for select/radio/swatch/toggle types)
 export type Selection = Record<string, string>
+
+// Numeric inputs: charId → number (for 'number' display_type characteristics)
+export type NumericInputs = Record<string, number>
 
 export interface InquiryPayload {
   tenant_id: string

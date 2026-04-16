@@ -1,12 +1,14 @@
 import { h } from 'preact'
-import type { Characteristic, CharacteristicValue } from '../types'
+import type { Characteristic, CharacteristicValue, NumericInputs } from '../types'
 import type { RuleEffect } from '../rules'
 
 interface Props {
   characteristic: Characteristic
   selectedValueId: string | undefined
   ruleEffect: RuleEffect
+  numericInputs: NumericInputs
   onChange: (charId: string, valueId: string) => void
+  onNumericInput: (charId: string, value: number) => void
 }
 
 function formatModifier(mod: number): string {
@@ -23,13 +25,57 @@ function visibleValues(char: Characteristic, effect: RuleEffect): Characteristic
   return char.values.filter(v => !effect.hiddenValues.has(v.id))
 }
 
-export function CharacteristicInput({ characteristic, selectedValueId, ruleEffect, onChange }: Props) {
-  const visible = visibleValues(characteristic, ruleEffect)
+export function CharacteristicInput({
+  characteristic,
+  selectedValueId,
+  ruleEffect,
+  numericInputs,
+  onChange,
+  onNumericInput,
+}: Props) {
+  const { display_type, id } = characteristic
+  const isLocked = id in ruleEffect.lockedValues
 
+  // ── Number input ────────────────────────────────────────────────────────────
+  if (display_type === 'number') {
+    const currentValue = numericInputs[id] ?? 0
+    return (
+      <div>
+        <div class="cw-char-label">{characteristic.name}</div>
+        <input
+          type="number"
+          class={`cw-number-input${isLocked ? ' locked' : ''}`}
+          value={currentValue}
+          disabled={isLocked}
+          onInput={(e) => {
+            const val = parseFloat((e.target as HTMLInputElement).value)
+            onNumericInput(id, isNaN(val) ? 0 : val)
+          }}
+        />
+        {isLocked && <span class="cw-locked-badge">Auto-set</span>}
+      </div>
+    )
+  }
+
+  const visible = visibleValues(characteristic, ruleEffect)
   if (visible.length === 0) return null
 
-  const { display_type, id } = characteristic
+  // ── Locked: show read-only badge ────────────────────────────────────────────
+  if (isLocked) {
+    const lockedValueId = ruleEffect.lockedValues[id]
+    const lockedValue   = characteristic.values.find(v => v.id === lockedValueId)
+    return (
+      <div>
+        <div class="cw-char-label">{characteristic.name}</div>
+        <div class="cw-locked-value">
+          <span class="cw-locked-label">{lockedValue?.label ?? '—'}</span>
+          <span class="cw-locked-badge">Auto-set</span>
+        </div>
+      </div>
+    )
+  }
 
+  // ── Select ──────────────────────────────────────────────────────────────────
   if (display_type === 'select') {
     return (
       <div>
@@ -58,6 +104,7 @@ export function CharacteristicInput({ characteristic, selectedValueId, ruleEffec
     )
   }
 
+  // ── Radio ───────────────────────────────────────────────────────────────────
   if (display_type === 'radio') {
     return (
       <div>
@@ -88,6 +135,7 @@ export function CharacteristicInput({ characteristic, selectedValueId, ruleEffec
     )
   }
 
+  // ── Swatch ──────────────────────────────────────────────────────────────────
   if (display_type === 'swatch') {
     return (
       <div>
@@ -103,7 +151,6 @@ export function CharacteristicInput({ characteristic, selectedValueId, ruleEffec
           {visible.map(v => {
             const disabled = ruleEffect.disabledValues.has(v.id)
             const selected = selectedValueId === v.id
-            // Show initials in swatch (color images would be set via visualization assets)
             const initials = v.label.slice(0, 2).toUpperCase()
             return (
               <button
@@ -122,6 +169,7 @@ export function CharacteristicInput({ characteristic, selectedValueId, ruleEffec
     )
   }
 
+  // ── Toggle ──────────────────────────────────────────────────────────────────
   if (display_type === 'toggle') {
     return (
       <div>
