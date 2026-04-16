@@ -1,8 +1,9 @@
 import { h } from 'preact'
 import { useState, useEffect, useMemo } from 'preact/hooks'
-import type { FullProductConfig, Selection, WidgetConfig, ConfigLineItem } from '../types'
+import type { FullProductConfig, Selection, NumericInputs, WidgetConfig, ConfigLineItem } from '../types'
 import { loadProductConfig } from '../api'
-import { evaluateRules, calculatePrice, sanitizeSelection } from '../rules'
+import { evaluateRules, calculatePrice, sanitizeSelection, applyDefaultValues } from '../rules'
+import { calculateFormulaTotal } from '../formulaEngine'
 import { Visualization } from './Visualization'
 import { CharacteristicInput } from './CharacteristicInput'
 import { InquiryForm } from './InquiryForm'
@@ -20,20 +21,27 @@ type State =
 export function Widget({ config }: Props) {
   const [state, setState] = useState<State>({ phase: 'loading' })
   const [selection, setSelection] = useState<Selection>({})
+  const [numericInputs, setNumericInputs] = useState<NumericInputs>({})
   const [showForm, setShowForm] = useState(false)
 
   useEffect(() => {
     loadProductConfig(config)
       .then(data => {
         setState({ phase: 'ready', data })
-        // Pre-select first value of each characteristic
+
+        // Pre-select first value of each select/radio/swatch/toggle characteristic
         const initial: Selection = {}
         for (const char of data.characteristics) {
-          if (char.values.length > 0) {
+          if (char.display_type !== 'number' && char.values.length > 0) {
             initial[char.id] = char.values[0].id
           }
         }
-        setSelection(initial)
+
+        // Apply initial rules (set_value_default / locked)
+        const initialEffect = evaluateRules(data.rules, initial)
+        const withDefaults  = applyDefaultValues(initial, initialEffect)
+        const sanitized     = sanitizeSelection(withDefaults, initialEffect)
+        setSelection(sanitized)
       })
       .catch(err => {
         setState({ phase: 'error', message: err.message })
@@ -43,48 +51,62 @@ export function Widget({ config }: Props) {
   function handleSelect(charId: string, valueId: string) {
     if (state.phase !== 'ready') return
 
-    const next = { ...selection, [charId]: valueId }
-
-    // Evaluate rules and sanitize (remove any newly-disabled selections)
-    const effect = evaluateRules(state.data.rules, next)
-    const sanitized = sanitizeSelection(next, effect)
-
+    const next     = { ...selection, [charId]: valueId }
+    const effect   = evaluateRules(state.data.rules, next)
+    const withDef  = applyDefaultValues(next, effect)
+    const sanitized = sanitizeSelection(withDef, effect)
     setSelection(sanitized)
+  }
+
+  function handleNumericInput(charId: string, value: number) {
+    setNumericInputs(prev => ({ ...prev, [charId]: value }))
   }
 
   // ── Derived state ───────────────────────────────────────────────────────────
   const ruleEffect = useMemo(() => {
-    if (state.phase !== 'ready') return { hiddenValues: new Set<string>(), disabledValues: new Set<string>(), priceOverrides: {} }
+    if (state.phase !== 'ready') {
+      return { hiddenValues: new Set<string>(), disabledValues: new Set<string>(), priceOverrides: {}, defaultValues: {}, lockedValues: {} }
+    }
     return evaluateRules(state.data.rules, selection)
   }, [state, selection])
 
   const totalPrice = useMemo(() => {
     if (state.phase !== 'ready') return 0
-    return calculatePrice(
-      state.data.product.base_price,
+    const base        = calculatePrice(state.data.product.base_price, selection, state.data.characteristics, ruleEffect.priceOverrides)
+    const formulaAdj  = calculateFormulaTotal(state.data.formulas, {
+      base_price:      state.data.product.base_price,
       selection,
-      state.data.characteristics,
-      ruleEffect.priceOverrides
-    )
-  }, [state, selection, ruleEffect])
+      numericInputs,
+      characteristics: state.data.characteristics,
+    })
+    return Math.max(0, base + formulaAdj)
+  }, [state, selection, numericInputs, ruleEffect])
 
   const lineItems = useMemo((): ConfigLineItem[] => {
     if (state.phase !== 'ready') return []
-    return state.data.characteristics
-      .filter(c => !!selection[c.id])
-      .map(c => {
-        const v = c.values.find(val => val.id === selection[c.id])
-        return {
-          characteristic_name: c.name,
-          value_label: v?.label ?? '',
-          price_modifier: v?.price_modifier ?? 0,
+    const items: ConfigLineItem[] = []
+
+    for (const char of state.data.characteristics) {
+      if (char.display_type === 'number') {
+        const val = numericInputs[char.id]
+        if (val !== undefined && val !== 0) {
+          items.push({ characteristic_name: char.name, value_label: String(val), price_modifier: 0 })
         }
-      })
-  }, [state, selection])
+        continue
+      }
+      if (!selection[char.id]) continue
+      const v = char.values.find(val => val.id === selection[char.id])
+      if (v) items.push({ characteristic_name: char.name, value_label: v.label, price_modifier: v.price_modifier })
+    }
+
+    return items
+  }, [state, selection, numericInputs])
 
   const allSelected = useMemo(() => {
     if (state.phase !== 'ready') return false
-    return state.data.characteristics.every(c => !!selection[c.id])
+    return state.data.characteristics.every(c =>
+      c.display_type === 'number' || !!selection[c.id]
+    )
   }, [state, selection])
 
   // ── Renders ─────────────────────────────────────────────────────────────────
@@ -150,7 +172,9 @@ export function Widget({ config }: Props) {
                 characteristic={char}
                 selectedValueId={selection[char.id]}
                 ruleEffect={ruleEffect}
+                numericInputs={numericInputs}
                 onChange={handleSelect}
+                onNumericInput={handleNumericInput}
               />
             ))}
           </div>

@@ -10,12 +10,23 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Spinner } from '@/components/ui/spinner'
 import { ProductForm, productToFormValues, type ProductFormValues } from './components/ProductForm'
 import { CharacteristicsPanel } from './components/CharacteristicsPanel'
+import { RulesPanel } from './components/RulesPanel'
+import { FormulaPanel } from './components/FormulaPanel'
 import { VisualizationPanel } from './components/VisualizationPanel'
 import { EmbedPanel } from './components/EmbedPanel'
 import { useToast } from '@/hooks/useToast'
 import { Toaster } from '@/components/ui/toast'
 
-type Tab = 'details' | 'characteristics' | 'visualization' | 'embed'
+type Tab = 'details' | 'characteristics' | 'rules' | 'formulas' | 'visualization' | 'embed'
+
+const TAB_LABELS: Record<Tab, string> = {
+  details:         'Details',
+  characteristics: 'Characteristics',
+  rules:           'Rules',
+  formulas:        'Formula pricing',
+  visualization:   'Visualization',
+  embed:           'Embed',
+}
 
 const statusVariant: Record<Product['status'], 'success' | 'warning' | 'secondary'> = {
   published: 'success',
@@ -130,17 +141,17 @@ export function EditProductPage() {
       {/* Tabs */}
       <div className="px-6 pt-4">
         <div className="flex gap-1 border-b">
-          {(['details', 'characteristics', 'visualization', 'embed'] as Tab[]).map(tab => (
+          {(['details', 'characteristics', 'rules', 'formulas', 'visualization', 'embed'] as Tab[]).map(tab => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`px-4 py-2 text-sm font-medium capitalize transition-colors border-b-2 -mb-px ${
+              className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
                 activeTab === tab
                   ? 'border-primary text-foreground'
                   : 'border-transparent text-muted-foreground hover:text-foreground'
               }`}
             >
-              {tab}
+              {TAB_LABELS[tab]}
             </button>
           ))}
         </div>
@@ -175,6 +186,34 @@ export function EditProductPage() {
             </CardHeader>
             <CardContent>
               <CharacteristicsPanel productId={product.id} />
+            </CardContent>
+          </Card>
+        )}
+
+        {activeTab === 'rules' && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Configuration rules</CardTitle>
+              <CardDescription>
+                Automatically hide, disable, lock, or set values based on other selections.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <RulesPanel productId={product.id} />
+            </CardContent>
+          </Card>
+        )}
+
+        {activeTab === 'formulas' && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Formula pricing</CardTitle>
+              <CardDescription>
+                Build custom pricing rules that calculate surcharges or discounts based on the configuration.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <FormulaPanel productId={product.id} />
             </CardContent>
           </Card>
         )}

@@ -6,11 +6,25 @@ export type Json = string | number | boolean | null | { [key: string]: Json } | 
 
 export type ProductStatus = 'draft' | 'published' | 'archived'
 export type Plan = 'free' | 'starter' | 'pro'
-export type DisplayType = 'select' | 'radio' | 'swatch' | 'toggle'
+export type DisplayType = 'select' | 'radio' | 'swatch' | 'toggle' | 'number'
 export type AssetType = 'image' | 'render' | '3d_model'
-export type RuleType = 'hide_value' | 'disable_value' | 'price_override'
+export type RuleType = 'hide_value' | 'disable_value' | 'price_override' | 'set_value_default' | 'set_value_locked'
 export type InquiryStatus = 'new' | 'read' | 'replied' | 'closed'
 export type QuoteStatus = 'sent' | 'expired'
+
+// ── Formula AST ─────────────────────────────────────────────────────────────
+// Stored as JSONB in pricing_formulas.formula.
+// Evaluated in the widget to produce a numeric surcharge/discount.
+export type FormulaNode =
+  | { type: 'number'; value: number }
+  | { type: 'base_price' }
+  | { type: 'modifier'; char_id: string }                                  // price_modifier of selected value
+  | { type: 'input'; char_id: string }                                     // numeric user input
+  | { type: 'is_selected'; char_id: string; value_id: string }             // boolean: is value selected
+  | { type: 'add' | 'subtract' | 'multiply' | 'divide'; left: FormulaNode; right: FormulaNode }
+  | { type: 'gt' | 'gte' | 'lt' | 'lte' | 'eq'; left: FormulaNode; right: FormulaNode }
+  | { type: 'and' | 'or'; left: FormulaNode; right: FormulaNode }
+  | { type: 'if'; condition: FormulaNode; then: FormulaNode; else_node: FormulaNode }
 
 export interface Database {
   public: {
@@ -55,10 +69,23 @@ export interface Database {
         Insert: Omit<Database['public']['Tables']['products']['Row'], 'id' | 'created_at' | 'updated_at'> & { id?: string }
         Update: Partial<Database['public']['Tables']['products']['Insert']>
       }
+      characteristic_classes: {
+        Row: {
+          id: string
+          tenant_id: string
+          name: string
+          sort_order: number
+          created_at: string
+          updated_at: string
+        }
+        Insert: Omit<Database['public']['Tables']['characteristic_classes']['Row'], 'id' | 'created_at' | 'updated_at'> & { id?: string }
+        Update: Partial<Database['public']['Tables']['characteristic_classes']['Insert']>
+      }
       characteristics: {
         Row: {
           id: string
           tenant_id: string
+          class_id: string | null
           name: string
           display_type: DisplayType
           sort_order: number
@@ -143,6 +170,21 @@ export interface Database {
         Insert: Omit<Database['public']['Tables']['inquiries']['Row'], 'id' | 'created_at' | 'updated_at'> & { id?: string }
         Update: Partial<Database['public']['Tables']['inquiries']['Insert']>
       }
+      pricing_formulas: {
+        Row: {
+          id: string
+          tenant_id: string
+          product_id: string
+          name: string
+          formula: Json           // FormulaNode AST
+          is_active: boolean
+          sort_order: number
+          created_at: string
+          updated_at: string
+        }
+        Insert: Omit<Database['public']['Tables']['pricing_formulas']['Row'], 'id' | 'created_at' | 'updated_at'> & { id?: string }
+        Update: Partial<Database['public']['Tables']['pricing_formulas']['Insert']>
+      }
       quotes: {
         Row: {
           id: string
@@ -181,5 +223,7 @@ export type CharacteristicValue = Database['public']['Tables']['characteristic_v
 export type ProductCharacteristic = Database['public']['Tables']['product_characteristics']['Row']
 export type VisualizationAsset = Database['public']['Tables']['visualization_assets']['Row']
 export type ConfigurationRule = Database['public']['Tables']['configuration_rules']['Row']
-export type Inquiry = Database['public']['Tables']['inquiries']['Row']
-export type Quote   = Database['public']['Tables']['quotes']['Row']
+export type Inquiry            = Database['public']['Tables']['inquiries']['Row']
+export type Quote              = Database['public']['Tables']['quotes']['Row']
+export type CharacteristicClass = Database['public']['Tables']['characteristic_classes']['Row']
+export type PricingFormula     = Database['public']['Tables']['pricing_formulas']['Row']

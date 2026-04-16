@@ -6,6 +6,7 @@ import { supabase } from './supabase'
 import type {
   Product,
   Characteristic,
+  CharacteristicClass,
   CharacteristicValue,
   ProductCharacteristic,
 } from '@/types/database'
@@ -60,6 +61,55 @@ export async function updateProduct(
 
 export async function deleteProduct(id: string): Promise<void> {
   const { error } = await supabase.from('products').delete().eq('id', id)
+  if (error) throw new Error(error.message)
+}
+
+// ─── Characteristic Classes ───────────────────────────────────────────────────
+
+export async function fetchClasses(): Promise<CharacteristicClass[]> {
+  const { data, error } = await supabase
+    .from('characteristic_classes')
+    .select('*')
+    .order('sort_order', { ascending: true })
+    .order('name', { ascending: true })
+  if (error) throw new Error(error.message)
+  return (data ?? []) as CharacteristicClass[]
+}
+
+export async function createClass(input: Pick<CharacteristicClass, 'name'>): Promise<CharacteristicClass> {
+  const { data, error } = await supabase
+    .from('characteristic_classes')
+    .insert(input as any)
+    .select()
+    .single()
+  if (error) throw new Error(error.message)
+  return data as CharacteristicClass
+}
+
+export async function updateClass(
+  id: string,
+  input: Partial<Pick<CharacteristicClass, 'name' | 'sort_order'>>
+): Promise<CharacteristicClass> {
+  const { data, error } = await supabase
+    .from('characteristic_classes')
+    .update(input as any)
+    .eq('id', id)
+    .select()
+    .single()
+  if (error) throw new Error(error.message)
+  return data as CharacteristicClass
+}
+
+export async function deleteClass(id: string): Promise<void> {
+  const { error } = await supabase.from('characteristic_classes').delete().eq('id', id)
+  if (error) throw new Error(error.message)
+}
+
+export async function setCharacteristicClass(charId: string, classId: string | null): Promise<void> {
+  const { error } = await supabase
+    .from('characteristics')
+    .update({ class_id: classId } as any)
+    .eq('id', charId)
   if (error) throw new Error(error.message)
 }
 

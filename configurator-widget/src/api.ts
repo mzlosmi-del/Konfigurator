@@ -6,6 +6,7 @@ import type {
   CharacteristicValue,
   VisualizationAsset,
   ConfigurationRule,
+  PricingFormula,
   InquiryPayload,
   WidgetConfig,
 } from './types'
@@ -45,7 +46,7 @@ export async function loadProductConfig(config: WidgetConfig): Promise<FullProdu
   // Load assets and rules in parallel with characteristic data.
   // Do NOT return early when characteristicIds is empty — a product may have
   // a default visualization asset with no configurable characteristics.
-  const [charResult, valuesResult, assetsResult, rulesResult] = await Promise.all([
+  const [charResult, valuesResult, assetsResult, rulesResult, formulasResult] = await Promise.all([
     characteristicIds.length > 0
       ? sb.from('characteristics').select('id, name, display_type, sort_order').in('id', characteristicIds)
       : Promise.resolve({ data: [], error: null }),
@@ -63,17 +64,24 @@ export async function loadProductConfig(config: WidgetConfig): Promise<FullProdu
       .select('id, rule_type, condition, effect, is_active')
       .eq('product_id', config.productId)
       .eq('is_active', true),
+    sb.from('pricing_formulas')
+      .select('id, name, formula, is_active, sort_order')
+      .eq('product_id', config.productId)
+      .eq('is_active', true)
+      .order('sort_order', { ascending: true }),
   ])
 
   if (charResult.error) throw new Error('Failed to load characteristic details')
   if (valuesResult.error) throw new Error('Failed to load characteristic values')
   if (assetsResult.error) throw new Error('Failed to load visualization assets')
   if (rulesResult.error) throw new Error('Failed to load rules')
+  if (formulasResult.error) throw new Error('Failed to load pricing formulas')
 
-  const charData = charResult.data
-  const valuesData = valuesResult.data
-  const assetsData = assetsResult.data
-  const rulesData = rulesResult.data
+  const charData     = charResult.data
+  const valuesData   = valuesResult.data
+  const assetsData   = assetsResult.data
+  const rulesData    = rulesResult.data
+  const formulasData = formulasResult.data
 
   // Assemble characteristics with their values, in product attachment order
   const valuesByCharId: Record<string, CharacteristicValue[]> = {}
@@ -99,8 +107,9 @@ export async function loadProductConfig(config: WidgetConfig): Promise<FullProdu
   return {
     product: product as ProductData,
     characteristics,
-    assets: (assetsData ?? []) as VisualizationAsset[],
-    rules: (rulesData ?? []) as ConfigurationRule[],
+    assets:    (assetsData    ?? []) as VisualizationAsset[],
+    rules:     (rulesData     ?? []) as ConfigurationRule[],
+    formulas:  (formulasData  ?? []) as PricingFormula[],
   }
 }
 
