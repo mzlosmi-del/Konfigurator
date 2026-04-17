@@ -58,13 +58,6 @@ export function evaluateRules(
         if (rule.effect.value_id) result.disabledValues.add(rule.effect.value_id)
         break
 
-      case 'price_override':
-        if (rule.effect.price_modifier !== undefined) {
-          const targetCharId = rule.effect.characteristic_id ?? characteristic_id
-          result.priceOverrides[targetCharId] = rule.effect.price_modifier
-        }
-        break
-
       case 'set_value_default':
         if (rule.effect.characteristic_id) {
           if (rule.effect.value_id) {
@@ -142,15 +135,17 @@ export function sanitizeSelection(
 
 /**
  * Apply default values from rules to selection.
- * Only sets a default if the characteristic has no current selection.
+ * Skips characteristics that the user has explicitly changed (tracked via userSelections).
+ * During initialisation pass an empty set so all defaults are applied unconditionally.
  */
 export function applyDefaultValues(
   selection: Selection,
-  effect: RuleEffect
+  effect: RuleEffect,
+  userSelections: Set<string> = new Set()
 ): Selection {
   const next = { ...selection }
   for (const [charId, valueId] of Object.entries(effect.defaultValues)) {
-    if (!next[charId]) {
+    if (!userSelections.has(charId)) {
       next[charId] = valueId
     }
   }

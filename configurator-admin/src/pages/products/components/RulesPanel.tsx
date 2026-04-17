@@ -24,16 +24,15 @@ const NUMERIC_OPS: { op: NumericOp; label: string }[] = [
   { op: 'eq',  label: '='  },
 ]
 
-const RULE_TYPE_CONFIG: Record<RuleType, { label: string; active: string }> = {
+const RULE_TYPE_CONFIG: Partial<Record<RuleType, { label: string; active: string }>> = {
   hide_value:        { label: 'Hide value',     active: 'bg-amber-100 text-amber-700 border-amber-300' },
   disable_value:     { label: 'Disable value',  active: 'bg-orange-100 text-orange-700 border-orange-300' },
-  price_override:    { label: 'Override price', active: 'bg-blue-100 text-blue-700 border-blue-300' },
   set_value_default: { label: 'Set default',    active: 'bg-emerald-100 text-emerald-700 border-emerald-300' },
   set_value_locked:  { label: 'Lock value',     active: 'bg-purple-100 text-purple-700 border-purple-300' },
 }
 
 const RULE_TYPES: RuleType[] = [
-  'hide_value', 'disable_value', 'price_override', 'set_value_default', 'set_value_locked',
+  'hide_value', 'disable_value', 'set_value_default', 'set_value_locked',
 ]
 
 function requiresSelectTarget(ruleType: RuleType) {
@@ -130,7 +129,6 @@ export function RulesPanel({ productId }: Props) {
   // Effect target
   const [effCharId, setEffCharId]           = useState('')
   const [effValueId, setEffValueId]         = useState('')
-  const [effPrice, setEffPrice]             = useState('0')
   const [effNumericVal, setEffNumericVal]   = useState('0')
 
   const [saving, setSaving]                 = useState(false)
@@ -182,7 +180,7 @@ export function RulesPanel({ productId }: Props) {
       return
     }
     const effIsNumeric = isNumeric(effCharId, characteristics)
-    if (!effIsNumeric && (ruleType === 'hide_value' || ruleType === 'disable_value' || ruleType === 'set_value_default' || ruleType === 'set_value_locked') && !effValueId) {
+    if (!effIsNumeric && !effValueId) {
       toast({ title: t('Select a target value'), variant: 'destructive' })
       return
     }
@@ -191,14 +189,9 @@ export function RulesPanel({ productId }: Props) {
       ? { characteristic_id: condCharId, numeric_op: condNumericOp, numeric_value: parseFloat(condNumericVal) || 0 }
       : { characteristic_id: condCharId, value_id: condValueId }
 
-    let effect: ConfigurationRule['effect']
-    if (ruleType === 'price_override') {
-      effect = { characteristic_id: effCharId, price_modifier: parseFloat(effPrice) || 0 }
-    } else if (effIsNumeric) {
-      effect = { characteristic_id: effCharId, numeric_value: parseFloat(effNumericVal) || 0 }
-    } else {
-      effect = { characteristic_id: effCharId, value_id: effValueId }
-    }
+    const effect: ConfigurationRule['effect'] = effIsNumeric
+      ? { characteristic_id: effCharId, numeric_value: parseFloat(effNumericVal) || 0 }
+      : { characteristic_id: effCharId, value_id: effValueId }
 
     setSaving(true)
     try {
@@ -210,7 +203,7 @@ export function RulesPanel({ productId }: Props) {
       })
       setRules(prev => [...prev, created])
       setCondCharId(''); setCondValueId(''); setCondNumericVal('0')
-      setEffCharId(''); setEffValueId(''); setEffPrice('0'); setEffNumericVal('0')
+      setEffCharId(''); setEffValueId(''); setEffNumericVal('0')
       toast({ title: t('Rule added') })
     } catch (e) {
       toast({ title: t('Failed to add rule'), description: e instanceof Error ? e.message : undefined, variant: 'destructive' })
@@ -277,6 +270,7 @@ export function RulesPanel({ productId }: Props) {
         <div className="space-y-2">
           {rules.map(rule => {
             const cfg = RULE_TYPE_CONFIG[rule.rule_type]
+            if (!cfg) return null
             return (
               <div key={rule.id} className="flex items-center gap-2 rounded-lg border bg-muted/20 px-4 py-3">
                 <div className="flex-1 flex items-center gap-1.5 flex-wrap text-sm">
@@ -307,11 +301,7 @@ export function RulesPanel({ productId }: Props) {
                       = {rule.effect.numeric_value}
                     </span>
                   )}
-                  {rule.rule_type === 'price_override' && rule.effect.price_modifier !== undefined && (
-                    <span className="px-2 py-0.5 rounded-full text-xs border bg-background font-mono">
-                      {rule.effect.price_modifier >= 0 ? '+' : ''}{rule.effect.price_modifier}
-                    </span>
-                  )}
+
                 </div>
                 <Button
                   variant="ghost"
@@ -385,7 +375,7 @@ export function RulesPanel({ productId }: Props) {
           <span className="text-xs font-bold text-primary pt-1 w-10 shrink-0">{t('THEN')}</span>
           <div className="flex flex-wrap gap-1.5">
             {RULE_TYPES.map(rt => {
-              const cfg = RULE_TYPE_CONFIG[rt]
+              const cfg = RULE_TYPE_CONFIG[rt]!
               const selected = ruleType === rt
               return (
                 <button
@@ -412,7 +402,7 @@ export function RulesPanel({ productId }: Props) {
           </div>
 
           {/* Select-type target: value picker */}
-          {effCharId && !effIsNumeric && ruleType !== 'price_override' && (
+          {effCharId && !effIsNumeric && (
             <div className="flex items-start gap-3 pl-[52px]">
               <span className="text-xs text-muted-foreground pt-1">=</span>
               <ValuePicker
@@ -438,19 +428,7 @@ export function RulesPanel({ productId }: Props) {
             </div>
           )}
 
-          {/* Price amount for price_override */}
-          {effCharId && ruleType === 'price_override' && (
-            <div className="flex items-center gap-2 pl-[52px]">
-              <span className="text-xs text-muted-foreground">{t('amount')}</span>
-              <input
-                type="number"
-                value={effPrice}
-                onChange={e => setEffPrice(e.target.value)}
-                className="w-28 rounded border border-input bg-background px-2 py-1 text-xs shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
-                placeholder={t('e.g. 50 or \u221220')}
-              />
-            </div>
-          )}
+
         </div>
 
         <div className="flex justify-end">
