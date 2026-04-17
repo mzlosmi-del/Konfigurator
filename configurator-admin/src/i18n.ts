@@ -149,7 +149,6 @@ const sr: Record<string, string> = {
   'Product saved':                         'Proizvod sačuvan',
   'Failed to save product':                'Čuvanje proizvoda nije uspelo',
   'Product published ':                    'Proizvod objavljen',
-  'Failed to update status':               'Ažuriranje statusa nije uspelo',
 
   // Product form
   'Product name':                          'Naziv proizvoda',
@@ -222,8 +221,6 @@ const sr: Record<string, string> = {
   'Failed to delete formula':              'Brisanje formule nije uspelo',
 
   // Formula builder – node type labels
-  'Number':                                'Broj',
-  'Base price':                            'Osnovna cena',
   'Price modifier of':                     'Modifikator cene za',
   'Numeric input':                         'Numerički unos',
   'Is selected':                           'Je izabrano',
@@ -290,7 +287,6 @@ const sr: Record<string, string> = {
 
   // Inquiries (missing keys)
   'Failed to load inquiries':              'Učitavanje upita nije uspelo',
-  'Failed to generate quote':              'Generisanje ponude nije uspelo',
   'Inquiry not found.':                    'Upit nije pronađen.',
 
   // Products (missing keys)
@@ -381,7 +377,6 @@ const sr: Record<string, string> = {
   'Radio':                                 'Radio',
   'Swatch':                                'Uzorak',
   'Toggle':                                'Preklopnik',
-  'Number':                                'Broj',
   'No characteristics yet.':              'Nema još karakteristika.',
   'Drag characteristics here':             'Prevucite karakteristike ovde',
   'Drop here to add':                      'Spustite ovde da dodate',

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from '@/components/auth/AuthContext'
-import { getLang, setLang, type Lang } from '@/i18n'
+import { getLang, type Lang } from '@/i18n'
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
 import { AppShell } from '@/components/layout/AppShell'
 import { LoginPage } from '@/pages/auth/LoginPage'
