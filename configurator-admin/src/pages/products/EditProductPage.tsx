@@ -16,8 +16,11 @@ import { VisualizationPanel } from './components/VisualizationPanel'
 import { EmbedPanel } from './components/EmbedPanel'
 import { useToast } from '@/hooks/useToast'
 import { Toaster } from '@/components/ui/toast'
+import { t } from '@/i18n'
 
 type Tab = 'details' | 'characteristics' | 'rules' | 'formulas' | 'visualization' | 'embed'
+
+const TAB_KEYS: Tab[] = ['details', 'characteristics', 'rules', 'formulas', 'visualization', 'embed']
 
 const TAB_LABELS: Record<Tab, string> = {
   details:         'Details',
@@ -47,7 +50,7 @@ export function EditProductPage() {
     if (!id) return
     fetchProduct(id)
       .then(setProduct)
-      .catch(() => toast({ title: 'Product not found', variant: 'destructive' }))
+      .catch(() => toast({ title: t('Product not found'), variant: 'destructive' }))
       .finally(() => setLoading(false))
   }, [id])
 
@@ -61,10 +64,10 @@ export function EditProductPage() {
         currency: values.currency,
       })
       setProduct(updated as Product)
-      toast({ title: 'Product saved' })
+      toast({ title: t('Product saved') })
     } catch (e) {
       toast({
-        title: 'Failed to save product',
+        title: t('Failed to save product'),
         description: e instanceof Error ? e.message : undefined,
         variant: 'destructive',
       })
@@ -77,9 +80,9 @@ export function EditProductPage() {
     try {
       const updated = await updateProduct(product.id, { status: next })
       setProduct(updated as Product)
-      toast({ title: next === 'published' ? 'Product published' : 'Product unpublished' })
+      toast({ title: next === 'published' ? t('Product published') : t('Product unpublished') })
     } catch {
-      toast({ title: 'Failed to update status', variant: 'destructive' })
+      toast({ title: t('Failed to update status'), variant: 'destructive' })
     }
   }
 
@@ -92,9 +95,9 @@ export function EditProductPage() {
   if (!product) {
     return (
       <div className="p-6">
-        <p className="text-sm text-muted-foreground">Product not found.</p>
+        <p className="text-sm text-muted-foreground">{t('Product not found.')}</p>
         <Button variant="link" className="mt-2 p-0" onClick={() => navigate('/products')}>
-          Back to products
+          {t('Back to products')}
         </Button>
       </div>
     )
@@ -107,10 +110,10 @@ export function EditProductPage() {
         description={
           <span className="flex items-center gap-2">
             <Badge variant={statusVariant[product.status]} className="capitalize">
-              {product.status}
+              {t(product.status)}
             </Badge>
             <span className="text-sm text-muted-foreground">
-              Base price: {product.base_price.toFixed(2)} {product.currency}
+              {t('Base price')}: {product.base_price.toFixed(2)} {product.currency}
             </span>
           </span>
         }
@@ -121,7 +124,7 @@ export function EditProductPage() {
               variant={product.status === 'published' ? 'outline' : 'default'}
               onClick={handleTogglePublish}
             >
-              {product.status === 'published' ? 'Unpublish' : 'Publish'}
+              {product.status === 'published' ? t('Unpublish') : t('Publish')}
             </Button>
           </div>
         }
@@ -134,14 +137,14 @@ export function EditProductPage() {
           className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
         >
           <ArrowLeft className="h-4 w-4" />
-          All products
+          {t('All products')}
         </button>
       </div>
 
       {/* Tabs */}
       <div className="px-6 pt-4">
         <div className="flex gap-1 border-b">
-          {(['details', 'characteristics', 'rules', 'formulas', 'visualization', 'embed'] as Tab[]).map(tab => (
+          {TAB_KEYS.map(tab => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -151,7 +154,7 @@ export function EditProductPage() {
                   : 'border-transparent text-muted-foreground hover:text-foreground'
               }`}
             >
-              {TAB_LABELS[tab]}
+              {t(TAB_LABELS[tab])}
             </button>
           ))}
         </div>
@@ -162,14 +165,14 @@ export function EditProductPage() {
         {activeTab === 'details' && (
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Product details</CardTitle>
-              <CardDescription>Update the product name, description, and pricing.</CardDescription>
+              <CardTitle className="text-base">{t('Product details')}</CardTitle>
+              <CardDescription>{t('Update the product name, description, and pricing.')}</CardDescription>
             </CardHeader>
             <CardContent>
               <ProductForm
                 defaultValues={productToFormValues(product)}
                 onSubmit={handleSaveDetails}
-                submitLabel="Save changes"
+                submitLabel={t('Save changes')}
               />
             </CardContent>
           </Card>
@@ -178,10 +181,9 @@ export function EditProductPage() {
         {activeTab === 'characteristics' && (
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Characteristics & options</CardTitle>
+              <CardTitle className="text-base">{t('Characteristics & options')}</CardTitle>
               <CardDescription>
-                Define what customers can configure. Each characteristic has selectable values
-                with optional price modifiers.
+                {t('Define what customers can configure. Each characteristic has selectable values with optional price modifiers.')}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -193,9 +195,9 @@ export function EditProductPage() {
         {activeTab === 'rules' && (
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Configuration rules</CardTitle>
+              <CardTitle className="text-base">{t('Configuration rules')}</CardTitle>
               <CardDescription>
-                Automatically hide, disable, lock, or set values based on other selections.
+                {t('Automatically hide, disable, lock, or set values based on other selections.')}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -207,9 +209,9 @@ export function EditProductPage() {
         {activeTab === 'formulas' && (
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Formula pricing</CardTitle>
+              <CardTitle className="text-base">{t('Formula pricing')}</CardTitle>
               <CardDescription>
-                Build custom pricing rules that calculate surcharges or discounts based on the configuration.
+                {t('Build custom pricing rules that calculate surcharges or discounts based on the configuration.')}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -221,10 +223,9 @@ export function EditProductPage() {
         {activeTab === 'visualization' && (
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Visualization assets</CardTitle>
+              <CardTitle className="text-base">{t('Visualization assets')}</CardTitle>
               <CardDescription>
-                Upload or link images and renders. Attach them to specific option values
-                so the product visual updates as customers configure.
+                {t('Upload or link images and renders. Attach them to specific option values so the product visual updates as customers configure.')}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -236,9 +237,9 @@ export function EditProductPage() {
         {activeTab === 'embed' && (
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Embed & share</CardTitle>
+              <CardTitle className="text-base">{t('Embed & share')}</CardTitle>
               <CardDescription>
-                Get the embed code to place the configurator on your website.
+                {t('Get the embed code to place the configurator on your website.')}
               </CardDescription>
             </CardHeader>
             <CardContent>

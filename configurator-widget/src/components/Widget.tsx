@@ -4,6 +4,7 @@ import type { FullProductConfig, Selection, NumericInputs, WidgetConfig, ConfigL
 import { loadProductConfig } from '../api'
 import { evaluateRules, calculatePrice, sanitizeSelection, applyDefaultValues } from '../rules'
 import { calculateFormulaTotal } from '../formulaEngine'
+import { t, getLang, setLang, LANGS, type Lang } from '../i18n'
 import { Visualization } from './Visualization'
 import { CharacteristicInput } from './CharacteristicInput'
 import { InquiryForm } from './InquiryForm'
@@ -23,6 +24,13 @@ export function Widget({ config }: Props) {
   const [selection, setSelection] = useState<Selection>({})
   const [numericInputs, setNumericInputs] = useState<NumericInputs>({})
   const [showForm, setShowForm] = useState(false)
+  const [lang, setLangState] = useState<Lang>(getLang())
+
+  useEffect(() => {
+    const handler = (e: Event) => setLangState((e as CustomEvent<Lang>).detail)
+    window.addEventListener('langchange', handler)
+    return () => window.removeEventListener('langchange', handler)
+  }, [])
 
   useEffect(() => {
     loadProductConfig(config)
@@ -111,12 +119,29 @@ export function Widget({ config }: Props) {
 
   // ── Renders ─────────────────────────────────────────────────────────────────
 
+  function LangSwitcher() {
+    return (
+      <div class="cw-lang-switcher">
+        {LANGS.map(l => (
+          <button
+            key={l}
+            type="button"
+            class={`cw-lang-btn${lang === l ? ' cw-lang-btn--active' : ''}`}
+            onClick={() => { setLang(l); setLangState(l) }}
+          >
+            {l.toUpperCase()}
+          </button>
+        ))}
+      </div>
+    )
+  }
+
   if (state.phase === 'loading') {
     return (
-      <div class="cw-root">
+      <div class="cw-root" key={lang}>
         <div class="cw-loading">
           <div class="cw-spinner" />
-          Loading configurator…
+          {t('Loading configurator\u2026')}
         </div>
       </div>
     )
@@ -124,7 +149,7 @@ export function Widget({ config }: Props) {
 
   if (state.phase === 'error') {
     return (
-      <div class="cw-root">
+      <div class="cw-root" key={lang}>
         <div class="cw-error">
           ⚠ {state.message}
         </div>
@@ -134,15 +159,16 @@ export function Widget({ config }: Props) {
 
   if (state.phase === 'success') {
     return (
-      <div class="cw-root">
+      <div class="cw-root" key={lang}>
         <div class="cw-success">
           <div class="cw-success-icon">✓</div>
-          <h3>Inquiry sent!</h3>
-          <p>Thank you. We'll get back to you as soon as possible.</p>
+          <h3>{t('Inquiry sent!')}</h3>
+          <p>{t("Thank you. We'll get back to you as soon as possible.")}</p>
         </div>
         <div class="cw-branding">
+          <LangSwitcher />
           <a href="https://konfigurator.app" target="_blank" rel="noopener">
-            Powered by Konfigurator
+            {t('Powered by Konfigurator')}
           </a>
         </div>
       </div>
@@ -152,7 +178,7 @@ export function Widget({ config }: Props) {
   const { product, characteristics, assets } = state.data
 
   return (
-    <div class="cw-root">
+    <div class="cw-root" key={lang}>
       {/* Product image */}
       <Visualization assets={assets} selection={selection} />
 
@@ -182,7 +208,7 @@ export function Widget({ config }: Props) {
 
         {/* Price */}
         <div class="cw-price-bar">
-          <span class="cw-price-label">Total price</span>
+          <span class="cw-price-label">{t('Total price')}</span>
           <span>
             <span class="cw-price-value">{totalPrice.toFixed(2)}</span>
             <span class="cw-price-currency">{product.currency}</span>
@@ -196,7 +222,7 @@ export function Widget({ config }: Props) {
             onClick={() => setShowForm(true)}
             disabled={!allSelected}
           >
-            {allSelected ? 'Request a quote' : 'Select all options to continue'}
+            {allSelected ? t('Request a quote') : t('Select all options to continue')}
           </button>
         )}
 
@@ -215,8 +241,9 @@ export function Widget({ config }: Props) {
       </div>
 
       <div class="cw-branding">
+        <LangSwitcher />
         <a href="https://konfigurator.app" target="_blank" rel="noopener">
-          Powered by Konfigurator
+          {t('Powered by Konfigurator')}
         </a>
       </div>
     </div>

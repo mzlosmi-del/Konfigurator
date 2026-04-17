@@ -2,6 +2,7 @@ import { h } from 'preact'
 import { useState, useEffect } from 'preact/hooks'
 import type { VisualizationAsset, Selection } from '../types'
 import { resolveImage } from '../resolveImage'
+import { t } from '../i18n'
 
 interface Props {
   assets: VisualizationAsset[]
@@ -23,7 +24,7 @@ export function Visualization({ assets, selection }: Props) {
   if (!url) {
     return (
       <div class="cw-visual">
-        <div class="cw-visual-placeholder">No image available</div>
+        <div class="cw-visual-placeholder">{t('No image available')}</div>
       </div>
     )
   }
@@ -32,7 +33,7 @@ export function Visualization({ assets, selection }: Props) {
     <div class="cw-visual">
       <img
         src={url}
-        alt="Product visualization"
+        alt={t('Product visualization')}
         class={loaded ? '' : 'loading'}
         onLoad={() => setLoaded(true)}
       />

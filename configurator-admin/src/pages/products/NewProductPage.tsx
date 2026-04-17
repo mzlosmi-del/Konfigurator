@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { ProductForm, type ProductFormValues } from './components/ProductForm'
 import { useToast } from '@/hooks/useToast'
 import { Toaster } from '@/components/ui/toast'
+import { t } from '@/i18n'
 
 export function NewProductPage() {
   const navigate = useNavigate()
@@ -21,7 +22,7 @@ export function NewProductPage() {
       navigate(`/products/${product.id}/edit`, { replace: true })
     } catch (e) {
       toast({
-        title: 'Failed to create product',
+        title: t('Failed to create product'),
         description: e instanceof Error ? e.message : undefined,
         variant: 'destructive',
       })
@@ -31,22 +32,22 @@ export function NewProductPage() {
   return (
     <div className="animate-fade-in">
       <PageHeader
-        title="New product"
-        description="Start by giving your product a name and base price."
+        title={t('New product')}
+        description={t('Start by giving your product a name and base price.')}
       />
 
       <div className="p-6 max-w-xl">
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Product details</CardTitle>
+            <CardTitle className="text-base">{t('Product details')}</CardTitle>
             <CardDescription>
-              You can add characteristics and options after saving.
+              {t('You can add characteristics and options after saving.')}
             </CardDescription>
           </CardHeader>
           <CardContent>
             <ProductForm
               onSubmit={handleSubmit}
-              submitLabel="Create product"
+              submitLabel={t('Create product')}
               onCancel={() => navigate('/products')}
             />
           </CardContent>

@@ -1,48 +1,139 @@
 import { useEffect, useState } from 'react'
-import { Plus, Trash2 } from 'lucide-react'
+import { Trash2 } from 'lucide-react'
 import { fetchRules, createRule, deleteRule } from '@/lib/rules'
 import { fetchCharacteristics, fetchValuesForCharacteristic } from '@/lib/products'
 import type { ConfigurationRule, RuleType, Characteristic, CharacteristicValue } from '@/types/database'
 import { Button } from '@/components/ui/button'
-import { Select } from '@/components/ui/select'
 import { Spinner } from '@/components/ui/spinner'
 import { useToast } from '@/hooks/useToast'
 import { Toaster } from '@/components/ui/toast'
+import { t } from '@/i18n'
 
 interface Props {
   productId: string
 }
 
-const RULE_TYPE_LABELS: Record<RuleType, string> = {
-  hide_value:        'Hide value',
-  disable_value:     'Disable value',
-  price_override:    'Override price',
-  set_value_default: 'Set default value',
-  set_value_locked:  'Lock value',
+type ValuesMap = Record<string, CharacteristicValue[]>
+type NumericOp = 'gt' | 'gte' | 'lt' | 'lte' | 'eq'
+
+const NUMERIC_OPS: { op: NumericOp; label: string }[] = [
+  { op: 'gt',  label: '>'  },
+  { op: 'gte', label: '≥'  },
+  { op: 'lt',  label: '<'  },
+  { op: 'lte', label: '≤'  },
+  { op: 'eq',  label: '='  },
+]
+
+const RULE_TYPE_CONFIG: Record<RuleType, { label: string; active: string }> = {
+  hide_value:        { label: 'Hide value',     active: 'bg-amber-100 text-amber-700 border-amber-300' },
+  disable_value:     { label: 'Disable value',  active: 'bg-orange-100 text-orange-700 border-orange-300' },
+  price_override:    { label: 'Override price', active: 'bg-blue-100 text-blue-700 border-blue-300' },
+  set_value_default: { label: 'Set default',    active: 'bg-emerald-100 text-emerald-700 border-emerald-300' },
+  set_value_locked:  { label: 'Lock value',     active: 'bg-purple-100 text-purple-700 border-purple-300' },
 }
 
 const RULE_TYPES: RuleType[] = [
   'hide_value', 'disable_value', 'price_override', 'set_value_default', 'set_value_locked',
 ]
 
-type ValuesMap = Record<string, CharacteristicValue[]>
+function requiresSelectTarget(ruleType: RuleType) {
+  return ruleType === 'hide_value' || ruleType === 'disable_value'
+}
+
+// ── Pill pickers ──────────────────────────────────────────────────────────────
+
+function CharPicker({ value, chars, onChange }: {
+  value: string
+  chars: Characteristic[]
+  onChange: (id: string) => void
+}) {
+  if (chars.length === 0) {
+    return <span className="text-xs text-muted-foreground italic">{t('No characteristics available')}</span>
+  }
+  return (
+    <div className="flex flex-wrap gap-1">
+      {chars.map(c => (
+        <button
+          key={c.id}
+          type="button"
+          onClick={() => onChange(c.id)}
+          className={[
+            'px-2 py-0.5 rounded-full text-xs border font-medium transition-colors',
+            value === c.id
+              ? 'bg-primary text-primary-foreground border-primary'
+              : 'bg-background border-input hover:bg-muted',
+          ].join(' ')}
+        >
+          {c.name}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+function ValuePicker({ charId, value, valuesMap, onChange }: {
+  charId: string
+  value: string
+  valuesMap: ValuesMap
+  onChange: (id: string) => void
+}) {
+  const vals = valuesMap[charId] ?? []
+  if (vals.length === 0) {
+    return <span className="text-xs text-muted-foreground italic">{t('No values')}</span>
+  }
+  return (
+    <div className="flex flex-wrap gap-1">
+      {vals.map(v => (
+        <button
+          key={v.id}
+          type="button"
+          onClick={() => onChange(v.id)}
+          className={[
+            'px-2 py-0.5 rounded-full text-xs border transition-colors',
+            value === v.id
+              ? 'bg-primary text-primary-foreground border-primary'
+              : 'bg-background border-input hover:bg-muted',
+          ].join(' ')}
+        >
+          {v.label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function isNumeric(charId: string, chars: Characteristic[]) {
+  return chars.find(c => c.id === charId)?.display_type === 'number'
+}
+
+// ── Main component ────────────────────────────────────────────────────────────
 
 export function RulesPanel({ productId }: Props) {
   const { toasts, toast, dismiss } = useToast()
 
-  const [loading, setLoading]             = useState(true)
-  const [rules, setRules]                 = useState<ConfigurationRule[]>([])
+  const [loading, setLoading]               = useState(true)
+  const [rules, setRules]                   = useState<ConfigurationRule[]>([])
   const [characteristics, setCharacteristics] = useState<Characteristic[]>([])
-  const [valuesMap, setValuesMap]         = useState<ValuesMap>({})
+  const [valuesMap, setValuesMap]           = useState<ValuesMap>({})
 
-  // New-rule form state
-  const [condCharId, setCondCharId]       = useState('')
-  const [condValueId, setCondValueId]     = useState('')
-  const [ruleType, setRuleType]           = useState<RuleType>('hide_value')
-  const [effCharId, setEffCharId]         = useState('')
-  const [effValueId, setEffValueId]       = useState('')
-  const [effPrice, setEffPrice]           = useState('0')
-  const [saving, setSaving]               = useState(false)
+  // Condition
+  const [condCharId, setCondCharId]         = useState('')
+  const [condValueId, setCondValueId]       = useState('')
+  const [condNumericOp, setCondNumericOp]   = useState<NumericOp>('gt')
+  const [condNumericVal, setCondNumericVal] = useState('0')
+
+  // Action
+  const [ruleType, setRuleType]             = useState<RuleType>('hide_value')
+
+  // Effect target
+  const [effCharId, setEffCharId]           = useState('')
+  const [effValueId, setEffValueId]         = useState('')
+  const [effPrice, setEffPrice]             = useState('0')
+  const [effNumericVal, setEffNumericVal]   = useState('0')
+
+  const [saving, setSaving]                 = useState(false)
 
   useEffect(() => { load() }, [productId])
 
@@ -55,68 +146,74 @@ export function RulesPanel({ productId }: Props) {
       ])
       setRules(rulesData)
       setCharacteristics(chars)
-
-      // Load all values in parallel
       const entries = await Promise.all(
         chars.map(async c => [c.id, await fetchValuesForCharacteristic(c.id)] as const)
       )
       setValuesMap(Object.fromEntries(entries))
     } catch {
-      toast({ title: 'Failed to load rules', variant: 'destructive' })
+      toast({ title: t('Failed to load rules'), variant: 'destructive' })
     } finally {
       setLoading(false)
     }
   }
 
-  // When condition char changes, reset condition value
   function handleCondCharChange(id: string) {
     setCondCharId(id)
     setCondValueId('')
   }
 
-  // When effect char changes, reset effect value
   function handleEffCharChange(id: string) {
     setEffCharId(id)
     setEffValueId('')
   }
 
-  // Effect fields depend on rule type
-  function effectIsValueBased(t: RuleType) {
-    return t === 'hide_value' || t === 'disable_value' || t === 'set_value_default' || t === 'set_value_locked'
-  }
-
   async function handleAdd() {
-    if (!condCharId || !condValueId) {
-      toast({ title: 'Select a condition characteristic and value', variant: 'destructive' })
+    if (!condCharId) {
+      toast({ title: t('Select a condition characteristic'), variant: 'destructive' })
       return
     }
-    if (effectIsValueBased(ruleType) && (!effCharId || !effValueId)) {
-      toast({ title: 'Select a target characteristic and value', variant: 'destructive' })
+    const condIsNumeric = isNumeric(condCharId, characteristics)
+    if (!condIsNumeric && !condValueId) {
+      toast({ title: t('Select a condition value'), variant: 'destructive' })
       return
     }
-    if (ruleType === 'price_override' && !effCharId) {
-      toast({ title: 'Select a target characteristic for the price override', variant: 'destructive' })
+    if (!effCharId) {
+      toast({ title: t('Select a target characteristic'), variant: 'destructive' })
+      return
+    }
+    const effIsNumeric = isNumeric(effCharId, characteristics)
+    if (!effIsNumeric && (ruleType === 'hide_value' || ruleType === 'disable_value' || ruleType === 'set_value_default' || ruleType === 'set_value_locked') && !effValueId) {
+      toast({ title: t('Select a target value'), variant: 'destructive' })
       return
     }
 
-    const effect: ConfigurationRule['effect'] = effectIsValueBased(ruleType)
-      ? { characteristic_id: effCharId, value_id: effValueId }
-      : { characteristic_id: effCharId, price_modifier: parseFloat(effPrice) || 0 }
+    const condition: ConfigurationRule['condition'] = condIsNumeric
+      ? { characteristic_id: condCharId, numeric_op: condNumericOp, numeric_value: parseFloat(condNumericVal) || 0 }
+      : { characteristic_id: condCharId, value_id: condValueId }
+
+    let effect: ConfigurationRule['effect']
+    if (ruleType === 'price_override') {
+      effect = { characteristic_id: effCharId, price_modifier: parseFloat(effPrice) || 0 }
+    } else if (effIsNumeric) {
+      effect = { characteristic_id: effCharId, numeric_value: parseFloat(effNumericVal) || 0 }
+    } else {
+      effect = { characteristic_id: effCharId, value_id: effValueId }
+    }
 
     setSaving(true)
     try {
       const created = await createRule({
         product_id: productId,
         rule_type: ruleType,
-        condition: { characteristic_id: condCharId, value_id: condValueId },
+        condition,
         effect,
       })
       setRules(prev => [...prev, created])
-      // Reset form
-      setCondCharId(''); setCondValueId(''); setEffCharId(''); setEffValueId(''); setEffPrice('0')
-      toast({ title: 'Rule added' })
+      setCondCharId(''); setCondValueId(''); setCondNumericVal('0')
+      setEffCharId(''); setEffValueId(''); setEffPrice('0'); setEffNumericVal('0')
+      toast({ title: t('Rule added') })
     } catch (e) {
-      toast({ title: 'Failed to add rule', description: e instanceof Error ? e.message : undefined, variant: 'destructive' })
+      toast({ title: t('Failed to add rule'), description: e instanceof Error ? e.message : undefined, variant: 'destructive' })
     } finally {
       setSaving(false)
     }
@@ -127,7 +224,7 @@ export function RulesPanel({ productId }: Props) {
       await deleteRule(id)
       setRules(prev => prev.filter(r => r.id !== id))
     } catch {
-      toast({ title: 'Failed to delete rule', variant: 'destructive' })
+      toast({ title: t('Failed to delete rule'), variant: 'destructive' })
     }
   }
 
@@ -139,158 +236,226 @@ export function RulesPanel({ productId }: Props) {
     return valuesMap[charId]?.find(v => v.id === valueId)?.label ?? valueId
   }
 
+  function ruleConditionLabel(rule: ConfigurationRule) {
+    const cond = rule.condition
+    if (cond.numeric_op !== undefined) {
+      const opLabel = NUMERIC_OPS.find(o => o.op === cond.numeric_op)?.label ?? cond.numeric_op
+      return (
+        <>
+          <span className="px-2 py-0.5 rounded-full text-xs border bg-background font-medium">{charName(cond.characteristic_id)}</span>
+          <span className="text-xs text-muted-foreground font-mono">{opLabel}</span>
+          <span className="px-2 py-0.5 rounded-full text-xs border bg-background font-mono">{cond.numeric_value}</span>
+        </>
+      )
+    }
+    return (
+      <>
+        <span className="px-2 py-0.5 rounded-full text-xs border bg-background font-medium">{charName(cond.characteristic_id)}</span>
+        <span className="text-xs text-muted-foreground">=</span>
+        <span className="px-2 py-0.5 rounded-full text-xs border bg-background">{valueName(cond.characteristic_id, cond.value_id ?? '')}</span>
+      </>
+    )
+  }
+
   if (loading) {
     return <div className="flex justify-center py-10"><Spinner /></div>
   }
 
-  const condValues  = valuesMap[condCharId] ?? []
-  const effValues   = valuesMap[effCharId]  ?? []
+  const condIsNumeric = isNumeric(condCharId, characteristics)
+  const effectChars = requiresSelectTarget(ruleType)
+    ? characteristics.filter(c => c.display_type !== 'number')
+    : characteristics
+  const effIsNumeric = isNumeric(effCharId, characteristics)
 
   return (
     <div className="space-y-5">
-      {/* Existing rules */}
+
+      {/* ── Existing rules ─────────────────────────────────────────────────── */}
       {rules.length === 0 ? (
-        <p className="text-sm text-muted-foreground py-2">No rules yet. Add one below.</p>
+        <p className="text-sm text-muted-foreground py-2">{t('No rules yet. Add one below.')}</p>
       ) : (
         <div className="space-y-2">
-          {rules.map(rule => (
-            <div
-              key={rule.id}
-              className="flex items-start gap-3 rounded-lg border bg-muted/20 px-4 py-3 text-sm"
-            >
-              <div className="flex-1 space-y-0.5">
-                <span className="text-muted-foreground">IF </span>
-                <span className="font-medium">{charName(rule.condition.characteristic_id)}</span>
-                <span className="text-muted-foreground"> = </span>
-                <span className="font-medium">{valueName(rule.condition.characteristic_id, rule.condition.value_id)}</span>
-                <span className="text-muted-foreground"> → </span>
-                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-primary/10 text-primary">
-                  {RULE_TYPE_LABELS[rule.rule_type]}
-                </span>
-                {rule.effect.characteristic_id && (
-                  <>
-                    <span className="text-muted-foreground"> on </span>
-                    <span className="font-medium">{charName(rule.effect.characteristic_id)}</span>
-                  </>
-                )}
-                {rule.effect.value_id && (
-                  <>
-                    <span className="text-muted-foreground"> = </span>
-                    <span className="font-medium">{valueName(rule.effect.characteristic_id ?? '', rule.effect.value_id)}</span>
-                  </>
-                )}
-                {rule.rule_type === 'price_override' && rule.effect.price_modifier !== undefined && (
-                  <span className="font-medium">
-                    {rule.effect.price_modifier >= 0 ? ' +' : ' '}{rule.effect.price_modifier}
+          {rules.map(rule => {
+            const cfg = RULE_TYPE_CONFIG[rule.rule_type]
+            return (
+              <div key={rule.id} className="flex items-center gap-2 rounded-lg border bg-muted/20 px-4 py-3">
+                <div className="flex-1 flex items-center gap-1.5 flex-wrap text-sm">
+                  <span className="text-xs font-bold text-primary">{t('IF')}</span>
+                  {ruleConditionLabel(rule)}
+                  <span className="text-xs text-muted-foreground mx-0.5">→</span>
+                  <span className={`px-2 py-0.5 rounded-full text-xs border font-medium ${cfg.active}`}>
+                    {t(cfg.label)}
                   </span>
-                )}
+                  {rule.effect.characteristic_id && (
+                    <>
+                      <span className="text-xs text-muted-foreground">{t('on')}</span>
+                      <span className="px-2 py-0.5 rounded-full text-xs border bg-background font-medium">
+                        {charName(rule.effect.characteristic_id)}
+                      </span>
+                    </>
+                  )}
+                  {rule.effect.value_id && (
+                    <>
+                      <span className="text-xs text-muted-foreground">=</span>
+                      <span className="px-2 py-0.5 rounded-full text-xs border bg-background">
+                        {valueName(rule.effect.characteristic_id ?? '', rule.effect.value_id)}
+                      </span>
+                    </>
+                  )}
+                  {rule.effect.numeric_value !== undefined && (
+                    <span className="px-2 py-0.5 rounded-full text-xs border bg-background font-mono">
+                      = {rule.effect.numeric_value}
+                    </span>
+                  )}
+                  {rule.rule_type === 'price_override' && rule.effect.price_modifier !== undefined && (
+                    <span className="px-2 py-0.5 rounded-full text-xs border bg-background font-mono">
+                      {rule.effect.price_modifier >= 0 ? '+' : ''}{rule.effect.price_modifier}
+                    </span>
+                  )}
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 text-destructive hover:text-destructive shrink-0"
+                  onClick={() => handleDelete(rule.id)}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
               </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7 text-destructive hover:text-destructive shrink-0"
-                onClick={() => handleDelete(rule.id)}
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-              </Button>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
 
-      {/* Add rule form */}
-      <div className="rounded-lg border p-4 space-y-3 bg-muted/10">
-        <p className="text-sm font-medium">New rule</p>
+      {/* ── New rule form ──────────────────────────────────────────────────── */}
+      <div className="rounded-lg border p-4 space-y-4 bg-muted/10">
+        <p className="text-sm font-medium">{t('New rule')}</p>
 
-        {/* Condition row */}
-        <div className="space-y-1.5">
-          <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">When</p>
-          <div className="flex gap-2">
-            <Select
-              value={condCharId}
-              onChange={e => handleCondCharChange(e.target.value)}
-              className="flex-1"
-            >
-              <option value="">Select characteristic…</option>
-              {characteristics.filter(c => c.display_type !== 'number').map(c => (
-                <option key={c.id} value={c.id}>{c.name}</option>
+        {/* Step 1: Condition */}
+        <div className="space-y-2">
+          <div className="flex items-start gap-3">
+            <span className="text-xs font-bold text-primary pt-1 w-10 shrink-0">{t('IF')}</span>
+            <CharPicker value={condCharId} chars={characteristics} onChange={handleCondCharChange} />
+          </div>
+
+          {/* Select-type condition: value picker */}
+          {condCharId && !condIsNumeric && (
+            <div className="flex items-start gap-3 pl-[52px]">
+              <span className="text-xs text-muted-foreground pt-1">=</span>
+              <ValuePicker
+                charId={condCharId}
+                value={condValueId}
+                valuesMap={valuesMap}
+                onChange={setCondValueId}
+              />
+            </div>
+          )}
+
+          {/* Numeric condition: op pills + number input */}
+          {condCharId && condIsNumeric && (
+            <div className="flex items-center gap-2 pl-[52px] flex-wrap">
+              {NUMERIC_OPS.map(({ op, label }) => (
+                <button
+                  key={op}
+                  type="button"
+                  onClick={() => setCondNumericOp(op)}
+                  className={[
+                    'px-2.5 py-0.5 rounded-full text-xs border font-mono font-medium transition-colors',
+                    condNumericOp === op
+                      ? 'bg-primary text-primary-foreground border-primary'
+                      : 'bg-background border-input hover:bg-muted',
+                  ].join(' ')}
+                >
+                  {label}
+                </button>
               ))}
-            </Select>
-            <span className="flex items-center text-sm text-muted-foreground px-1">=</span>
-            <Select
-              value={condValueId}
-              onChange={e => setCondValueId(e.target.value)}
-              className="flex-1"
-              disabled={!condCharId}
-            >
-              <option value="">Select value…</option>
-              {condValues.map(v => (
-                <option key={v.id} value={v.id}>{v.label}</option>
-              ))}
-            </Select>
+              <input
+                type="number"
+                value={condNumericVal}
+                onChange={e => setCondNumericVal(e.target.value)}
+                className="w-24 rounded border border-input bg-background px-2 py-0.5 text-xs shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                placeholder={t('value')}
+              />
+            </div>
+          )}
+        </div>
+
+        {/* Step 2: Action */}
+        <div className="flex items-start gap-3">
+          <span className="text-xs font-bold text-primary pt-1 w-10 shrink-0">{t('THEN')}</span>
+          <div className="flex flex-wrap gap-1.5">
+            {RULE_TYPES.map(rt => {
+              const cfg = RULE_TYPE_CONFIG[rt]
+              const selected = ruleType === rt
+              return (
+                <button
+                  key={rt}
+                  type="button"
+                  onClick={() => { setRuleType(rt); setEffCharId(''); setEffValueId('') }}
+                  className={[
+                    'px-2.5 py-1 rounded-full text-xs border font-medium transition-colors',
+                    selected ? cfg.active : 'bg-background border-input hover:bg-muted',
+                  ].join(' ')}
+                >
+                  {t(cfg.label)}
+                </button>
+              )
+            })}
           </div>
         </div>
 
-        {/* Action */}
-        <div className="space-y-1.5">
-          <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Then</p>
-          <Select
-            value={ruleType}
-            onChange={e => { setRuleType(e.target.value as RuleType); setEffCharId(''); setEffValueId('') }}
-          >
-            {RULE_TYPES.map(t => (
-              <option key={t} value={t}>{RULE_TYPE_LABELS[t]}</option>
-            ))}
-          </Select>
-        </div>
+        {/* Step 3: Target characteristic */}
+        <div className="space-y-2">
+          <div className="flex items-start gap-3">
+            <span className="text-xs font-bold text-primary pt-1 w-10 shrink-0">{t('ON')}</span>
+            <CharPicker value={effCharId} chars={effectChars} onChange={handleEffCharChange} />
+          </div>
 
-        {/* Effect target */}
-        <div className="flex gap-2">
-          <Select
-            value={effCharId}
-            onChange={e => handleEffCharChange(e.target.value)}
-            className="flex-1"
-          >
-            <option value="">Target characteristic…</option>
-            {characteristics
-              .filter(c => ruleType === 'price_override' ? c.display_type !== 'number' : c.display_type !== 'number')
-              .map(c => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-          </Select>
-
-          {effectIsValueBased(ruleType) && (
-            <>
-              <span className="flex items-center text-sm text-muted-foreground px-1">=</span>
-              <Select
+          {/* Select-type target: value picker */}
+          {effCharId && !effIsNumeric && ruleType !== 'price_override' && (
+            <div className="flex items-start gap-3 pl-[52px]">
+              <span className="text-xs text-muted-foreground pt-1">=</span>
+              <ValuePicker
+                charId={effCharId}
                 value={effValueId}
-                onChange={e => setEffValueId(e.target.value)}
-                className="flex-1"
-                disabled={!effCharId}
-              >
-                <option value="">Target value…</option>
-                {effValues.map(v => (
-                  <option key={v.id} value={v.id}>{v.label}</option>
-                ))}
-              </Select>
-            </>
+                valuesMap={valuesMap}
+                onChange={setEffValueId}
+              />
+            </div>
           )}
 
-          {ruleType === 'price_override' && (
-            <input
-              type="number"
-              value={effPrice}
-              onChange={e => setEffPrice(e.target.value)}
-              className="w-24 rounded-md border border-input bg-background px-3 py-1.5 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
-              placeholder="Amount"
-            />
+          {/* Numeric target: number input (for set default / lock) */}
+          {effCharId && effIsNumeric && (ruleType === 'set_value_default' || ruleType === 'set_value_locked') && (
+            <div className="flex items-center gap-2 pl-[52px]">
+              <span className="text-xs text-muted-foreground">=</span>
+              <input
+                type="number"
+                value={effNumericVal}
+                onChange={e => setEffNumericVal(e.target.value)}
+                className="w-28 rounded border border-input bg-background px-2 py-1 text-xs shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                placeholder={t('value')}
+              />
+            </div>
+          )}
+
+          {/* Price amount for price_override */}
+          {effCharId && ruleType === 'price_override' && (
+            <div className="flex items-center gap-2 pl-[52px]">
+              <span className="text-xs text-muted-foreground">{t('amount')}</span>
+              <input
+                type="number"
+                value={effPrice}
+                onChange={e => setEffPrice(e.target.value)}
+                className="w-28 rounded border border-input bg-background px-2 py-1 text-xs shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                placeholder={t('e.g. 50 or \u221220')}
+              />
+            </div>
           )}
         </div>
 
         <div className="flex justify-end">
           <Button size="sm" onClick={handleAdd} loading={saving} disabled={saving}>
-            <Plus className="h-4 w-4" />
-            Add rule
+            {t('Add rule')}
           </Button>
         </div>
       </div>

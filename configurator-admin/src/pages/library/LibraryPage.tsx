@@ -32,6 +32,7 @@ import { CharacteristicValuesEditor } from '@/pages/products/components/Characte
 import { useToast } from '@/hooks/useToast'
 import { Toaster } from '@/components/ui/toast'
 import { useAuthContext } from '@/components/auth/AuthContext'
+import { t } from '@/i18n'
 
 // ─── DroppableClass card ─────────────────────────────────────────────────────
 
@@ -76,7 +77,7 @@ function DroppableClass({ cls, memberIds, characteristics, onRemoveMember, onDel
       {/* Member chips */}
       {memberIds.length === 0 ? (
         <p className="text-xs text-muted-foreground italic">
-          {isOver ? 'Drop here to add' : 'Drag characteristics here'}
+          {isOver ? t('Drop here to add') : t('Drag characteristics here')}
         </p>
       ) : (
         <div className="flex flex-wrap gap-1.5">
@@ -102,7 +103,7 @@ function DroppableClass({ cls, memberIds, characteristics, onRemoveMember, onDel
           })}
           {isOver && (
             <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs border border-dashed border-primary text-primary">
-              + drop here
+              {t('+ drop here')}
             </span>
           )}
         </div>
@@ -156,7 +157,7 @@ function DraggableChar({
           className="touch-none cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground shrink-0"
           {...attributes}
           {...listeners}
-          aria-label="Drag to assign to class"
+          aria-label={t('Drag to assign to class')}
         >
           <GripVertical className="h-4 w-4" />
         </button>
@@ -185,17 +186,17 @@ function DraggableChar({
           onChange={e => onChangeType(e.target.value as Characteristic['display_type'])}
           className="text-xs h-7 py-0 w-32 shrink-0"
         >
-          <option value="select">Select</option>
-          <option value="radio">Radio</option>
-          <option value="swatch">Swatch</option>
-          <option value="toggle">Toggle</option>
-          <option value="number">Number</option>
+          <option value="select">{t('Select')}</option>
+          <option value="radio">{t('Radio')}</option>
+          <option value="swatch">{t('Swatch')}</option>
+          <option value="toggle">{t('Toggle')}</option>
+          <option value="number">{t('Number')}</option>
         </Select>
 
         {/* Class membership tags */}
         <div className="flex gap-1 flex-wrap max-w-[160px] shrink-0">
           {classesForChar.length === 0 ? (
-            <span className="text-xs text-muted-foreground italic">no class</span>
+            <span className="text-xs text-muted-foreground italic">{t('no class')}</span>
           ) : (
             classesForChar.map(cls => (
               <span
@@ -210,7 +211,7 @@ function DraggableChar({
 
         {/* Value count */}
         <span className="text-xs text-muted-foreground shrink-0 w-14 text-right">
-          {values.length} val{values.length !== 1 ? 's' : ''}
+          {values.length} {values.length !== 1 ? t('vals') : t('val')}
         </span>
 
         <Button
@@ -227,7 +228,7 @@ function DraggableChar({
       {expanded && (
         <div className="px-4 pb-4 pt-2 border-t bg-muted/10">
           <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
-            Values
+            {t('Values')}
           </p>
           <CharacteristicValuesEditor
             characteristicId={char.id}
@@ -250,24 +251,20 @@ export function LibraryPage() {
   const [loading, setLoading]             = useState(true)
   const [characteristics, setChars]       = useState<Characteristic[]>([])
   const [classes, setClasses]             = useState<CharacteristicClass[]>([])
-  // classId → charId[]
   const [memberships, setMemberships]     = useState<Record<string, string[]>>({})
   const [values, setValues]               = useState<Record<string, CharacteristicValue[]>>({})
   const [expanded, setExpanded]           = useState<Record<string, boolean>>({})
   const [activeCharId, setActiveCharId]   = useState<string | null>(null)
 
-  // New characteristic form
   const [showNewChar, setShowNewChar]     = useState(false)
   const [newName, setNewName]             = useState('')
   const [newType, setNewType]             = useState<Characteristic['display_type']>('select')
   const [creatingChar, setCreatingChar]   = useState(false)
 
-  // New class form
   const [showNewClass, setShowNewClass]   = useState(false)
   const [newClassName, setNewClassName]   = useState('')
   const [creatingClass, setCreatingClass] = useState(false)
 
-  // Delete confirmations
   const [toDelete, setToDelete]           = useState<Characteristic | null>(null)
   const [deleting, setDeleting]           = useState(false)
   const [toDeleteClass, setToDeleteClass] = useState<CharacteristicClass | null>(null)
@@ -286,7 +283,6 @@ export function LibraryPage() {
       setChars(chars)
       setClasses(cls)
 
-      // Build classId → charId[] map
       const memberMap: Record<string, string[]> = {}
       for (const m of allMemberships) {
         if (!memberMap[m.class_id]) memberMap[m.class_id] = []
@@ -294,14 +290,13 @@ export function LibraryPage() {
       }
       setMemberships(memberMap)
 
-      // Load values for all chars
       const valMap: Record<string, CharacteristicValue[]> = {}
       await Promise.all(chars.map(async c => {
         valMap[c.id] = await fetchValuesForCharacteristic(c.id)
       }))
       setValues(valMap)
     } catch {
-      toast({ title: 'Failed to load library', variant: 'destructive' })
+      toast({ title: t('Failed to load library'), variant: 'destructive' })
     } finally {
       setLoading(false)
     }
@@ -310,8 +305,6 @@ export function LibraryPage() {
   function toggleExpand(id: string) {
     setExpanded(prev => ({ ...prev, [id]: !prev[id] }))
   }
-
-  // ── DnD handlers ────────────────────────────────────────────────────────────
 
   function handleDragStart({ active }: DragStartEvent) {
     setActiveCharId(active.id as string)
@@ -322,7 +315,6 @@ export function LibraryPage() {
     if (!over) return
     const charId  = active.id as string
     const classId = over.id as string
-    // Guard: already a member
     if (memberships[classId]?.includes(charId)) return
     try {
       await addCharacteristicToClass(classId, charId)
@@ -331,7 +323,7 @@ export function LibraryPage() {
         [classId]: [...(prev[classId] ?? []), charId],
       }))
     } catch {
-      toast({ title: 'Failed to add characteristic to class', variant: 'destructive' })
+      toast({ title: t('Failed to add characteristic to class'), variant: 'destructive' })
     }
   }
 
@@ -343,11 +335,9 @@ export function LibraryPage() {
         [classId]: (prev[classId] ?? []).filter(id => id !== charId),
       }))
     } catch {
-      toast({ title: 'Failed to remove characteristic from class', variant: 'destructive' })
+      toast({ title: t('Failed to remove characteristic from class'), variant: 'destructive' })
     }
   }
-
-  // ── Characteristic CRUD ──────────────────────────────────────────────────────
 
   async function handleCreateChar() {
     if (!newName.trim()) return
@@ -360,7 +350,7 @@ export function LibraryPage() {
       setNewType('select')
       setShowNewChar(false)
     } catch {
-      toast({ title: 'Failed to create characteristic', variant: 'destructive' })
+      toast({ title: t('Failed to create characteristic'), variant: 'destructive' })
     } finally {
       setCreatingChar(false)
     }
@@ -372,7 +362,7 @@ export function LibraryPage() {
       const updated = await updateCharacteristic(char.id, { name: name.trim() })
       setChars(prev => prev.map(c => c.id === char.id ? updated : c))
     } catch {
-      toast({ title: 'Failed to rename characteristic', variant: 'destructive' })
+      toast({ title: t('Failed to rename characteristic'), variant: 'destructive' })
     }
   }
 
@@ -381,7 +371,7 @@ export function LibraryPage() {
       const updated = await updateCharacteristic(char.id, { display_type })
       setChars(prev => prev.map(c => c.id === char.id ? updated : c))
     } catch {
-      toast({ title: 'Failed to update type', variant: 'destructive' })
+      toast({ title: t('Failed to update type'), variant: 'destructive' })
     }
   }
 
@@ -391,7 +381,6 @@ export function LibraryPage() {
     try {
       await deleteCharacteristic(toDelete.id)
       setChars(prev => prev.filter(c => c.id !== toDelete.id))
-      // Remove from all class memberships
       setMemberships(prev => {
         const next = { ...prev }
         for (const classId of Object.keys(next)) {
@@ -401,13 +390,11 @@ export function LibraryPage() {
       })
       setToDelete(null)
     } catch {
-      toast({ title: 'Failed to delete characteristic', variant: 'destructive' })
+      toast({ title: t('Failed to delete characteristic'), variant: 'destructive' })
     } finally {
       setDeleting(false)
     }
   }
-
-  // ── Class CRUD ───────────────────────────────────────────────────────────────
 
   async function handleCreateClass() {
     if (!newClassName.trim()) return
@@ -419,7 +406,7 @@ export function LibraryPage() {
       setNewClassName('')
       setShowNewClass(false)
     } catch {
-      toast({ title: 'Failed to create class', variant: 'destructive' })
+      toast({ title: t('Failed to create class'), variant: 'destructive' })
     } finally {
       setCreatingClass(false)
     }
@@ -438,13 +425,11 @@ export function LibraryPage() {
       })
       setToDeleteClass(null)
     } catch {
-      toast({ title: 'Failed to delete class', variant: 'destructive' })
+      toast({ title: t('Failed to delete class'), variant: 'destructive' })
     } finally {
       setDeletingClass(false)
     }
   }
-
-  // ── Derived ──────────────────────────────────────────────────────────────────
 
   const activeChar = activeCharId ? characteristics.find(c => c.id === activeCharId) : null
 
@@ -459,8 +444,8 @@ export function LibraryPage() {
   return (
     <div className="animate-fade-in">
       <PageHeader
-        title="Characteristic Library"
-        description="Manage all characteristics and classes. Drag a characteristic onto a class card to assign it."
+        title={t('Characteristic Library')}
+        description={t('Manage all characteristics and classes. Drag a characteristic onto a class card to assign it.')}
       />
 
       <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
@@ -473,23 +458,23 @@ export function LibraryPage() {
                 <div>
                   <CardTitle className="text-base flex items-center gap-2">
                     <Tag className="h-4 w-4 text-muted-foreground" />
-                    Classes
+                    {t('Classes')}
                   </CardTitle>
                   <CardDescription className="mt-1">
-                    Group characteristics into named sections. Assign classes to products.
+                    {t('Group characteristics into named sections. Assign classes to products.')}
                   </CardDescription>
                 </div>
                 {!showNewClass && (
                   <Button size="sm" variant="outline" onClick={() => setShowNewClass(true)}>
                     <Plus className="h-4 w-4 mr-1" />
-                    New class
+                    {t('New class')}
                   </Button>
                 )}
               </div>
             </CardHeader>
             <CardContent>
               {classes.length === 0 && !showNewClass && (
-                <p className="text-sm text-muted-foreground mb-3">No classes yet.</p>
+                <p className="text-sm text-muted-foreground mb-3">{t('No classes yet.')}</p>
               )}
 
               {classes.length > 0 && (
@@ -510,7 +495,7 @@ export function LibraryPage() {
               {showNewClass && (
                 <div className="flex gap-2 items-center pt-1">
                   <Input
-                    placeholder="Class name (e.g. Dimensions, Material)"
+                    placeholder={t('Class name (e.g. Dimensions, Material)')}
                     value={newClassName}
                     onChange={e => setNewClassName(e.target.value)}
                     onKeyDown={e => { if (e.key === 'Enter') handleCreateClass() }}
@@ -518,10 +503,10 @@ export function LibraryPage() {
                     className="flex-1 text-sm"
                   />
                   <Button size="sm" onClick={handleCreateClass} loading={creatingClass} disabled={!newClassName.trim()}>
-                    Create
+                    {t('Create')}
                   </Button>
                   <Button size="sm" variant="ghost" onClick={() => { setShowNewClass(false); setNewClassName('') }}>
-                    Cancel
+                    {t('Cancel')}
                   </Button>
                 </div>
               )}
@@ -533,15 +518,15 @@ export function LibraryPage() {
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
                 <div>
-                  <CardTitle className="text-base">Characteristics</CardTitle>
+                  <CardTitle className="text-base">{t('Characteristics')}</CardTitle>
                   <CardDescription className="mt-1">
-                    Drag a characteristic onto a class card above to assign it.
+                    {t('Manage all characteristics and classes. Drag a characteristic onto a class card to assign it.')}
                   </CardDescription>
                 </div>
                 {!showNewChar && (
                   <Button size="sm" variant="outline" onClick={() => setShowNewChar(true)}>
                     <Plus className="h-4 w-4 mr-1" />
-                    New characteristic
+                    {t('New characteristic')}
                   </Button>
                 )}
               </div>
@@ -551,10 +536,10 @@ export function LibraryPage() {
               {/* New characteristic form */}
               {showNewChar && (
                 <div className="rounded-lg border p-4 space-y-3 bg-muted/10">
-                  <p className="text-sm font-medium">New characteristic</p>
+                  <p className="text-sm font-medium">{t('New characteristic ')}</p>
                   <div className="flex gap-2">
                     <Input
-                      placeholder="Name (e.g. Material, Width)"
+                      placeholder={t('Name (e.g. Material, Width)')}
                       value={newName}
                       onChange={e => setNewName(e.target.value)}
                       onKeyDown={e => { if (e.key === 'Enter') handleCreateChar() }}
@@ -566,26 +551,26 @@ export function LibraryPage() {
                       onChange={e => setNewType(e.target.value as Characteristic['display_type'])}
                       className="w-36"
                     >
-                      <option value="select">Select</option>
-                      <option value="radio">Radio</option>
-                      <option value="swatch">Swatch</option>
-                      <option value="toggle">Toggle</option>
-                      <option value="number">Number</option>
+                      <option value="select">{t('Select')}</option>
+                      <option value="radio">{t('Radio')}</option>
+                      <option value="swatch">{t('Swatch')}</option>
+                      <option value="toggle">{t('Toggle')}</option>
+                      <option value="number">{t('Number')}</option>
                     </Select>
                   </div>
                   <div className="flex gap-2">
                     <Button size="sm" onClick={handleCreateChar} loading={creatingChar} disabled={!newName.trim()}>
-                      Create
+                      {t('Create')}
                     </Button>
                     <Button size="sm" variant="ghost" onClick={() => { setShowNewChar(false); setNewName('') }}>
-                      Cancel
+                      {t('Cancel')}
                     </Button>
                   </div>
                 </div>
               )}
 
               {characteristics.length === 0 && !showNewChar && (
-                <p className="text-sm text-muted-foreground">No characteristics yet.</p>
+                <p className="text-sm text-muted-foreground">{t('No characteristics yet.')}</p>
               )}
 
               <div className="space-y-1.5">
@@ -611,7 +596,7 @@ export function LibraryPage() {
 
         </div>
 
-        {/* Drag overlay — ghost following cursor */}
+        {/* Drag overlay */}
         <DragOverlay>
           {activeChar && (
             <div className="rounded-lg border bg-card shadow-lg px-3 py-2.5 flex items-center gap-2 opacity-90 max-w-xs">
@@ -623,24 +608,22 @@ export function LibraryPage() {
         </DragOverlay>
       </DndContext>
 
-      {/* Confirm delete characteristic */}
       <ConfirmDialog
         open={!!toDelete}
         onOpenChange={open => !open && setToDelete(null)}
-        title="Delete characteristic?"
+        title={t('Delete characteristic?')}
         description={`Delete "${toDelete?.name}"? This removes it from all classes and products.`}
-        confirmLabel="Delete"
+        confirmLabel={t('Delete')}
         onConfirm={handleDeleteChar}
         loading={deleting}
       />
 
-      {/* Confirm delete class */}
       <ConfirmDialog
         open={!!toDeleteClass}
         onOpenChange={open => !open && setToDeleteClass(null)}
-        title="Delete class?"
+        title={t('Delete class?')}
         description={`Delete class "${toDeleteClass?.name}"? Characteristics in this class will remain in the library, unassigned from this class.`}
-        confirmLabel="Delete"
+        confirmLabel={t('Delete')}
         onConfirm={handleDeleteClass}
         loading={deletingClass}
       />

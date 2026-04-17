@@ -9,6 +9,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Spinner } from '@/components/ui/spinner'
 import { useToast } from '@/hooks/useToast'
 import { Toaster } from '@/components/ui/toast'
+import { t } from '@/i18n'
 
 type FilterStatus = InquiryStatus | 'all'
 
@@ -30,7 +31,7 @@ const statusVariant: Record<InquiryStatus, 'destructive' | 'warning' | 'success'
 function timeAgo(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime()
   const mins = Math.floor(diff / 60000)
-  if (mins < 1) return 'just now'
+  if (mins < 1) return t('just now')
   if (mins < 60) return `${mins}m ago`
   const hours = Math.floor(mins / 60)
   if (hours < 24) return `${hours}h ago`
@@ -53,7 +54,7 @@ export function InquiriesPage() {
     try {
       setInquiries(await fetchInquiries(status) as any)
     } catch {
-      toast({ title: 'Failed to load inquiries', variant: 'destructive' })
+      toast({ title: t('Failed to load inquiries'), variant: 'destructive' })
     } finally {
       setLoading(false)
     }
@@ -62,8 +63,8 @@ export function InquiriesPage() {
   return (
     <div className="animate-fade-in">
       <PageHeader
-        title="Inquiries"
-        description="Quote requests submitted by your customers."
+        title={t('Inquiries')}
+        description={t('Quote requests submitted by your customers.')}
       />
 
       {/* Filter tabs */}
@@ -79,7 +80,7 @@ export function InquiriesPage() {
                   : 'border-transparent text-muted-foreground hover:text-foreground'
               }`}
             >
-              {f.label}
+              {t(f.label)}
             </button>
           ))}
         </div>
@@ -92,11 +93,11 @@ export function InquiriesPage() {
           <Card>
             <CardContent className="flex flex-col items-center justify-center py-16 text-center">
               <Inbox className="h-10 w-10 text-muted-foreground/40 mb-3" />
-              <p className="font-medium text-sm">No inquiries yet</p>
+              <p className="font-medium text-sm">{t('No inquiries yet')}</p>
               <p className="text-sm text-muted-foreground mt-1">
                 {filter === 'all'
-                  ? 'When customers submit quote requests, they will appear here.'
-                  : `No ${filter} inquiries.`}
+                  ? t('When customers submit quote requests, they will appear here.')
+                  : t(`No ${filter} inquiries.`)}
               </p>
             </CardContent>
           </Card>
@@ -106,11 +107,11 @@ export function InquiriesPage() {
               <thead>
                 <tr className="border-b bg-muted/40">
                   <th className="px-4 py-3 text-left font-medium text-muted-foreground w-6" />
-                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">Customer</th>
-                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">Product</th>
-                  <th className="px-4 py-3 text-right font-medium text-muted-foreground">Total</th>
-                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">Status</th>
-                  <th className="px-4 py-3 text-right font-medium text-muted-foreground">Received</th>
+                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">{t('Customer')}</th>
+                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">{t('Product')}</th>
+                  <th className="px-4 py-3 text-right font-medium text-muted-foreground">{t('Total')}</th>
+                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">{t('Status')}</th>
+                  <th className="px-4 py-3 text-right font-medium text-muted-foreground">{t('Received')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y">
@@ -142,7 +143,7 @@ export function InquiriesPage() {
                     </td>
                     <td className="px-4 py-3">
                       <Badge variant={statusVariant[inq.status]} className="capitalize">
-                        {inq.status}
+                        {t(inq.status)}
                       </Badge>
                     </td>
                     <td className="px-4 py-3 text-right text-muted-foreground text-xs">

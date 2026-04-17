@@ -1,37 +1,38 @@
 import type { FormulaNode } from '@/types/database'
 import type { Characteristic, CharacteristicValue } from '@/types/database'
+import { t } from '@/i18n'
 
 // ── Node type helpers ─────────────────────────────────────────────────────────
 
 type NodeType = FormulaNode['type']
 
 const NODE_GROUPS: { label: string; types: NodeType[] }[] = [
-  { label: 'Values',     types: ['number', 'base_price', 'modifier', 'input'] },
-  { label: 'Selection',  types: ['is_selected'] },
-  { label: 'Arithmetic', types: ['add', 'subtract', 'multiply', 'divide'] },
-  { label: 'Compare',    types: ['gt', 'gte', 'lt', 'lte', 'eq'] },
-  { label: 'Logic',      types: ['and', 'or'] },
-  { label: 'Conditional',types: ['if'] },
+  { label: 'Values',      types: ['number', 'base_price', 'modifier', 'input'] },
+  { label: 'Selection',   types: ['is_selected'] },
+  { label: 'Arithmetic',  types: ['add', 'subtract', 'multiply', 'divide'] },
+  { label: 'Compare',     types: ['gt', 'gte', 'lt', 'lte', 'eq'] },
+  { label: 'Logic',       types: ['and', 'or'] },
+  { label: 'Conditional', types: ['if'] },
 ]
 
 const NODE_LABELS: Record<NodeType, string> = {
-  number:     'Number',
-  base_price: 'Base price',
-  modifier:   'Price modifier',
-  input:      'Numeric input',
-  is_selected:'Is selected',
-  add:        'Add (+)',
-  subtract:   'Subtract (−)',
-  multiply:   'Multiply (×)',
-  divide:     'Divide (÷)',
-  gt:         'Greater than (>)',
-  gte:        'Greater or equal (≥)',
-  lt:         'Less than (<)',
-  lte:        'Less or equal (≤)',
-  eq:         'Equal (=)',
-  and:        'AND',
-  or:         'OR',
-  if:         'IF / THEN / ELSE',
+  number:      'Number',
+  base_price:  'Base price',
+  modifier:    'Price modifier of',
+  input:       'Numeric input',
+  is_selected: 'Is selected',
+  add:         'Add (+)',
+  subtract:    'Subtract (−)',
+  multiply:    'Multiply (×)',
+  divide:      'Divide (÷)',
+  gt:          'Greater than (>)',
+  gte:         'Greater or equal (≥)',
+  lt:          'Less than (<)',
+  lte:         'Less or equal (≤)',
+  eq:          'Equal (=)',
+  and:         'AND',
+  or:          'OR',
+  if:          'IF / THEN / ELSE',
 }
 
 const OP_SYMBOL: Partial<Record<NodeType, string>> = {
@@ -44,30 +45,235 @@ function isBinaryNode(node: FormulaNode): node is Extract<FormulaNode, { left: F
   return ['add','subtract','multiply','divide','gt','gte','lt','lte','eq','and','or'].includes(node.type)
 }
 
-function defaultNode(type: NodeType, firstCharId = '', firstValueId = ''): FormulaNode {
+function defaultNode(nodeType: NodeType, firstCharId = '', firstValueId = ''): FormulaNode {
   const zero: FormulaNode = { type: 'number', value: 0 }
-  switch (type) {
-    case 'number':     return { type: 'number', value: 0 }
-    case 'base_price': return { type: 'base_price' }
-    case 'modifier':   return { type: 'modifier', char_id: firstCharId }
-    case 'input':      return { type: 'input',    char_id: firstCharId }
-    case 'is_selected':return { type: 'is_selected', char_id: firstCharId, value_id: firstValueId }
-    case 'if':         return { type: 'if', condition: zero, then: zero, else_node: zero }
-    default:           return { type, left: zero, right: zero } as FormulaNode
+  switch (nodeType) {
+    case 'number':      return { type: 'number', value: 0 }
+    case 'base_price':  return { type: 'base_price' }
+    case 'modifier':    return { type: 'modifier', char_id: firstCharId }
+    case 'input':       return { type: 'input', char_id: firstCharId }
+    case 'is_selected': return { type: 'is_selected', char_id: firstCharId, value_id: firstValueId }
+    case 'if':          return { type: 'if', condition: zero, then: zero, else_node: zero }
+    default:            return { type: nodeType, left: zero, right: zero } as FormulaNode
   }
 }
 
-// ── Props ─────────────────────────────────────────────────────────────────────
+// ── Formula → human-readable string ──────────────────────────────────────────
 
-interface FormulaBuilderProps {
-  node: FormulaNode
-  onChange: (node: FormulaNode) => void
-  characteristics: Characteristic[]
+function formulaToString(
+  node: FormulaNode,
+  chars: Characteristic[],
   valuesMap: Record<string, CharacteristicValue[]>
-  depth?: number
+): string {
+  const charName  = (id: string) => chars.find(c => c.id === id)?.name ?? '?'
+  const valueName = (cId: string, vId: string) => valuesMap[cId]?.find(v => v.id === vId)?.label ?? '?'
+  const s = (n: FormulaNode): string => formulaToString(n, chars, valuesMap)
+
+  switch (node.type) {
+    case 'number':      return String(node.value)
+    case 'base_price':  return t('base price')
+    case 'modifier':    return node.char_id ? `[${charName(node.char_id)} modifier]` : '[modifier ?]'
+    case 'input':       return node.char_id ? `[${charName(node.char_id)}]` : '[input ?]'
+    case 'is_selected': return node.char_id
+      ? `[${charName(node.char_id)} = ${node.value_id ? valueName(node.char_id, node.value_id) : '?'}]`
+      : '[is selected ?]'
+    case 'add':         return `(${s(node.left)} + ${s(node.right)})`
+    case 'subtract':    return `(${s(node.left)} − ${s(node.right)})`
+    case 'multiply':    return `(${s(node.left)} × ${s(node.right)})`
+    case 'divide':      return `(${s(node.left)} ÷ ${s(node.right)})`
+    case 'gt':          return `(${s(node.left)} > ${s(node.right)})`
+    case 'gte':         return `(${s(node.left)} ≥ ${s(node.right)})`
+    case 'lt':          return `(${s(node.left)} < ${s(node.right)})`
+    case 'lte':         return `(${s(node.left)} ≤ ${s(node.right)})`
+    case 'eq':          return `(${s(node.left)} = ${s(node.right)})`
+    case 'and':         return `(${s(node.left)} AND ${s(node.right)})`
+    case 'or':          return `(${s(node.left)} OR ${s(node.right)})`
+    case 'if':          return `IF ${s(node.condition)} THEN ${s(node.then)} ELSE ${s(node.else_node)}`
+  }
 }
 
-// ── Inline small Select helper ────────────────────────────────────────────────
+// ── Templates ─────────────────────────────────────────────────────────────────
+
+interface Template {
+  label: string
+  description: string
+  build: (firstSelectCharId: string, firstValueId: string, firstNumberCharId: string) => FormulaNode
+}
+
+interface TemplateGroup {
+  group: string
+  items: Template[]
+}
+
+const TEMPLATE_GROUPS: TemplateGroup[] = [
+  {
+    group: 'Simple (no condition)',
+    items: [
+      {
+        label: 'Base price + fixed amount',
+        description: 'base price + X',
+        build: () => ({ type: 'add', left: { type: 'base_price' }, right: { type: 'number', value: 0 } }),
+      },
+      {
+        label: 'Base price × percentage',
+        description: 'base price × X',
+        build: () => ({ type: 'multiply', left: { type: 'base_price' }, right: { type: 'number', value: 1 } }),
+      },
+      {
+        label: 'Base price × input',
+        description: 'base price × numeric characteristic',
+        build: (_c, _v, numCharId) => ({
+          type: 'multiply',
+          left: { type: 'base_price' },
+          right: { type: 'input', char_id: numCharId },
+        }),
+      },
+      {
+        label: 'Base price × input × input',
+        description: 'base price × Width × Height (two numeric inputs)',
+        build: (_c, _v, numCharId) => ({
+          type: 'multiply',
+          left: { type: 'multiply', left: { type: 'base_price' }, right: { type: 'input', char_id: numCharId } },
+          right: { type: 'input', char_id: numCharId },
+        }),
+      },
+      {
+        label: 'Base price + modifier',
+        description: 'base price + price modifier of a characteristic',
+        build: (charId) => ({
+          type: 'add',
+          left: { type: 'base_price' },
+          right: { type: 'modifier', char_id: charId },
+        }),
+      },
+    ],
+  },
+  {
+    group: 'Conditional (IF / THEN / ELSE)',
+    items: [
+      {
+        label: 'Add amount if value selected',
+        description: 'IF [char] = value THEN base + X ELSE base',
+        build: (charId, valueId) => ({
+          type: 'if',
+          condition: { type: 'is_selected', char_id: charId, value_id: valueId },
+          then: { type: 'add', left: { type: 'base_price' }, right: { type: 'number', value: 0 } },
+          else_node: { type: 'base_price' },
+        }),
+      },
+      {
+        label: 'Multiply base if value selected',
+        description: 'IF [char] = value THEN base × X ELSE base',
+        build: (charId, valueId) => ({
+          type: 'if',
+          condition: { type: 'is_selected', char_id: charId, value_id: valueId },
+          then: { type: 'multiply', left: { type: 'base_price' }, right: { type: 'number', value: 1 } },
+          else_node: { type: 'base_price' },
+        }),
+      },
+      {
+        label: 'Add amount if input > N',
+        description: 'IF [numeric input] > N THEN base + X ELSE base',
+        build: (_c, _v, numCharId) => ({
+          type: 'if',
+          condition: { type: 'gt', left: { type: 'input', char_id: numCharId }, right: { type: 'number', value: 0 } },
+          then: { type: 'add', left: { type: 'base_price' }, right: { type: 'number', value: 0 } },
+          else_node: { type: 'base_price' },
+        }),
+      },
+      {
+        label: 'Add if A or B selected',
+        description: 'IF (A = v1 OR B = v2) THEN base + X ELSE base',
+        build: (charId, valueId) => ({
+          type: 'if',
+          condition: {
+            type: 'or',
+            left:  { type: 'is_selected', char_id: charId, value_id: valueId },
+            right: { type: 'is_selected', char_id: charId, value_id: valueId },
+          },
+          then: { type: 'add', left: { type: 'base_price' }, right: { type: 'number', value: 0 } },
+          else_node: { type: 'base_price' },
+        }),
+      },
+      {
+        label: 'Add if A and B selected',
+        description: 'IF (A = v1 AND B = v2) THEN base + X ELSE base',
+        build: (charId, valueId) => ({
+          type: 'if',
+          condition: {
+            type: 'and',
+            left:  { type: 'is_selected', char_id: charId, value_id: valueId },
+            right: { type: 'is_selected', char_id: charId, value_id: valueId },
+          },
+          then: { type: 'add', left: { type: 'base_price' }, right: { type: 'number', value: 0 } },
+          else_node: { type: 'base_price' },
+        }),
+      },
+    ],
+  },
+]
+
+// ── Sub-components ────────────────────────────────────────────────────────────
+
+function CharPicker({ value, chars, onChange }: {
+  value: string
+  chars: Characteristic[]
+  onChange: (id: string) => void
+}) {
+  if (chars.length === 0) {
+    return <span className="text-xs text-muted-foreground italic">{t('No characteristics available')}</span>
+  }
+  return (
+    <div className="flex flex-wrap gap-1">
+      {chars.map(c => (
+        <button
+          key={c.id}
+          type="button"
+          onClick={() => onChange(c.id)}
+          className={[
+            'px-2 py-0.5 rounded-full text-xs border font-medium transition-colors',
+            value === c.id
+              ? 'bg-primary text-primary-foreground border-primary'
+              : 'bg-background border-input hover:bg-muted',
+          ].join(' ')}
+        >
+          {c.name}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+function ValuePicker({ charId, value, valuesMap, onChange }: {
+  charId: string
+  value: string
+  valuesMap: Record<string, CharacteristicValue[]>
+  onChange: (id: string) => void
+}) {
+  const vals = valuesMap[charId] ?? []
+  if (vals.length === 0) {
+    return <span className="text-xs text-muted-foreground italic">{t('No values for this characteristic')}</span>
+  }
+  return (
+    <div className="flex flex-wrap gap-1">
+      {vals.map(v => (
+        <button
+          key={v.id}
+          type="button"
+          onClick={() => onChange(v.id)}
+          className={[
+            'px-2 py-0.5 rounded-full text-xs border transition-colors',
+            value === v.id
+              ? 'bg-primary text-primary-foreground border-primary'
+              : 'bg-background border-input hover:bg-muted',
+          ].join(' ')}
+        >
+          {v.label}
+        </button>
+      ))}
+    </div>
+  )
+}
 
 function SmallSelect({ value, onChange, children, className = '' }: {
   value: string
@@ -79,183 +285,274 @@ function SmallSelect({ value, onChange, children, className = '' }: {
     <select
       value={value}
       onChange={e => onChange(e.target.value)}
-      className={`rounded border border-input bg-background px-2 py-1 text-xs shadow-sm focus:outline-none focus:ring-1 focus:ring-ring ${className}`}
+      className={`rounded border border-input bg-muted/40 px-2 py-0.5 text-xs text-muted-foreground shadow-sm focus:outline-none focus:ring-1 focus:ring-ring ${className}`}
     >
       {children}
     </select>
   )
 }
 
+// ── Props ─────────────────────────────────────────────────────────────────────
+
+interface FormulaBuilderProps {
+  node: FormulaNode
+  onChange: (node: FormulaNode) => void
+  characteristics: Characteristic[]
+  valuesMap: Record<string, CharacteristicValue[]>
+  /** When true, show the preview string and templates (only at root level) */
+  isRoot?: boolean
+}
+
 // ── Main recursive component ──────────────────────────────────────────────────
 
-export function FormulaBuilder({ node, onChange, characteristics, valuesMap, depth = 0 }: FormulaBuilderProps) {
-  const indent = depth * 16
-  const selectChars = characteristics.filter(c => c.display_type !== 'number')
-  const numberChars = characteristics.filter(c => c.display_type === 'number')
-  const firstCharId  = characteristics[0]?.id ?? ''
-  const firstValId   = valuesMap[firstCharId]?.[0]?.id ?? ''
+export function FormulaBuilder({ node, onChange, characteristics, valuesMap, isRoot = false }: FormulaBuilderProps) {
+  const selectChars  = characteristics.filter(c => c.display_type !== 'number')
+  const numberChars  = characteristics.filter(c => c.display_type === 'number')
+  const firstCharId  = selectChars[0]?.id ?? characteristics[0]?.id ?? ''
+  const firstValueId = valuesMap[firstCharId]?.[0]?.id ?? ''
+  const firstNumId   = numberChars[0]?.id ?? ''
 
-  function changeType(type: NodeType) {
-    onChange(defaultNode(type, firstCharId, firstValId))
+  function changeType(nodeType: NodeType) {
+    onChange(defaultNode(nodeType, firstCharId, firstValueId))
   }
 
-  // ── Type selector ─────────────────────────────────────────────────────────
+  // Node-type escape hatch (de-emphasised — power users only)
   const typeSelector = (
-    <SmallSelect value={node.type} onChange={t => changeType(t as NodeType)} className="font-medium">
+    <SmallSelect value={node.type} onChange={nodeType => changeType(nodeType as NodeType)}>
       {NODE_GROUPS.map(group => (
-        <optgroup key={group.label} label={group.label}>
-          {group.types.map(t => (
-            <option key={t} value={t}>{NODE_LABELS[t]}</option>
+        <optgroup key={group.label} label={t(group.label)}>
+          {group.types.map(nodeType => (
+            <option key={nodeType} value={nodeType}>{t(NODE_LABELS[nodeType])}</option>
           ))}
         </optgroup>
       ))}
     </SmallSelect>
   )
 
-  // ── Leaf: number ──────────────────────────────────────────────────────────
-  if (node.type === 'number') {
+  const childProps = { characteristics, valuesMap }
+
+  // ── Root wrapper: preview + templates ─────────────────────────────────────
+  const inner = renderNode()
+
+  if (isRoot) {
     return (
-      <div className="flex items-center gap-2 flex-wrap" style={{ marginLeft: indent }}>
-        {typeSelector}
-        <input
-          type="number"
-          value={node.value}
-          onChange={e => onChange({ type: 'number', value: parseFloat(e.target.value) || 0 })}
-          className="w-24 rounded border border-input bg-background px-2 py-1 text-xs shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
-        />
+      <div className="space-y-4">
+        {/* Preview */}
+        <div className="rounded bg-muted/40 px-3 py-2 font-mono text-xs text-foreground break-all">
+          {formulaToString(node, characteristics, valuesMap)}
+        </div>
+
+        {/* Templates */}
+        {characteristics.length > 0 && (
+          <div className="space-y-3">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{t('Quick templates')}</p>
+            {TEMPLATE_GROUPS.map(grp => {
+              const visibleItems = grp.group.includes('Simple')
+                ? grp.items.filter(item => {
+                    const needsNum = item.label.toLowerCase().includes('input')
+                    return needsNum ? numberChars.length > 0 : true
+                  })
+                : grp.items
+              if (visibleItems.length === 0) return null
+              return (
+                <div key={grp.group} className="space-y-1">
+                  <p className="text-xs text-muted-foreground">{t(grp.group)}</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {visibleItems.map(tpl => (
+                      <button
+                        key={tpl.label}
+                        type="button"
+                        title={t(tpl.description)}
+                        onClick={() => onChange(tpl.build(firstCharId, firstValueId, firstNumId))}
+                        className="px-2.5 py-1 rounded border border-input bg-background text-xs hover:bg-muted transition-colors"
+                      >
+                        {t(tpl.label)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+
+        {/* Builder tree */}
+        <div className="rounded-lg border bg-muted/10 p-3">
+          {inner}
+        </div>
       </div>
     )
   }
 
-  // ── Leaf: base_price ──────────────────────────────────────────────────────
-  if (node.type === 'base_price') {
-    return (
-      <div className="flex items-center gap-2" style={{ marginLeft: indent }}>
-        {typeSelector}
-      </div>
-    )
-  }
+  return inner
 
-  // ── Leaf: modifier ────────────────────────────────────────────────────────
-  if (node.type === 'modifier') {
-    return (
-      <div className="flex items-center gap-2 flex-wrap" style={{ marginLeft: indent }}>
-        {typeSelector}
-        <SmallSelect value={node.char_id} onChange={v => onChange({ type: 'modifier', char_id: v })}>
-          <option value="">Select characteristic…</option>
-          {selectChars.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-        </SmallSelect>
-      </div>
-    )
-  }
+  // ── Node renderers ─────────────────────────────────────────────────────────
 
-  // ── Leaf: input ───────────────────────────────────────────────────────────
-  if (node.type === 'input') {
-    return (
-      <div className="flex items-center gap-2 flex-wrap" style={{ marginLeft: indent }}>
-        {typeSelector}
-        <SmallSelect value={node.char_id} onChange={v => onChange({ type: 'input', char_id: v })}>
-          <option value="">Select numeric input…</option>
-          {numberChars.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-        </SmallSelect>
-      </div>
-    )
-  }
+  function renderNode() {
+    // ── number ────────────────────────────────────────────────────────────────
+    if (node.type === 'number') {
+      return (
+        <div className="flex items-center gap-2 flex-wrap">
+          {typeSelector}
+          <input
+            type="number"
+            value={node.value}
+            onChange={e => onChange({ type: 'number', value: parseFloat(e.target.value) || 0 })}
+            className="w-24 rounded border border-input bg-background px-2 py-1 text-xs shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+          />
+        </div>
+      )
+    }
 
-  // ── Leaf: is_selected ─────────────────────────────────────────────────────
-  if (node.type === 'is_selected') {
-    const values = valuesMap[node.char_id] ?? []
-    return (
-      <div className="flex items-center gap-2 flex-wrap" style={{ marginLeft: indent }}>
-        {typeSelector}
-        <SmallSelect
-          value={node.char_id}
-          onChange={v => onChange({ type: 'is_selected', char_id: v, value_id: '' })}
-        >
-          <option value="">Select characteristic…</option>
-          {selectChars.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-        </SmallSelect>
-        <span className="text-xs text-muted-foreground">=</span>
-        <SmallSelect
-          value={node.value_id}
-          onChange={v => onChange({ ...node, value_id: v })}
-        >
-          <option value="">Select value…</option>
-          {values.map(v => <option key={v.id} value={v.id}>{v.label}</option>)}
-        </SmallSelect>
-      </div>
-    )
-  }
-
-  // ── Binary ops (arithmetic + comparison + logical) ────────────────────────
-  if (isBinaryNode(node)) {
-    return (
-      <div className="space-y-1" style={{ marginLeft: indent }}>
+    // ── base_price ────────────────────────────────────────────────────────────
+    if (node.type === 'base_price') {
+      return (
         <div className="flex items-center gap-2">
           {typeSelector}
+          <span className="text-xs text-muted-foreground">{t('base price')}</span>
         </div>
-        <div className="border-l-2 border-muted pl-3 space-y-1.5">
-          <div className="flex items-start gap-1.5">
-            <span className="text-xs text-muted-foreground w-8 mt-1 shrink-0">Left</span>
-            <div className="flex-1">
+      )
+    }
+
+    // ── modifier ──────────────────────────────────────────────────────────────
+    if (node.type === 'modifier') {
+      return (
+        <div className="space-y-1.5">
+          <div className="flex items-center gap-2 flex-wrap">
+            {typeSelector}
+            <span className="text-xs text-muted-foreground">→</span>
+            <CharPicker
+              value={node.char_id}
+              chars={selectChars}
+              onChange={v => onChange({ type: 'modifier', char_id: v })}
+            />
+          </div>
+        </div>
+      )
+    }
+
+    // ── input ─────────────────────────────────────────────────────────────────
+    if (node.type === 'input') {
+      return (
+        <div className="space-y-1.5">
+          <div className="flex items-center gap-2 flex-wrap">
+            {typeSelector}
+            <span className="text-xs text-muted-foreground">→</span>
+            <CharPicker
+              value={node.char_id}
+              chars={numberChars}
+              onChange={v => onChange({ type: 'input', char_id: v })}
+            />
+          </div>
+        </div>
+      )
+    }
+
+    // ── is_selected ───────────────────────────────────────────────────────────
+    if (node.type === 'is_selected') {
+      return (
+        <div className="space-y-1.5">
+          <div className="flex items-center gap-2 flex-wrap">
+            {typeSelector}
+            <span className="text-xs text-muted-foreground">→</span>
+            <CharPicker
+              value={node.char_id}
+              chars={selectChars}
+              onChange={v => onChange({ type: 'is_selected', char_id: v, value_id: '' })}
+            />
+            {node.char_id && (
+              <>
+                <span className="text-xs font-bold text-muted-foreground">=</span>
+                <ValuePicker
+                  charId={node.char_id}
+                  value={node.value_id}
+                  valuesMap={valuesMap}
+                  onChange={v => onChange({ ...node, value_id: v })}
+                />
+              </>
+            )}
+          </div>
+        </div>
+      )
+    }
+
+    // ── Binary ops ────────────────────────────────────────────────────────────
+    if (isBinaryNode(node)) {
+      const [leftLabel, rightLabel] = ((): [string, string] => {
+        switch (node.type) {
+          case 'add':
+          case 'subtract':    return [t('Start with'), t('Adjustment')]
+          case 'multiply':
+          case 'divide':      return [t('Base'), t('Factor')]
+          case 'gt':
+          case 'gte':
+          case 'lt':
+          case 'lte':
+          case 'eq':          return [t('Characteristic value'), t('Compare to')]
+          case 'and':
+          case 'or':          return [t('First condition'), t('Second condition')]
+        }
+      })()
+      return (
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            {typeSelector}
+          </div>
+          <div className="border-l-2 border-muted pl-3 space-y-2">
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground font-medium">{leftLabel}</p>
               <FormulaBuilder
                 node={node.left}
                 onChange={left => onChange({ ...node, left } as FormulaNode)}
-                characteristics={characteristics}
-                valuesMap={valuesMap}
-                depth={0}
+                {...childProps}
               />
             </div>
-          </div>
-          <div className="flex items-center gap-1.5 py-0.5">
-            <span className="text-xs font-bold text-primary w-8 shrink-0">{OP_SYMBOL[node.type]}</span>
-          </div>
-          <div className="flex items-start gap-1.5">
-            <span className="text-xs text-muted-foreground w-8 mt-1 shrink-0">Right</span>
-            <div className="flex-1">
+            <div className="flex items-center gap-2 py-0.5">
+              <span className="text-xs font-bold text-primary px-1.5 py-0.5 rounded bg-primary/10">
+                {OP_SYMBOL[node.type]}
+              </span>
+            </div>
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground font-medium">{rightLabel}</p>
               <FormulaBuilder
                 node={node.right}
                 onChange={right => onChange({ ...node, right } as FormulaNode)}
-                characteristics={characteristics}
-                valuesMap={valuesMap}
-                depth={0}
+                {...childProps}
               />
             </div>
           </div>
         </div>
-      </div>
-    )
-  }
+      )
+    }
 
-  // ── IF / THEN / ELSE ──────────────────────────────────────────────────────
-  if (node.type === 'if') {
-    return (
-      <div className="space-y-1" style={{ marginLeft: indent }}>
-        <div className="flex items-center gap-2">
-          {typeSelector}
-        </div>
-        <div className="border-l-2 border-primary/30 pl-3 space-y-2">
-          {(['condition', 'then', 'else_node'] as const).map(field => {
-            const labels = { condition: 'IF', then: 'THEN', else_node: 'ELSE' }
-            return (
-              <div key={field} className="flex items-start gap-1.5">
-                <span className="text-xs font-bold text-primary w-10 mt-1 shrink-0">{labels[field]}</span>
-                <div className="flex-1">
-                  <FormulaBuilder
-                    node={node[field]}
-                    onChange={updated => onChange({ ...node, [field]: updated })}
-                    characteristics={characteristics}
-                    valuesMap={valuesMap}
-                    depth={0}
-                  />
-                </div>
+    // ── IF / THEN / ELSE ──────────────────────────────────────────────────────
+    if (node.type === 'if') {
+      const fields = [
+        { key: 'condition' as const, label: t('IF'),   color: 'border-blue-400/50' },
+        { key: 'then'      as const, label: t('THEN'), color: 'border-green-400/50' },
+        { key: 'else_node' as const, label: t('ELSE'), color: 'border-muted' },
+      ]
+      return (
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            {typeSelector}
+          </div>
+          <div className="space-y-2">
+            {fields.map(({ key, label, color }) => (
+              <div key={key} className={`border-l-2 ${color} pl-3 space-y-1`}>
+                <p className="text-xs font-bold text-primary">{label}</p>
+                <FormulaBuilder
+                  node={node[key]}
+                  onChange={updated => onChange({ ...node, [key]: updated })}
+                  {...childProps}
+                />
               </div>
-            )
-          })}
+            ))}
+          </div>
         </div>
-      </div>
-    )
-  }
+      )
+    }
 
-  return null
+    return null
+  }
 }
