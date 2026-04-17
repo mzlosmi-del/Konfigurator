@@ -23,7 +23,6 @@ export function Widget({ config }: Props) {
   const [state, setState] = useState<State>({ phase: 'loading' })
   const [selection, setSelection] = useState<Selection>({})
   const [numericInputs, setNumericInputs] = useState<NumericInputs>({})
-  const [userSelections, setUserSelections] = useState<Set<string>>(new Set())
   const [showForm, setShowForm] = useState(false)
   const [lang, setLangState] = useState<Lang>(getLang())
 
@@ -61,13 +60,9 @@ export function Widget({ config }: Props) {
 
   function handleSelect(charId: string, valueId: string) {
     if (state.phase !== 'ready') return
-
-    const nextUserSel = new Set([...userSelections, charId])
-    setUserSelections(nextUserSel)
-
     const next      = { ...selection, [charId]: valueId }
     const effect    = evaluateRules(state.data.rules, next)
-    const withDef   = applyDefaultValues(next, effect, nextUserSel)
+    const withDef   = applyDefaultValues(next, effect, new Set([charId]))
     const sanitized = sanitizeSelection(withDef, effect)
     setSelection(sanitized)
   }
