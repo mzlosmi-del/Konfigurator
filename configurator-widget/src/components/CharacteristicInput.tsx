@@ -39,15 +39,18 @@ export function CharacteristicInput({
 
   // ── Number input ────────────────────────────────────────────────────────────
   if (display_type === 'number') {
-    const currentValue = numericInputs[id] ?? 0
+    const isNumericLocked = id in ruleEffect.lockedNumericValues
+    const displayValue    = isNumericLocked
+      ? ruleEffect.lockedNumericValues[id]
+      : (numericInputs[id] ?? 0)
     return (
       <div>
         <div class="cw-char-label">{characteristic.name}</div>
         <input
           type="number"
-          class={`cw-number-input${isLocked ? ' locked' : ''}`}
-          value={currentValue}
-          disabled={isLocked}
+          class={`cw-number-input${(isLocked || isNumericLocked) ? ' locked' : ''}`}
+          value={displayValue}
+          disabled={isLocked || isNumericLocked}
           onInput={(e) => {
             const val = parseFloat((e.target as HTMLInputElement).value)
             onNumericInput(id, isNaN(val) ? 0 : val)
