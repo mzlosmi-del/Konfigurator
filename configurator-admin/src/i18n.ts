@@ -1,0 +1,442 @@
+// Serbian (Latin) translations for the admin
+const sr: Record<string, string> = {
+  // App / branding
+  'Configurator':                          'Konfigurator',
+
+  // Auth – Login
+  'Sign in':                               'Prijava',
+  'Enter your email and password to continue': 'Unesite e-mail i lozinku da biste nastavili',
+  'Email':                                 'E-mail',
+  'you@example.com':                       'vi@primer.com',
+  'Password':                              'Lozinka',
+  'Enter a valid email':                   'Unesite ispravnu e-mail adresu',
+  'Password is required':                  'Lozinka je obavezna',
+  "Don't have an account?":               'Nemate nalog?',
+  'Create one':                            'Kreirajte ga',
+
+  // Auth – Register
+  'Create your account':                   'Kreirajte nalog',
+  'Set up your configurator workspace':    'Podesite vaš konfigurator radni prostor',
+  'Company name':                          'Naziv kompanije',
+  'This becomes your workspace name':      'Ovo postaje naziv vašeg radnog prostora',
+  'Acme Furniture Co.':                    'Primer d.o.o.',
+  'Company name must be at least 2 characters': 'Naziv kompanije mora imati najmanje 2 karaktera',
+  'Min. 8 characters':                     'Min. 8 karaktera',
+  'Password must be at least 8 characters': 'Lozinka mora imati najmanje 8 karaktera',
+  'Confirm password':                      'Potvrdi lozinku',
+  'Passwords do not match':                'Lozinke se ne poklapaju',
+  'Create account':                        'Kreirajte nalog',
+  'Already have an account?':             'Već imate nalog?',
+  'A company with that name already exists. Try a different name.': 'Kompanija sa tim nazivom već postoji. Pokušajte sa drugim nazivom.',
+  'Account setup failed. Please try again.': 'Podešavanje naloga nije uspelo. Pokušajte ponovo.',
+
+  // Navigation
+  'Dashboard':                             'Kontrolna tabla',
+  'Products':                              'Proizvodi',
+  'Library':                               'Biblioteka',
+  'Inquiries':                             'Upiti',
+  'Settings':                              'Podešavanja',
+  'Sign out':                              'Odjavi se',
+
+  // Dashboard
+  'Overview of your configurator activity.': 'Pregled aktivnosti vašeg konfiguratora.',
+  'Published products':                    'Objavljeni proizvodi',
+  'total':                                 'ukupno',
+  'New inquiries':                         'Novi upiti',
+  'Awaiting review':                       'Čeka pregled',
+  'Total inquiries':                       'Ukupni upiti',
+  'All time':                              'Ukupno',
+  'Recent inquiries':                      'Nedavni upiti',
+  'View all':                              'Pogledaj sve',
+  'No inquiries yet':                      'Nema još upita',
+  'Create your first product':             'Kreirajte vaš prvi proizvod',
+  'Welcome':                               'Dobrodošli',
+
+  // Inquiries list
+  'Quote requests submitted by your customers.': 'Zahtevi za ponude koje su podneli vaši kupci.',
+  'All':                                   'Svi',
+  'New':                                   'Novo',
+  'Read':                                  'Pročitano',
+  'Replied':                               'Odgovoreno',
+  'Closed':                                'Zatvoreno',
+  'When customers submit quote requests, they will appear here.': 'Kada kupci podnesu zahteve za ponude, pojaviće se ovde.',
+  'Customer':                              'Kupac',
+  'Product':                               'Proizvod',
+  'Total':                                 'Ukupno',
+  'Status':                                'Status',
+  'Received':                              'Primljeno',
+  'No new inquiries.':                     'Nema novih upita.',
+  'No read inquiries.':                    'Nema pročitanih upita.',
+  'No replied inquiries.':                 'Nema odgovorenih upita.',
+  'No closed inquiries.':                  'Nema zatvorenih upita.',
+
+  // Inquiry detail
+  'Reply by email':                        'Odgovori e-mailom',
+  'All inquiries':                         'Svi upiti',
+  'Configuration':                         'Konfiguracija',
+  'No configuration data recorded.':      'Nema sačuvanih podataka o konfiguraciji.',
+  'Message':                               'Poruka',
+  'Quote':                                 'Ponuda',
+  'Valid until':                           'Važi do',
+  'Generate & Send Quote':                 'Generiši i pošalji ponudu',
+  'Sent quotes':                           'Poslate ponude',
+  'PDF':                                   'PDF',
+  'Expires':                               'Ističe',
+  'Name':                                  'Ime',
+  'View product':                          'Pogledaj proizvod',
+  'Timeline':                              'Vremenska linija',
+  'Updated':                               'Ažurirano',
+  'Changing status here does not send any email. Use "Reply by email" to contact the customer.':
+    'Promena statusa ovde ne šalje e-mail. Koristite „Odgovori e-mailom" da kontaktirate kupca.',
+  'Quote sent to':                         'Ponuda poslata na',
+  'Failed to generate quote':              'Generisanje ponude nije uspelo',
+  'Status updated':                        'Status ažuriran',
+  'Failed to update status':              'Ažuriranje statusa nije uspelo',
+  'Inquiry not found':                     'Upit nije pronađen',
+  'Back to inquiries':                     'Nazad na upite',
+
+  // Products list
+  'Manage your configurable products.':   'Upravljajte vašim konfigurabilnim proizvodima.',
+  'New product':                           'Novi proizvod',
+  'No products yet':                       'Nema još proizvoda',
+  'Create your first configurable product to get started.': 'Kreirajte vaš prvi konfigurabilni proizvod da biste počeli.',
+  'Create product':                        'Kreiraj proizvod',
+  'Base price':                            'Osnovna cena',
+  'Actions':                               'Akcije',
+  'Unpublish':                             'Ukloni iz prodaje',
+  'Publish':                               'Objavi',
+  'Edit':                                  'Uredi',
+  'Delete':                                'Obriši',
+  'Delete product?':                       'Obriši proizvod?',
+  'Delete failed':                         'Brisanje nije uspelo',
+  'Product published':                     'Proizvod objavljen',
+  'Product unpublished':                   'Proizvod uklonjen iz prodaje',
+  'Failed to load products':               'Učitavanje proizvoda nije uspelo',
+  'Product deleted':                       'Proizvod obrisan',
+  'Update failed':                         'Ažuriranje nije uspelo',
+
+  // New product page
+  'Start by giving your product a name and base price.': 'Počnite davanjem naziva i osnovne cene vašem proizvodu.',
+  'Product details':                       'Detalji proizvoda',
+  'You can add characteristics and options after saving.': 'Možete dodati karakteristike i opcije nakon čuvanja.',
+  'Failed to create product':              'Kreiranje proizvoda nije uspelo',
+
+  // Edit product page
+  'All products':                          'Svi proizvodi',
+  'Details':                               'Detalji',
+  'Characteristics':                       'Karakteristike',
+  'Rules':                                 'Pravila',
+  'Formula pricing':                       'Cenovne formule',
+  'Visualization':                         'Vizualizacija',
+  'Embed':                                 'Ugradnja',
+  'Update the product name, description, and pricing.': 'Ažurirajte naziv, opis i cene proizvoda.',
+  'Save changes':                          'Sačuvaj promene',
+  'Characteristics & options':             'Karakteristike i opcije',
+  'Define what customers can configure. Each characteristic has selectable values with optional price modifiers.':
+    'Definišite šta kupci mogu da konfigurišu. Svaka karakteristika ima vrednosti sa opcionalnim modifikatorima cene.',
+  'Configuration rules':                   'Pravila konfiguracije',
+  'Automatically hide, disable, lock, or set values based on other selections.':
+    'Automatski sakrijte, onemogućite, zaključajte ili postavite vrednosti na osnovu drugih izbora.',
+  'Build custom pricing rules that calculate surcharges or discounts based on the configuration.':
+    'Izgradite prilagođena pravila cena koja računaju doplate ili popuste na osnovu konfiguracije.',
+  'Upload or link images and renders. Attach them to specific option values so the product visual updates as customers configure.':
+    'Otpremite ili povežite slike i prikaze. Priložite ih specifičnim vrednostima opcija da vizualni prikaz proizvoda bude ažuriran dok kupci konfigurišu.',
+  'Visualization assets':                  'Vizualizacioni resursi',
+  'Embed & share':                         'Ugradnja i deljenje',
+  'Get the embed code to place the configurator on your website.': 'Dobijte kod za ugradnju konfiguratora na vaš sajt.',
+  'Product not found.':                    'Proizvod nije pronađen.',
+  'Back to products':                      'Nazad na proizvode',
+  'Product saved':                         'Proizvod sačuvan',
+  'Failed to save product':                'Čuvanje proizvoda nije uspelo',
+  'Product published ':                    'Proizvod objavljen',
+  'Failed to update status':               'Ažuriranje statusa nije uspelo',
+
+  // Product form
+  'Product name':                          'Naziv proizvoda',
+  'e.g. Solid Wood Dining Table':          'npr. Trpezarijski sto od punog drveta',
+  'Description':                           'Opis',
+  'Shown to customers in the configurator': 'Prikazuje se kupcima u konfiguratoru',
+  'Brief product description...':          'Kratak opis proizvoda...',
+  'Before any option modifiers':           'Pre bilo kakvih modifikatora opcija',
+  'Price must be 0 or more':              'Cena mora biti 0 ili više',
+  'Name is required':                      'Naziv je obavezan',
+  'Currency':                              'Valuta',
+  '0.00':                                  '0.00',
+  'Cancel':                                'Otkaži',
+  'Save product':                          'Sačuvaj proizvod',
+
+  // CharacteristicsPanel
+  'No classes assigned yet. Add a class below to define what customers can configure.': 'Još nema dodeljenih klasa. Dodajte klasu ispod da definišete šta kupci mogu da konfigurišu.',
+  'Go to the':                             'Idite na',
+  'to create classes and characteristics first.': 'da biste prvo kreirali klase i karakteristike.',
+  'No characteristics in this class yet. Add some in the Library.': 'Nema karakteristika u ovoj klasi. Dodajte neke u Biblioteci.',
+  'Add a class\u2026':                     'Dodaj klasu\u2026',
+  'Add':                                   'Dodaj',
+  'All library classes are already assigned to this product.': 'Sve klase iz biblioteke su već dodeljene ovom proizvodu.',
+  'Remove class from product?':            'Ukloni klasu sa proizvoda?',
+  'Remove':                                'Ukloni',
+  'Failed to load classes':                'Učitavanje klasa nije uspelo',
+  'Failed to add class':                   'Dodavanje klase nije uspelo',
+  'Failed to remove class':                'Uklanjanje klase nije uspelo',
+
+  // CharacteristicValuesEditor
+  'Label is required':                     'Oznaka je obavezna',
+  'Add value':                             'Dodaj vrednost',
+  'Value label (e.g. Oak)':               'Oznaka vrednosti (npr. Hrast)',
+  'Failed to add value':                   'Dodavanje vrednosti nije uspelo',
+  'Failed to delete value':                'Brisanje vrednosti nije uspelo',
+  'Failed to update value':                'Ažuriranje vrednosti nije uspelo',
+
+  // Embed panel
+  'This product is not published. Publish it first so the widget can load it.':
+    'Ovaj proizvod nije objavljen. Objavite ga prvo da bi widget mogao da ga učita.',
+  'Live preview':                          'Pregled uživo',
+  'Reload':                                'Osveži',
+  'Publish the product to see a live preview.': 'Objavite proizvod da biste videli pregled uživo.',
+  'Open in new tab':                       'Otvori u novom tabu',
+  'Embed code':                            'Kod za ugradnju',
+  'Paste this into any HTML page to embed the configurator.': 'Nalepite ovo u bilo koju HTML stranicu da ugradite konfigurator.',
+  'Copy':                                  'Kopiraj',
+  'Copied':                                'Kopirano',
+  'Deploying the widget to your site':     'Postavljanje widgeta na vaš sajt',
+
+  // Formula panel
+  'No formulas yet. Add one below.':       'Nema još formula. Dodajte jednu ispod.',
+  'Active':                                'Aktivno',
+  'Inactive':                              'Neaktivno',
+  'Formula name':                          'Naziv formule',
+  'Formula expression':                    'Izraz formule',
+  'Save formula':                          'Sačuvaj formulu',
+  'New formula':                           'Nova formula',
+  "Formula name (e.g. 'Size surcharge', 'Material discount')":
+    "Naziv formule (npr. 'Doplata za veličinu', 'Popust za materijal')",
+  'Create formula':                        'Kreiraj formulu',
+  'Add formula':                           'Dodaj formulu',
+  'Failed to load formulas':               'Učitavanje formula nije uspelo',
+  'Enter a formula name':                  'Unesite naziv formule',
+  'Failed to create formula':              'Kreiranje formule nije uspelo',
+  'Formula created':                       'Formula kreirana',
+  'Formula saved':                         'Formula sačuvana',
+  'Failed to save formula':                'Čuvanje formule nije uspelo',
+  'Failed to update formula':              'Ažuriranje formule nije uspelo',
+  'Failed to delete formula':              'Brisanje formule nije uspelo',
+
+  // Formula builder – node type labels
+  'Number':                                'Broj',
+  'Base price':                            'Osnovna cena',
+  'Price modifier of':                     'Modifikator cene za',
+  'Numeric input':                         'Numerički unos',
+  'Is selected':                           'Je izabrano',
+  'Add (+)':                               'Saberi (+)',
+  'Subtract (\u2212)':                     'Oduzmi (\u2212)',
+  'Multiply (\u00d7)':                     'Pomnoži (\u00d7)',
+  'Divide (\u00f7)':                       'Podeli (\u00f7)',
+  'Greater than (>)':                      'Veće od (>)',
+  'Greater or equal (\u2265)':             'Veće ili jednako (\u2265)',
+  'Less than (<)':                         'Manje od (<)',
+  'Less or equal (\u2264)':               'Manje ili jednako (\u2264)',
+  'Equal (=)':                             'Jednako (=)',
+  'AND':                                   'I',
+  'OR':                                    'ILI',
+  'IF / THEN / ELSE':                      'AKO / ONDA / INAČE',
+  'No characteristics available':          'Nema dostupnih karakteristika',
+  'No values for this characteristic':     'Nema vrednosti za ovu karakteristiku',
+  'base price':                            'osnovna cena',
+  'Quick templates':                       'Brzi predlošci',
+  'Simple (no condition)':                 'Jednostavno (bez uslova)',
+  'Conditional (IF / THEN / ELSE)':        'Uslovni (AKO / ONDA / INAČE)',
+  'Base price + fixed amount':             'Osnovna cena + fiksni iznos',
+  'base price + X':                        'osnovna cena + X',
+  'Base price \u00d7 percentage':          'Osnovna cena \u00d7 procenat',
+  'base price \u00d7 X':                   'osnovna cena \u00d7 X',
+  'Base price \u00d7 input':               'Osnovna cena \u00d7 unos',
+  'base price \u00d7 numeric characteristic': 'osnovna cena \u00d7 numerička karakteristika',
+  'Base price \u00d7 input \u00d7 input':  'Osnovna cena \u00d7 unos \u00d7 unos',
+  'base price \u00d7 Width \u00d7 Height (two numeric inputs)': 'osnovna cena \u00d7 Širina \u00d7 Visina (dva numerička unosa)',
+  'Base price + modifier':                 'Osnovna cena + modifikator',
+  'base price + price modifier of a characteristic': 'osnovna cena + modifikator cene karakteristike',
+  'Add amount if value selected':          'Dodaj iznos ako je vrednost izabrana',
+  'IF [char] = value THEN base + X ELSE base': 'AKO [kar.] = vrednost ONDA osnova + X INAČE osnova',
+  'Multiply base if value selected':       'Pomnoži osnovu ako je vrednost izabrana',
+  'IF [char] = value THEN base \u00d7 X ELSE base': 'AKO [kar.] = vrednost ONDA osnova \u00d7 X INAČE osnova',
+  'Add amount if input > N':               'Dodaj iznos ako je unos > N',
+  'IF [numeric input] > N THEN base + X ELSE base': 'AKO [numerički unos] > N ONDA osnova + X INAČE osnova',
+  'Add if A or B selected':                'Dodaj ako je A ili B izabrano',
+  'IF (A = v1 OR B = v2) THEN base + X ELSE base': 'AKO (A = v1 ILI B = v2) ONDA osnova + X INAČE osnova',
+  'Add if A and B selected':               'Dodaj ako su A i B izabrani',
+  'IF (A = v1 AND B = v2) THEN base + X ELSE base': 'AKO (A = v1 I B = v2) ONDA osnova + X INAČE osnova',
+  'IF':                                    'AKO',
+  'THEN':                                  'ONDA',
+  'ELSE':                                  'INAČE',
+  'Start with':                            'Počni sa',
+  'Adjustment':                            'Korekcija',
+  'Factor':                                'Faktor',
+  'Characteristic value':                  'Vrednost karakteristike',
+  'Compare to':                            'Uporedi sa',
+  'First condition':                       'Prvi uslov',
+  'Second condition':                      'Drugi uslov',
+
+  // Status values (lowercase, for badges/options)
+  'new':                                   'Novo',
+  'read':                                  'Pročitano',
+  'replied':                               'Odgovoreno',
+  'closed':                                'Zatvoreno',
+  'published':                             'Objavljeno',
+  'draft':                                 'Nacrt',
+  'archived':                              'Arhivirano',
+
+  // Time ago
+  'just now':                              'upravo sada',
+
+  // Inquiries (missing keys)
+  'Failed to load inquiries':              'Učitavanje upita nije uspelo',
+  'Failed to generate quote':              'Generisanje ponude nije uspelo',
+  'Inquiry not found.':                    'Upit nije pronađen.',
+
+  // Products (missing keys)
+  'Product not found':                     'Proizvod nije pronađen',
+
+  // Auth (missing)
+  'Sign up failed. Please try again.':     'Registracija nije uspela. Pokušajte ponovo.',
+
+  // Visualization (missing)
+  'Enter a URL first':                     'Prvo unesite URL',
+  'Asset added':                           'Resurs dodat',
+
+  // Formula Builder node groups
+  'Selection':                             'Selekcija',
+  'Arithmetic':                            'Aritmetika',
+  'Compare':                               'Poređenje',
+  'Logic':                                 'Logika',
+  'Conditional':                           'Uslovni',
+  'Base':                                  'Osnova',
+
+  // Rules panel
+  'Rule added':                            'Pravilo dodato',
+  'No rules yet. Add one below.':          'Nema još pravila. Dodajte jedno ispod.',
+  'Hide value':                            'Sakrij vrednost',
+  'Disable value':                         'Onemogući vrednost',
+  'Override price':                        'Promeni cenu',
+  'Set default':                           'Postavi podrazumevano',
+  'Lock value':                            'Zaključaj vrednost',
+  'No values':                             'Nema vrednosti',
+  'New rule':                              'Novo pravilo',
+  'ON':                                    'NA',
+  'value':                                 'vrednost',
+  'e.g. 50 or \u221220':                   'npr. 50 ili \u221220',
+  'Add rule':                              'Dodaj pravilo',
+  'Select a condition characteristic':     'Izaberite karakteristiku za uslov',
+  'Select a condition value':              'Izaberite vrednost za uslov',
+  'Select a target characteristic':        'Izaberite ciljanu karakteristiku',
+  'Select a target value':                 'Izaberite ciljanu vrednost',
+  'Failed to load rules':                  'Učitavanje pravila nije uspelo',
+  'Failed to add rule':                    'Dodavanje pravila nije uspelo',
+  'Failed to delete rule':                 'Brisanje pravila nije uspelo',
+  'amount':                                'iznos',
+
+  // Visualization panel
+  'No visualization assets yet. Add one below.': 'Nema još vizualizacionih resursa. Dodajte jedan ispod.',
+  'Default':                               'Podrazumevano',
+  'Image':                                 'Slika',
+  'Render':                                'Prikaz',
+  '3D Model':                              '3D model',
+  'Add visualization asset':              'Dodaj vizualizacioni resurs',
+  'Add asset':                             'Dodaj resurs',
+  'Paste URL':                             'Nalepi URL',
+  'Upload file':                           'Otpremi fajl',
+  'https://example.com/image.jpg':         'https://primer.com/slika.jpg',
+  'Type':                                  'Tip',
+  'Attach to value':                       'Priloži vrednosti',
+  'Default (no specific value)':           'Podrazumevano (bez specifične vrednosti)',
+  'Also use as default fallback':          'Koristi i kao podrazumevano',
+  'Set as default':                        'Postavi kao podrazumevano',
+  'Unset default':                         'Ukloni podrazumevano',
+  'Move up':                               'Pomeri gore',
+  'Move down':                             'Pomeri dole',
+  'Delete asset?':                         'Obriši resurs?',
+  'This will remove the asset. The image file itself (if hosted externally) will not be deleted.':
+    'Ovo će ukloniti resurs. Sam fajl slike (ako je hostovan eksterno) neće biti obrisan.',
+  'File uploaded \u2014 click Add to save': 'Fajl otpremljen \u2014 kliknite Dodaj za čuvanje',
+  'Upload failed':                         'Otpremanje nije uspelo',
+  'Failed to add asset':                   'Dodavanje resursa nije uspelo',
+  'Failed to delete asset':                'Brisanje resursa nije uspelo',
+  'Failed to update asset':                'Ažuriranje resursa nije uspelo',
+  'Failed to reorder':                     'Promena redosleda nije uspela',
+
+  // Library page
+  'Characteristic Library':                'Biblioteka karakteristika',
+  'Manage all characteristics and classes. Drag a characteristic onto a class card to assign it.':
+    'Upravljajte svim karakteristikama i klasama. Prevucite karakteristiku na karticu klase da je dodelite.',
+  'Classes':                               'Klase',
+  'Group characteristics into named sections. Assign classes to products.':
+    'Grupi\u0161ite karakteristike u imenovane sekcije. Dodelite klase proizvodima.',
+  'New class':                             'Nova klasa',
+  'No classes yet.':                       'Nema još klasa.',
+  'Class name (e.g. Dimensions, Material)': 'Naziv klase (npr. Dimenzije, Materijal)',
+  'Create':                                'Kreiraj',
+  'New characteristic':                    'Nova karakteristika',
+  'New characteristic ':                   'Nova karakteristika',
+  'Name (e.g. Material, Width)':           'Naziv (npr. Materijal, Širina)',
+  'Select':                                'Izbor',
+  'Radio':                                 'Radio',
+  'Swatch':                                'Uzorak',
+  'Toggle':                                'Preklopnik',
+  'Number':                                'Broj',
+  'No characteristics yet.':              'Nema još karakteristika.',
+  'Drag characteristics here':             'Prevucite karakteristike ovde',
+  'Drop here to add':                      'Spustite ovde da dodate',
+  '+ drop here':                           '+ spustite ovde',
+  'no class':                              'bez klase',
+  'val':                                   'vred.',
+  'vals':                                  'vred.',
+  'Values':                                'Vrednosti',
+  'Delete characteristic?':               'Obriši karakteristiku?',
+  'Delete class?':                         'Obriši klasu?',
+  'Failed to load library':                'Učitavanje biblioteke nije uspelo',
+  'Failed to create characteristic':       'Kreiranje karakteristike nije uspelo',
+  'Failed to rename characteristic':       'Preimenovanje karakteristike nije uspelo',
+  'Failed to update type':                 'Ažuriranje tipa nije uspelo',
+  'Failed to delete characteristic':       'Brisanje karakteristike nije uspelo',
+  'Failed to create class':                'Kreiranje klase nije uspelo',
+  'Failed to delete class':                'Brisanje klase nije uspelo',
+  'Failed to add characteristic to class': 'Dodavanje karakteristike u klasu nije uspelo',
+  'Failed to remove characteristic from class': 'Uklanjanje karakteristike iz klase nije uspelo',
+  'Drag to assign to class':               'Prevucite da biste dodelili klasi',
+
+  // Settings page
+  'Manage your account and workspace.':   'Upravljajte vašim nalogom i radnim prostorom.',
+  'Workspace':                             'Radni prostor',
+  'Your tenant details':                   'Detalji vašeg naloga',
+  'Inquiry notifications':                 'Obaveštenja o upitima',
+  'Where to send email alerts when a customer submits a new inquiry. Defaults to your account email if left blank.':
+    'Gde slati e-mail upozorenja kada kupac podnese novi upit. Podrazumevano je vaš nalog e-mail ako se ostavi prazno.',
+  'Notification email':                    'E-mail za obaveštenja',
+  'you@example.com (fallback)':            'vi@primer.com (rezervno)',
+  'Save':                                  'Sačuvaj',
+  'Account':                               'Nalog',
+  'Your login details':                    'Vaši podaci za prijavu',
+  'Notification email saved':              'E-mail za obaveštenja sačuvan',
+  'Failed to save':                        'Čuvanje nije uspelo',
+  'Plan':                                  'Plan',
+  'Slug':                                  'Identifikator',
+}
+
+export const LANGS = ['en', 'sr'] as const
+export type Lang = typeof LANGS[number]
+
+let _lang: Lang = (typeof localStorage !== 'undefined'
+  ? (localStorage.getItem('lang') as Lang | null) ?? 'sr'
+  : 'sr')
+
+export function getLang(): Lang { return _lang }
+
+export function setLang(l: Lang) {
+  _lang = l
+  if (typeof localStorage !== 'undefined') localStorage.setItem('lang', l)
+  if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('langchange', { detail: l }))
+}
+
+export function t(key: string): string {
+  if (_lang === 'en') return key
+  return sr[key] ?? key
+}

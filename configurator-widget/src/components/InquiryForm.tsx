@@ -2,6 +2,7 @@ import { h } from 'preact'
 import { useState } from 'preact/hooks'
 import type { WidgetConfig, ConfigLineItem } from '../types'
 import { submitInquiry } from '../api'
+import { t } from '../i18n'
 
 interface Props {
   config: WidgetConfig
@@ -32,9 +33,9 @@ export function InquiryForm({ config, productId, tenantId, lineItems, totalPrice
 
   function validate(): boolean {
     const errs: FormErrors = {}
-    if (!form.name.trim()) errs.name = 'Name is required'
-    if (!form.email.trim()) errs.email = 'Email is required'
-    else if (!/^[^@]+@[^@]+\.[^@]+$/.test(form.email)) errs.email = 'Enter a valid email'
+    if (!form.name.trim()) errs.name = t('Name is required')
+    if (!form.email.trim()) errs.email = t('Email is required')
+    else if (!/^[^@]+@[^@]+\.[^@]+$/.test(form.email)) errs.email = t('Enter a valid email')
     setErrors(errs)
     return Object.keys(errs).length === 0
   }
@@ -60,7 +61,7 @@ export function InquiryForm({ config, productId, tenantId, lineItems, totalPrice
       onSuccess()
     } catch (err) {
       setServerError(
-        err instanceof Error ? err.message : 'Failed to submit. Please try again.'
+        err instanceof Error ? err.message : t('Failed to submit. Please try again.')
       )
     } finally {
       setSubmitting(false)
@@ -69,7 +70,7 @@ export function InquiryForm({ config, productId, tenantId, lineItems, totalPrice
 
   return (
     <div class="cw-inquiry-form">
-      <p class="cw-inquiry-title">Request a quote</p>
+      <p class="cw-inquiry-title">{t('Request a quote')}</p>
 
       {serverError && (
         <div style={{ color: '#dc2626', fontSize: '13px', padding: '8px 12px', background: '#fef2f2', borderRadius: '6px' }}>
@@ -80,10 +81,10 @@ export function InquiryForm({ config, productId, tenantId, lineItems, totalPrice
       <form onSubmit={handleSubmit} noValidate>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
           <div class="cw-field">
-            <label>Your name *</label>
+            <label>{t('Your name *')}</label>
             <input
               type="text"
-              placeholder="Ivan Horvat"
+              placeholder={t('Ivan Horvat')}
               value={form.name}
               onInput={(e) => setForm(f => ({ ...f, name: (e.target as HTMLInputElement).value }))}
               autocomplete="name"
@@ -92,10 +93,10 @@ export function InquiryForm({ config, productId, tenantId, lineItems, totalPrice
           </div>
 
           <div class="cw-field">
-            <label>Email address *</label>
+            <label>{t('Email address *')}</label>
             <input
               type="email"
-              placeholder="ivan@example.com"
+              placeholder={t('ivan@example.com')}
               value={form.email}
               onInput={(e) => setForm(f => ({ ...f, email: (e.target as HTMLInputElement).value }))}
               autocomplete="email"
@@ -104,10 +105,10 @@ export function InquiryForm({ config, productId, tenantId, lineItems, totalPrice
           </div>
 
           <div class="cw-field">
-            <label>Message (optional)</label>
+            <label>{t('Message (optional)')}</label>
             <textarea
               rows={3}
-              placeholder="Any additional details or questions…"
+              placeholder={t('Any additional details or questions\u2026')}
               value={form.message}
               onInput={(e) => setForm(f => ({ ...f, message: (e.target as HTMLTextAreaElement).value }))}
             />
@@ -118,7 +119,7 @@ export function InquiryForm({ config, productId, tenantId, lineItems, totalPrice
             class="cw-submit-btn"
             disabled={submitting}
           >
-            {submitting ? 'Sending…' : 'Send inquiry'}
+            {submitting ? t('Sending\u2026') : t('Send inquiry')}
           </button>
         </div>
       </form>

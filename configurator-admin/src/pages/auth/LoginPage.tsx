@@ -10,13 +10,9 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { FormField } from '@/components/ui/form-field'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
+import { t } from '@/i18n'
 
-const schema = z.object({
-  email: z.string().email('Enter a valid email'),
-  password: z.string().min(1, 'Password is required'),
-})
-
-type FormValues = z.infer<typeof schema>
+type FormValues = { email: string; password: string }
 
 export function LoginPage() {
   const navigate = useNavigate()
@@ -27,6 +23,11 @@ export function LoginPage() {
   useEffect(() => {
     if (session) navigate('/dashboard', { replace: true })
   }, [session])
+
+  const schema = z.object({
+    email: z.string().email(t('Enter a valid email')),
+    password: z.string().min(1, t('Password is required')),
+  })
 
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -52,13 +53,13 @@ export function LoginPage() {
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary">
             <Boxes className="h-5 w-5 text-primary-foreground" />
           </div>
-          <span className="text-lg font-semibold">Configurator</span>
+          <span className="text-lg font-semibold">{t('Configurator')}</span>
         </div>
 
         <Card>
           <CardHeader>
-            <CardTitle>Sign in</CardTitle>
-            <CardDescription>Enter your email and password to continue</CardDescription>
+            <CardTitle>{t('Sign in')}</CardTitle>
+            <CardDescription>{t('Enter your email and password to continue')}</CardDescription>
           </CardHeader>
 
           <form onSubmit={handleSubmit(onSubmit)}>
@@ -69,17 +70,17 @@ export function LoginPage() {
                 </div>
               )}
 
-              <FormField label="Email" htmlFor="email" error={errors.email?.message} required>
+              <FormField label={t('Email')} htmlFor="email" error={errors.email?.message} required>
                 <Input
                   id="email"
                   type="email"
-                  placeholder="you@example.com"
+                  placeholder={t('you@example.com')}
                   autoComplete="email"
                   {...register('email')}
                 />
               </FormField>
 
-              <FormField label="Password" htmlFor="password" error={errors.password?.message} required>
+              <FormField label={t('Password')} htmlFor="password" error={errors.password?.message} required>
                 <Input
                   id="password"
                   type="password"
@@ -92,12 +93,12 @@ export function LoginPage() {
 
             <CardFooter className="flex flex-col gap-3">
               <Button type="submit" className="w-full" loading={isSubmitting}>
-                Sign in
+                {t('Sign in')}
               </Button>
               <p className="text-center text-sm text-muted-foreground">
-                Don't have an account?{' '}
+                {t("Don't have an account?")}{' '}
                 <Link to="/register" className="text-primary hover:underline font-medium">
-                  Create one
+                  {t('Create one')}
                 </Link>
               </p>
             </CardFooter>

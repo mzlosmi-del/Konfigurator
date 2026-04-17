@@ -10,18 +10,9 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { FormField } from '@/components/ui/form-field'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
+import { t } from '@/i18n'
 
-const schema = z.object({
-  companyName: z.string().min(2, 'Company name must be at least 2 characters'),
-  email: z.string().email('Enter a valid email'),
-  password: z.string().min(8, 'Password must be at least 8 characters'),
-  confirmPassword: z.string(),
-}).refine(d => d.password === d.confirmPassword, {
-  message: 'Passwords do not match',
-  path: ['confirmPassword'],
-})
-
-type FormValues = z.infer<typeof schema>
+type FormValues = { companyName: string; email: string; password: string; confirmPassword: string }
 
 // Derive a URL-safe slug from the company name
 function toSlug(name: string): string {
@@ -41,6 +32,16 @@ export function RegisterPage() {
     if (session) navigate('/dashboard', { replace: true })
   }, [session])
 
+  const schema = z.object({
+    companyName: z.string().min(2, t('Company name must be at least 2 characters')),
+    email: z.string().email(t('Enter a valid email')),
+    password: z.string().min(8, t('Password must be at least 8 characters')),
+    confirmPassword: z.string(),
+  }).refine(d => d.password === d.confirmPassword, {
+    message: t('Passwords do not match'),
+    path: ['confirmPassword'],
+  })
+
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<FormValues>({
     resolver: zodResolver(schema),
   })
@@ -56,7 +57,7 @@ export function RegisterPage() {
     })
 
     if (signUpError || !data.user) {
-      setServerError(signUpError?.message ?? 'Sign up failed. Please try again.')
+      setServerError(signUpError?.message ?? t('Sign up failed. Please try again.'))
       return
     }
 
@@ -73,8 +74,8 @@ export function RegisterPage() {
       await supabase.auth.signOut()
       setServerError(
         rpcError.message.includes('unique')
-          ? 'A company with that name already exists. Try a different name.'
-          : 'Account setup failed. Please try again.'
+          ? t('A company with that name already exists. Try a different name.')
+          : t('Account setup failed. Please try again.')
       )
       return
     }
@@ -89,13 +90,13 @@ export function RegisterPage() {
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary">
             <Boxes className="h-5 w-5 text-primary-foreground" />
           </div>
-          <span className="text-lg font-semibold">Configurator</span>
+          <span className="text-lg font-semibold">{t('Configurator')}</span>
         </div>
 
         <Card>
           <CardHeader>
-            <CardTitle>Create your account</CardTitle>
-            <CardDescription>Set up your configurator workspace</CardDescription>
+            <CardTitle>{t('Create your account')}</CardTitle>
+            <CardDescription>{t('Set up your configurator workspace')}</CardDescription>
           </CardHeader>
 
           <form onSubmit={handleSubmit(onSubmit)}>
@@ -107,42 +108,42 @@ export function RegisterPage() {
               )}
 
               <FormField
-                label="Company name"
+                label={t('Company name')}
                 htmlFor="companyName"
                 error={errors.companyName?.message}
-                hint="This becomes your workspace name"
+                hint={t('This becomes your workspace name')}
                 required
               >
                 <Input
                   id="companyName"
-                  placeholder="Acme Furniture Co."
+                  placeholder={t('Acme Furniture Co.')}
                   autoComplete="organization"
                   {...register('companyName')}
                 />
               </FormField>
 
-              <FormField label="Email" htmlFor="email" error={errors.email?.message} required>
+              <FormField label={t('Email')} htmlFor="email" error={errors.email?.message} required>
                 <Input
                   id="email"
                   type="email"
-                  placeholder="you@example.com"
+                  placeholder={t('you@example.com')}
                   autoComplete="email"
                   {...register('email')}
                 />
               </FormField>
 
-              <FormField label="Password" htmlFor="password" error={errors.password?.message} required>
+              <FormField label={t('Password')} htmlFor="password" error={errors.password?.message} required>
                 <Input
                   id="password"
                   type="password"
-                  placeholder="Min. 8 characters"
+                  placeholder={t('Min. 8 characters')}
                   autoComplete="new-password"
                   {...register('password')}
                 />
               </FormField>
 
               <FormField
-                label="Confirm password"
+                label={t('Confirm password')}
                 htmlFor="confirmPassword"
                 error={errors.confirmPassword?.message}
                 required
@@ -159,12 +160,12 @@ export function RegisterPage() {
 
             <CardFooter className="flex flex-col gap-3">
               <Button type="submit" className="w-full" loading={isSubmitting}>
-                Create account
+                {t('Create account')}
               </Button>
               <p className="text-center text-sm text-muted-foreground">
-                Already have an account?{' '}
+                {t('Already have an account?')}{' '}
                 <Link to="/login" className="text-primary hover:underline font-medium">
-                  Sign in
+                  {t('Sign in')}
                 </Link>
               </p>
             </CardFooter>

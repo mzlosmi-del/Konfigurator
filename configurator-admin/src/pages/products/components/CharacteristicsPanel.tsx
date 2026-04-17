@@ -14,6 +14,7 @@ import { Spinner } from '@/components/ui/spinner'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { useToast } from '@/hooks/useToast'
 import { Toaster } from '@/components/ui/toast'
+import { t } from '@/i18n'
 
 interface Props {
   productId: string
@@ -44,7 +45,7 @@ export function CharacteristicsPanel({ productId }: Props) {
       setAllClasses(libData)
       if (assignedData.length > 0) setExpanded({ [assignedData[0].id]: true })
     } catch {
-      toast({ title: 'Failed to load classes', variant: 'destructive' })
+      toast({ title: t('Failed to load classes'), variant: 'destructive' })
     } finally {
       setLoading(false)
     }
@@ -61,7 +62,7 @@ export function CharacteristicsPanel({ productId }: Props) {
       setExpanded(prev => ({ ...prev, [selectedClassId]: true }))
       setSelectedClassId('')
     } catch {
-      toast({ title: 'Failed to add class', variant: 'destructive' })
+      toast({ title: t('Failed to add class'), variant: 'destructive' })
     } finally {
       setAttaching(false)
     }
@@ -75,7 +76,7 @@ export function CharacteristicsPanel({ productId }: Props) {
       setAssigned(prev => prev.filter(a => a.id !== toDetach.id))
       setToDetach(null)
     } catch {
-      toast({ title: 'Failed to remove class', variant: 'destructive' })
+      toast({ title: t('Failed to remove class'), variant: 'destructive' })
     } finally {
       setDetaching(false)
     }
@@ -95,9 +96,9 @@ export function CharacteristicsPanel({ productId }: Props) {
       {/* ── Assigned classes ──────────────────────────────────────────────── */}
       {assigned.length === 0 ? (
         <p className="text-sm text-muted-foreground py-2">
-          No classes assigned yet. Add a class below to define what customers can configure.
+          {t('No classes assigned yet. Add a class below to define what customers can configure.')}
           {allClasses.length === 0 && (
-            <> Go to the <span className="font-medium">Library</span> to create classes and characteristics first.</>
+            <> {t('Go to the')} <span className="font-medium">{t('Library')}</span> {t('to create classes and characteristics first.')}</>
           )}
         </p>
       ) : (
@@ -115,7 +116,7 @@ export function CharacteristicsPanel({ productId }: Props) {
                 <Tag className="h-4 w-4 text-muted-foreground shrink-0" />
                 <span className="font-medium text-sm flex-1">{cls.name}</span>
                 <span className="text-xs text-muted-foreground px-2 py-0.5 rounded bg-muted">
-                  {cls.characteristics.length} characteristic{cls.characteristics.length !== 1 ? 's' : ''}
+                  {cls.characteristics.length} {t('characteristic')}{cls.characteristics.length !== 1 ? 's' : ''}
                 </span>
                 <Button
                   variant="ghost"
@@ -132,7 +133,7 @@ export function CharacteristicsPanel({ productId }: Props) {
                 <div className="px-4 pb-3 pt-1 border-t bg-muted/10">
                   {cls.characteristics.length === 0 ? (
                     <p className="text-xs text-muted-foreground py-2">
-                      No characteristics in this class yet. Add some in the Library.
+                      {t('No characteristics in this class yet. Add some in the Library.')}
                     </p>
                   ) : (
                     <div className="space-y-1 pt-1">
@@ -164,7 +165,7 @@ export function CharacteristicsPanel({ productId }: Props) {
             onChange={e => setSelectedClassId(e.target.value)}
             className="flex-1"
           >
-            <option value="">Add a class…</option>
+            <option value="">{t('Add a class\u2026')}</option>
             {unassigned.map(c => (
               <option key={c.id} value={c.id}>{c.name}</option>
             ))}
@@ -176,21 +177,21 @@ export function CharacteristicsPanel({ productId }: Props) {
             disabled={!selectedClassId}
             loading={attaching}
           >
-            Add
+            {t('Add')}
           </Button>
         </div>
       )}
 
       {unassigned.length === 0 && allClasses.length > 0 && assigned.length === allClasses.length && (
-        <p className="text-xs text-muted-foreground">All library classes are already assigned to this product.</p>
+        <p className="text-xs text-muted-foreground">{t('All library classes are already assigned to this product.')}</p>
       )}
 
       <ConfirmDialog
         open={!!toDetach}
         onOpenChange={open => !open && setToDetach(null)}
-        title="Remove class from product?"
+        title={t('Remove class from product?')}
         description={`Remove class "${toDetach?.name}" from this product? The class and its characteristics remain in the Library.`}
-        confirmLabel="Remove"
+        confirmLabel={t('Remove')}
         onConfirm={handleDetach}
         loading={detaching}
       />

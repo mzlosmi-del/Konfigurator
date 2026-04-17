@@ -1,6 +1,7 @@
 import { h } from 'preact'
 import type { Characteristic, CharacteristicValue, NumericInputs } from '../types'
 import type { RuleEffect } from '../rules'
+import { t, tSelect } from '../i18n'
 
 interface Props {
   characteristic: Characteristic
@@ -38,24 +39,21 @@ export function CharacteristicInput({
 
   // ── Number input ────────────────────────────────────────────────────────────
   if (display_type === 'number') {
-    const isNumericLocked = id in ruleEffect.lockedNumericValues
-    const displayValue    = isNumericLocked
-      ? ruleEffect.lockedNumericValues[id]
-      : (numericInputs[id] ?? 0)
+    const currentValue = numericInputs[id] ?? 0
     return (
       <div>
         <div class="cw-char-label">{characteristic.name}</div>
         <input
           type="number"
-          class={`cw-number-input${(isLocked || isNumericLocked) ? ' locked' : ''}`}
-          value={displayValue}
-          disabled={isLocked || isNumericLocked}
+          class={`cw-number-input${isLocked ? ' locked' : ''}`}
+          value={currentValue}
+          disabled={isLocked}
           onInput={(e) => {
             const val = parseFloat((e.target as HTMLInputElement).value)
             onNumericInput(id, isNaN(val) ? 0 : val)
           }}
         />
-        {(isLocked || isNumericLocked) && <span class="cw-locked-badge">Auto-set</span>}
+        {(isLocked || isNumericLocked) && <span class="cw-locked-badge">{t('Auto-set')}</span>}
       </div>
     )
   }
@@ -72,7 +70,7 @@ export function CharacteristicInput({
         <div class="cw-char-label">{characteristic.name}</div>
         <div class="cw-locked-value">
           <span class="cw-locked-label">{lockedValue?.label ?? '—'}</span>
-          <span class="cw-locked-badge">Auto-set</span>
+          <span class="cw-locked-badge">{t('Auto-set')}</span>
         </div>
       </div>
     )
@@ -91,7 +89,7 @@ export function CharacteristicInput({
             if (val) onChange(id, val)
           }}
         >
-          <option value="">Select {characteristic.name}…</option>
+          <option value="">{tSelect(characteristic.name)}</option>
           {visible.map(v => (
             <option
               key={v.id}

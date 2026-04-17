@@ -7,17 +7,11 @@ import { Textarea } from '@/components/ui/textarea'
 import { Select } from '@/components/ui/select'
 import { FormField } from '@/components/ui/form-field'
 import type { Product } from '@/types/database'
+import { t } from '@/i18n'
 
 const CURRENCIES = ['EUR', 'USD', 'GBP', 'CHF', 'HRK', 'RSD']
 
-const schema = z.object({
-  name: z.string().min(1, 'Name is required').max(300),
-  description: z.string().optional(),
-  base_price: z.coerce.number().min(0, 'Price must be 0 or more'),
-  currency: z.string().length(3),
-})
-
-export type ProductFormValues = z.infer<typeof schema>
+export type ProductFormValues = { name: string; description?: string; base_price: number; currency: string }
 
 interface ProductFormProps {
   defaultValues?: Partial<ProductFormValues>
@@ -29,9 +23,16 @@ interface ProductFormProps {
 export function ProductForm({
   defaultValues,
   onSubmit,
-  submitLabel = 'Save product',
+  submitLabel,
   onCancel,
 }: ProductFormProps) {
+  const schema = z.object({
+    name: z.string().min(1, t('Name is required')).max(300),
+    description: z.string().optional(),
+    base_price: z.coerce.number().min(0, t('Price must be 0 or more')),
+    currency: z.string().length(3),
+  })
+
   const {
     register,
     handleSubmit,
@@ -47,23 +48,23 @@ export function ProductForm({
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
-      <FormField label="Product name" htmlFor="name" error={errors.name?.message} required>
+      <FormField label={t('Product name')} htmlFor="name" error={errors.name?.message} required>
         <Input
           id="name"
-          placeholder="e.g. Solid Wood Dining Table"
+          placeholder={t('e.g. Solid Wood Dining Table')}
           {...register('name')}
         />
       </FormField>
 
       <FormField
-        label="Description"
+        label={t('Description')}
         htmlFor="description"
         error={errors.description?.message}
-        hint="Shown to customers in the configurator"
+        hint={t('Shown to customers in the configurator')}
       >
         <Textarea
           id="description"
-          placeholder="Brief product description..."
+          placeholder={t('Brief product description...')}
           rows={3}
           {...register('description')}
         />
@@ -71,10 +72,10 @@ export function ProductForm({
 
       <div className="grid grid-cols-2 gap-4">
         <FormField
-          label="Base price"
+          label={t('Base price')}
           htmlFor="base_price"
           error={errors.base_price?.message}
-          hint="Before any option modifiers"
+          hint={t('Before any option modifiers')}
           required
         >
           <Input
@@ -82,12 +83,12 @@ export function ProductForm({
             type="number"
             step="0.01"
             min="0"
-            placeholder="0.00"
+            placeholder={t('0.00')}
             {...register('base_price')}
           />
         </FormField>
 
-        <FormField label="Currency" htmlFor="currency" error={errors.currency?.message} required>
+        <FormField label={t('Currency')} htmlFor="currency" error={errors.currency?.message} required>
           <Select id="currency" {...register('currency')}>
             {CURRENCIES.map(c => (
               <option key={c} value={c}>{c}</option>
@@ -99,11 +100,11 @@ export function ProductForm({
       <div className="flex justify-end gap-2 pt-2">
         {onCancel && (
           <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>
-            Cancel
+            {t('Cancel')}
           </Button>
         )}
         <Button type="submit" loading={isSubmitting}>
-          {submitLabel}
+          {submitLabel ?? t('Save product')}
         </Button>
       </div>
     </form>

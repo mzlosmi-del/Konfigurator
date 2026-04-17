@@ -13,6 +13,7 @@ import { Separator } from '@/components/ui/separator'
 import { Spinner } from '@/components/ui/spinner'
 import { useToast } from '@/hooks/useToast'
 import { Toaster } from '@/components/ui/toast'
+import { t } from '@/i18n'
 
 type InquiryWithProduct = Inquiry & { product: { name: string } | null }
 
@@ -81,7 +82,7 @@ export function InquiryDetailPage() {
         setInquiry(prev => prev ? { ...prev, status: updated.status } : prev)
       }
     } catch {
-      toast({ title: 'Inquiry not found', variant: 'destructive' })
+      toast({ title: t('Inquiry not found'), variant: 'destructive' })
     } finally {
       setLoading(false)
     }
@@ -93,10 +94,10 @@ export function InquiryDetailPage() {
     try {
       const quote = await generateAndSendQuote(inquiry.id, quoteExpiry || null)
       setQuotes(prev => [quote, ...prev])
-      toast({ title: `Quote sent to ${inquiry.customer_email}` })
+      toast({ title: `${t('Quote sent to')} ${inquiry.customer_email}` })
     } catch (e) {
       toast({
-        title: 'Failed to generate quote',
+        title: t('Failed to generate quote'),
         description: e instanceof Error ? e.message : undefined,
         variant: 'destructive',
       })
@@ -111,9 +112,9 @@ export function InquiryDetailPage() {
     try {
       const updated = await updateInquiryStatus(inquiry.id, next)
       setInquiry(prev => prev ? { ...prev, status: updated.status } : prev)
-      toast({ title: 'Status updated' })
+      toast({ title: t('Status updated') })
     } catch {
-      toast({ title: 'Failed to update status', variant: 'destructive' })
+      toast({ title: t('Failed to update status'), variant: 'destructive' })
     } finally {
       setUpdatingStatus(false)
     }
@@ -135,9 +136,9 @@ export function InquiryDetailPage() {
   if (!inquiry) {
     return (
       <div className="p-6">
-        <p className="text-sm text-muted-foreground">Inquiry not found.</p>
+        <p className="text-sm text-muted-foreground">{t('Inquiry not found.')}</p>
         <Button variant="link" className="mt-2 p-0" onClick={() => navigate('/inquiries')}>
-          Back to inquiries
+          {t('Back to inquiries')}
         </Button>
       </div>
     )
@@ -152,7 +153,7 @@ export function InquiryDetailPage() {
         description={
           <span className="flex items-center gap-2">
             <Badge variant={statusVariant[inquiry.status]} className="capitalize">
-              {inquiry.status}
+              {t(inquiry.status)}
             </Badge>
             <span className="text-sm text-muted-foreground">
               {new Date(inquiry.created_at).toLocaleString()}
@@ -163,7 +164,7 @@ export function InquiryDetailPage() {
           <div className="flex items-center gap-2">
             <Button size="sm" variant="outline" onClick={handleEmailReply}>
               <Mail className="h-4 w-4" />
-              Reply by email
+              {t('Reply by email')}
             </Button>
           </div>
         }
@@ -176,7 +177,7 @@ export function InquiryDetailPage() {
           className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
         >
           <ArrowLeft className="h-4 w-4" />
-          All inquiries
+          {t('All inquiries')}
         </button>
       </div>
 
@@ -188,11 +189,11 @@ export function InquiryDetailPage() {
           {/* Configuration snapshot */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Configuration</CardTitle>
+              <CardTitle className="text-base">{t('Configuration')}</CardTitle>
             </CardHeader>
             <CardContent>
               {configItems.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No configuration data recorded.</p>
+                <p className="text-sm text-muted-foreground">{t('No configuration data recorded.')}</p>
               ) : (
                 <div className="space-y-0">
                   {configItems.map((item, i) => (
@@ -220,7 +221,7 @@ export function InquiryDetailPage() {
                 <>
                   <Separator className="my-2" />
                   <div className="flex items-center justify-between py-2 text-sm">
-                    <span className="font-semibold">Total</span>
+                    <span className="font-semibold">{t('Total')}</span>
                     <span className="font-semibold tabular-nums text-base">
                       {inquiry.total_price.toFixed(2)} {inquiry.currency}
                     </span>
@@ -234,7 +235,7 @@ export function InquiryDetailPage() {
           {inquiry.message && (
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Message</CardTitle>
+                <CardTitle className="text-base">{t('Message')}</CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-sm whitespace-pre-wrap">{inquiry.message}</p>
@@ -249,7 +250,7 @@ export function InquiryDetailPage() {
           {/* Status control */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Status</CardTitle>
+              <CardTitle className="text-base">{t('Status')}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               <Select
@@ -258,11 +259,11 @@ export function InquiryDetailPage() {
                 disabled={updatingStatus}
               >
                 {STATUS_OPTIONS.map(s => (
-                  <option key={s} value={s} className="capitalize">{s}</option>
+                  <option key={s} value={s} className="capitalize">{t(s)}</option>
                 ))}
               </Select>
               <p className="text-xs text-muted-foreground">
-                Changing status here does not send any email. Use "Reply by email" to contact the customer.
+                {t('Changing status here does not send any email. Use "Reply by email" to contact the customer.')}
               </p>
             </CardContent>
           </Card>
@@ -270,11 +271,11 @@ export function InquiryDetailPage() {
           {/* Quote generator */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Quote</CardTitle>
+              <CardTitle className="text-base">{t('Quote')}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               <div>
-                <label className="text-xs text-muted-foreground block mb-1">Valid until</label>
+                <label className="text-xs text-muted-foreground block mb-1">{t('Valid until')}</label>
                 <input
                   type="date"
                   value={quoteExpiry}
@@ -291,12 +292,12 @@ export function InquiryDetailPage() {
                 loading={generatingQuote}
               >
                 <FileText className="h-4 w-4" />
-                Generate &amp; Send Quote
+                {t('Generate & Send Quote')}
               </Button>
 
               {quotes.length > 0 && (
                 <div className="space-y-2 pt-1">
-                  <p className="text-xs text-muted-foreground font-medium">Sent quotes</p>
+                  <p className="text-xs text-muted-foreground font-medium">{t('Sent quotes')}</p>
                   {quotes.map(q => (
                     <div key={q.id} className="rounded-md border bg-muted/20 px-3 py-2 text-xs space-y-1">
                       <div className="flex items-center justify-between">
@@ -310,13 +311,13 @@ export function InquiryDetailPage() {
                             rel="noopener noreferrer"
                             className="flex items-center gap-1 text-primary hover:underline"
                           >
-                            PDF <ExternalLink className="h-3 w-3" />
+                            {t('PDF')} <ExternalLink className="h-3 w-3" />
                           </a>
                         )}
                       </div>
                       {q.expires_at && (
                         <p className="text-muted-foreground">
-                          Expires {new Date(q.expires_at).toLocaleDateString('en-GB', { dateStyle: 'medium' })}
+                          {t('Expires')} {new Date(q.expires_at).toLocaleDateString('en-GB', { dateStyle: 'medium' })}
                         </p>
                       )}
                     </div>
@@ -329,15 +330,15 @@ export function InquiryDetailPage() {
           {/* Customer details */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Customer</CardTitle>
+              <CardTitle className="text-base">{t('Customer')}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3 text-sm">
               <div>
-                <p className="text-xs text-muted-foreground mb-0.5">Name</p>
+                <p className="text-xs text-muted-foreground mb-0.5">{t('Name')}</p>
                 <p className="font-medium">{inquiry.customer_name}</p>
               </div>
               <div>
-                <p className="text-xs text-muted-foreground mb-0.5">Email</p>
+                <p className="text-xs text-muted-foreground mb-0.5">{t('Email')}</p>
                 <a
                   href={`mailto:${inquiry.customer_email}`}
                   className="text-primary hover:underline flex items-center gap-1"
@@ -352,7 +353,7 @@ export function InquiryDetailPage() {
           {/* Product */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Product</CardTitle>
+              <CardTitle className="text-base">{t('Product')}</CardTitle>
             </CardHeader>
             <CardContent className="text-sm">
               <p className="font-medium">{inquiry.product?.name ?? '—'}</p>
@@ -360,7 +361,7 @@ export function InquiryDetailPage() {
                 onClick={() => navigate(`/products/${inquiry.product_id}/edit`)}
                 className="text-xs text-primary hover:underline mt-1 flex items-center gap-1"
               >
-                View product <ExternalLink className="h-3 w-3" />
+                {t('View product')} <ExternalLink className="h-3 w-3" />
               </button>
             </CardContent>
           </Card>
@@ -368,16 +369,16 @@ export function InquiryDetailPage() {
           {/* Timestamps */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Timeline</CardTitle>
+              <CardTitle className="text-base">{t('Timeline')}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2 text-sm">
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Received</span>
+                <span className="text-muted-foreground">{t('Received')}</span>
                 <span className="text-xs">{new Date(inquiry.created_at).toLocaleString()}</span>
               </div>
               {inquiry.updated_at !== inquiry.created_at && (
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Updated</span>
+                  <span className="text-muted-foreground">{t('Updated')}</span>
                   <span className="text-xs">{new Date(inquiry.updated_at).toLocaleString()}</span>
                 </div>
               )}

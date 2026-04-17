@@ -1,5 +1,7 @@
+import { useState, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from '@/components/auth/AuthContext'
+import { getLang, setLang, type Lang } from '@/i18n'
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
 import { AppShell } from '@/components/layout/AppShell'
 import { LoginPage } from '@/pages/auth/LoginPage'
@@ -15,7 +17,16 @@ import { PreviewPage } from '@/pages/preview/PreviewPage'
 import { LibraryPage } from '@/pages/library/LibraryPage'
 
 export function App() {
+  const [lang, setLangState] = useState<Lang>(getLang())
+
+  useEffect(() => {
+    const handler = (e: Event) => setLangState((e as CustomEvent<Lang>).detail)
+    window.addEventListener('langchange', handler)
+    return () => window.removeEventListener('langchange', handler)
+  }, [])
+
   return (
+    <div key={lang}>
     <BrowserRouter>
       <AuthProvider>
         <Routes>
@@ -43,5 +54,6 @@ export function App() {
         </Routes>
       </AuthProvider>
     </BrowserRouter>
+    </div>
   )
 }

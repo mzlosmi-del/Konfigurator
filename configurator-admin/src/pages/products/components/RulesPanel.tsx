@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
 import { useToast } from '@/hooks/useToast'
 import { Toaster } from '@/components/ui/toast'
+import { t } from '@/i18n'
 
 interface Props {
   productId: string
@@ -35,9 +36,8 @@ const RULE_TYPES: RuleType[] = [
   'hide_value', 'disable_value', 'price_override', 'set_value_default', 'set_value_locked',
 ]
 
-// hide/disable only make sense for select-type targets (they target value_ids)
-function requiresSelectTarget(t: RuleType) {
-  return t === 'hide_value' || t === 'disable_value'
+function requiresSelectTarget(ruleType: RuleType) {
+  return ruleType === 'hide_value' || ruleType === 'disable_value'
 }
 
 // ── Pill pickers ──────────────────────────────────────────────────────────────
@@ -48,7 +48,7 @@ function CharPicker({ value, chars, onChange }: {
   onChange: (id: string) => void
 }) {
   if (chars.length === 0) {
-    return <span className="text-xs text-muted-foreground italic">No characteristics available</span>
+    return <span className="text-xs text-muted-foreground italic">{t('No characteristics available')}</span>
   }
   return (
     <div className="flex flex-wrap gap-1">
@@ -79,7 +79,7 @@ function ValuePicker({ charId, value, valuesMap, onChange }: {
 }) {
   const vals = valuesMap[charId] ?? []
   if (vals.length === 0) {
-    return <span className="text-xs text-muted-foreground italic">No values</span>
+    return <span className="text-xs text-muted-foreground italic">{t('No values')}</span>
   }
   return (
     <div className="flex flex-wrap gap-1">
@@ -151,7 +151,7 @@ export function RulesPanel({ productId }: Props) {
       )
       setValuesMap(Object.fromEntries(entries))
     } catch {
-      toast({ title: 'Failed to load rules', variant: 'destructive' })
+      toast({ title: t('Failed to load rules'), variant: 'destructive' })
     } finally {
       setLoading(false)
     }
@@ -169,21 +169,21 @@ export function RulesPanel({ productId }: Props) {
 
   async function handleAdd() {
     if (!condCharId) {
-      toast({ title: 'Select a condition characteristic', variant: 'destructive' })
+      toast({ title: t('Select a condition characteristic'), variant: 'destructive' })
       return
     }
     const condIsNumeric = isNumeric(condCharId, characteristics)
     if (!condIsNumeric && !condValueId) {
-      toast({ title: 'Select a condition value', variant: 'destructive' })
+      toast({ title: t('Select a condition value'), variant: 'destructive' })
       return
     }
     if (!effCharId) {
-      toast({ title: 'Select a target characteristic', variant: 'destructive' })
+      toast({ title: t('Select a target characteristic'), variant: 'destructive' })
       return
     }
     const effIsNumeric = isNumeric(effCharId, characteristics)
     if (!effIsNumeric && (ruleType === 'hide_value' || ruleType === 'disable_value' || ruleType === 'set_value_default' || ruleType === 'set_value_locked') && !effValueId) {
-      toast({ title: 'Select a target value', variant: 'destructive' })
+      toast({ title: t('Select a target value'), variant: 'destructive' })
       return
     }
 
@@ -211,9 +211,9 @@ export function RulesPanel({ productId }: Props) {
       setRules(prev => [...prev, created])
       setCondCharId(''); setCondValueId(''); setCondNumericVal('0')
       setEffCharId(''); setEffValueId(''); setEffPrice('0'); setEffNumericVal('0')
-      toast({ title: 'Rule added' })
+      toast({ title: t('Rule added') })
     } catch (e) {
-      toast({ title: 'Failed to add rule', description: e instanceof Error ? e.message : undefined, variant: 'destructive' })
+      toast({ title: t('Failed to add rule'), description: e instanceof Error ? e.message : undefined, variant: 'destructive' })
     } finally {
       setSaving(false)
     }
@@ -224,7 +224,7 @@ export function RulesPanel({ productId }: Props) {
       await deleteRule(id)
       setRules(prev => prev.filter(r => r.id !== id))
     } catch {
-      toast({ title: 'Failed to delete rule', variant: 'destructive' })
+      toast({ title: t('Failed to delete rule'), variant: 'destructive' })
     }
   }
 
@@ -262,7 +262,6 @@ export function RulesPanel({ productId }: Props) {
   }
 
   const condIsNumeric = isNumeric(condCharId, characteristics)
-  // For hide/disable, only select-type chars make sense as targets
   const effectChars = requiresSelectTarget(ruleType)
     ? characteristics.filter(c => c.display_type !== 'number')
     : characteristics
@@ -273,7 +272,7 @@ export function RulesPanel({ productId }: Props) {
 
       {/* ── Existing rules ─────────────────────────────────────────────────── */}
       {rules.length === 0 ? (
-        <p className="text-sm text-muted-foreground py-2">No rules yet. Add one below.</p>
+        <p className="text-sm text-muted-foreground py-2">{t('No rules yet. Add one below.')}</p>
       ) : (
         <div className="space-y-2">
           {rules.map(rule => {
@@ -281,15 +280,15 @@ export function RulesPanel({ productId }: Props) {
             return (
               <div key={rule.id} className="flex items-center gap-2 rounded-lg border bg-muted/20 px-4 py-3">
                 <div className="flex-1 flex items-center gap-1.5 flex-wrap text-sm">
-                  <span className="text-xs font-bold text-primary">IF</span>
+                  <span className="text-xs font-bold text-primary">{t('IF')}</span>
                   {ruleConditionLabel(rule)}
                   <span className="text-xs text-muted-foreground mx-0.5">→</span>
                   <span className={`px-2 py-0.5 rounded-full text-xs border font-medium ${cfg.active}`}>
-                    {cfg.label}
+                    {t(cfg.label)}
                   </span>
                   {rule.effect.characteristic_id && (
                     <>
-                      <span className="text-xs text-muted-foreground">on</span>
+                      <span className="text-xs text-muted-foreground">{t('on')}</span>
                       <span className="px-2 py-0.5 rounded-full text-xs border bg-background font-medium">
                         {charName(rule.effect.characteristic_id)}
                       </span>
@@ -330,12 +329,12 @@ export function RulesPanel({ productId }: Props) {
 
       {/* ── New rule form ──────────────────────────────────────────────────── */}
       <div className="rounded-lg border p-4 space-y-4 bg-muted/10">
-        <p className="text-sm font-medium">New rule</p>
+        <p className="text-sm font-medium">{t('New rule')}</p>
 
         {/* Step 1: Condition */}
         <div className="space-y-2">
           <div className="flex items-start gap-3">
-            <span className="text-xs font-bold text-primary pt-1 w-10 shrink-0">IF</span>
+            <span className="text-xs font-bold text-primary pt-1 w-10 shrink-0">{t('IF')}</span>
             <CharPicker value={condCharId} chars={characteristics} onChange={handleCondCharChange} />
           </div>
 
@@ -375,7 +374,7 @@ export function RulesPanel({ productId }: Props) {
                 value={condNumericVal}
                 onChange={e => setCondNumericVal(e.target.value)}
                 className="w-24 rounded border border-input bg-background px-2 py-0.5 text-xs shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
-                placeholder="value"
+                placeholder={t('value')}
               />
             </div>
           )}
@@ -383,22 +382,22 @@ export function RulesPanel({ productId }: Props) {
 
         {/* Step 2: Action */}
         <div className="flex items-start gap-3">
-          <span className="text-xs font-bold text-primary pt-1 w-10 shrink-0">THEN</span>
+          <span className="text-xs font-bold text-primary pt-1 w-10 shrink-0">{t('THEN')}</span>
           <div className="flex flex-wrap gap-1.5">
-            {RULE_TYPES.map(t => {
-              const cfg = RULE_TYPE_CONFIG[t]
-              const selected = ruleType === t
+            {RULE_TYPES.map(rt => {
+              const cfg = RULE_TYPE_CONFIG[rt]
+              const selected = ruleType === rt
               return (
                 <button
-                  key={t}
+                  key={rt}
                   type="button"
-                  onClick={() => { setRuleType(t); setEffCharId(''); setEffValueId('') }}
+                  onClick={() => { setRuleType(rt); setEffCharId(''); setEffValueId('') }}
                   className={[
                     'px-2.5 py-1 rounded-full text-xs border font-medium transition-colors',
                     selected ? cfg.active : 'bg-background border-input hover:bg-muted',
                   ].join(' ')}
                 >
-                  {cfg.label}
+                  {t(cfg.label)}
                 </button>
               )
             })}
@@ -408,7 +407,7 @@ export function RulesPanel({ productId }: Props) {
         {/* Step 3: Target characteristic */}
         <div className="space-y-2">
           <div className="flex items-start gap-3">
-            <span className="text-xs font-bold text-primary pt-1 w-10 shrink-0">ON</span>
+            <span className="text-xs font-bold text-primary pt-1 w-10 shrink-0">{t('ON')}</span>
             <CharPicker value={effCharId} chars={effectChars} onChange={handleEffCharChange} />
           </div>
 
@@ -434,7 +433,7 @@ export function RulesPanel({ productId }: Props) {
                 value={effNumericVal}
                 onChange={e => setEffNumericVal(e.target.value)}
                 className="w-28 rounded border border-input bg-background px-2 py-1 text-xs shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
-                placeholder="value"
+                placeholder={t('value')}
               />
             </div>
           )}
@@ -442,13 +441,13 @@ export function RulesPanel({ productId }: Props) {
           {/* Price amount for price_override */}
           {effCharId && ruleType === 'price_override' && (
             <div className="flex items-center gap-2 pl-[52px]">
-              <span className="text-xs text-muted-foreground">amount</span>
+              <span className="text-xs text-muted-foreground">{t('amount')}</span>
               <input
                 type="number"
                 value={effPrice}
                 onChange={e => setEffPrice(e.target.value)}
                 className="w-28 rounded border border-input bg-background px-2 py-1 text-xs shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
-                placeholder="e.g. 50 or −20"
+                placeholder={t('e.g. 50 or \u221220')}
               />
             </div>
           )}
@@ -456,7 +455,7 @@ export function RulesPanel({ productId }: Props) {
 
         <div className="flex justify-end">
           <Button size="sm" onClick={handleAdd} loading={saving} disabled={saving}>
-            Add rule
+            {t('Add rule')}
           </Button>
         </div>
       </div>

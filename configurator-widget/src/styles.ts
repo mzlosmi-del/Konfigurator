@@ -319,11 +319,37 @@ export const WIDGET_STYLES = `
 
   /* ── Branding ────────────────────────────────────── */
   .cw-branding {
-    text-align: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
     font-size: 11px;
     color: #d1d5db;
     padding: 10px 0 4px;
   }
   .cw-branding a { color: #d1d5db; text-decoration: none; }
   .cw-branding a:hover { color: #9ca3af; }
+
+  /* ── Language switcher ───────────────────────────── */
+  .cw-lang-switcher {
+    display: flex;
+    gap: 2px;
+  }
+  .cw-lang-btn {
+    font-size: 10px;
+    font-weight: 600;
+    padding: 1px 6px;
+    border-radius: 4px;
+    border: 1px solid #e5e7eb;
+    background: transparent;
+    color: #9ca3af;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .cw-lang-btn:hover { color: #6b7280; border-color: #d1d5db; }
+  .cw-lang-btn--active {
+    background: #111827;
+    color: #fff;
+    border-color: #111827;
+  }
 `

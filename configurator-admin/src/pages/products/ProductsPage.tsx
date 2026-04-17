@@ -11,6 +11,7 @@ import { Spinner } from '@/components/ui/spinner'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { useToast } from '@/hooks/useToast'
 import { Toaster } from '@/components/ui/toast'
+import { t } from '@/i18n'
 
 const statusVariant: Record<Product['status'], 'success' | 'warning' | 'secondary'> = {
   published: 'success',
@@ -34,7 +35,7 @@ export function ProductsPage() {
     try {
       setProducts(await fetchProducts())
     } catch {
-      toast({ title: 'Failed to load products', variant: 'destructive' })
+      toast({ title: t('Failed to load products'), variant: 'destructive' })
     } finally {
       setLoading(false)
     }
@@ -46,10 +47,10 @@ export function ProductsPage() {
     try {
       await deleteProduct(toDelete.id)
       setProducts(p => p.filter(x => x.id !== toDelete.id))
-      toast({ title: 'Product deleted' })
+      toast({ title: t('Product deleted') })
       setToDelete(null)
     } catch {
-      toast({ title: 'Delete failed', variant: 'destructive' })
+      toast({ title: t('Delete failed'), variant: 'destructive' })
     } finally {
       setDeleting(false)
     }
@@ -61,9 +62,9 @@ export function ProductsPage() {
     try {
       const updated = await updateProduct(product.id, { status: next })
       setProducts(p => p.map(x => (x.id === (updated as Product).id ? (updated as Product) : x)))
-      toast({ title: next === 'published' ? 'Product published' : 'Product unpublished' })
+      toast({ title: next === 'published' ? t('Product published') : t('Product unpublished') })
     } catch {
-      toast({ title: 'Update failed', variant: 'destructive' })
+      toast({ title: t('Update failed'), variant: 'destructive' })
     } finally {
       setToggling(null)
     }
@@ -72,11 +73,11 @@ export function ProductsPage() {
   return (
     <div className="animate-fade-in">
       <PageHeader
-        title="Products"
-        description="Manage your configurable products."
+        title={t('Products')}
+        description={t('Manage your configurable products.')}
         action={
           <Button size="sm" onClick={() => navigate('/products/new')}>
-            <Plus className="h-4 w-4" /> New product
+            <Plus className="h-4 w-4" /> {t('New product')}
           </Button>
         }
       />
@@ -87,12 +88,12 @@ export function ProductsPage() {
           <Card>
             <CardContent className="flex flex-col items-center justify-center py-16 text-center">
               <Package className="h-10 w-10 text-muted-foreground/40 mb-3" />
-              <p className="font-medium text-sm">No products yet</p>
+              <p className="font-medium text-sm">{t('No products yet')}</p>
               <p className="text-sm text-muted-foreground mt-1 mb-4">
-                Create your first configurable product to get started.
+                {t('Create your first configurable product to get started.')}
               </p>
               <Button size="sm" onClick={() => navigate('/products/new')}>
-                <Plus className="h-4 w-4" /> Create product
+                <Plus className="h-4 w-4" /> {t('Create product')}
               </Button>
             </CardContent>
           </Card>
@@ -101,10 +102,10 @@ export function ProductsPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b bg-muted/40">
-                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">Name</th>
-                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">Status</th>
-                  <th className="px-4 py-3 text-right font-medium text-muted-foreground">Base price</th>
-                  <th className="px-4 py-3 text-right font-medium text-muted-foreground w-32">Actions</th>
+                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">{t('Name')}</th>
+                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">{t('Status')}</th>
+                  <th className="px-4 py-3 text-right font-medium text-muted-foreground">{t('Base price')}</th>
+                  <th className="px-4 py-3 text-right font-medium text-muted-foreground w-32">{t('Actions')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y">
@@ -120,7 +121,7 @@ export function ProductsPage() {
                     </td>
                     <td className="px-4 py-3">
                       <Badge variant={statusVariant[product.status]} className="capitalize">
-                        {product.status}
+                        {t(product.status)}
                       </Badge>
                     </td>
                     <td className="px-4 py-3 text-right tabular-nums">
@@ -130,7 +131,7 @@ export function ProductsPage() {
                       <div className="flex items-center justify-end gap-1">
                         <Button
                           variant="ghost" size="icon"
-                          title={product.status === 'published' ? 'Unpublish' : 'Publish'}
+                          title={product.status === 'published' ? t('Unpublish') : t('Publish')}
                           loading={toggling === product.id}
                           onClick={() => handleToggleStatus(product)}
                           disabled={product.status === 'archived'}
@@ -139,11 +140,11 @@ export function ProductsPage() {
                             ? <EyeOff className="h-4 w-4" />
                             : <Eye className="h-4 w-4" />}
                         </Button>
-                        <Button variant="ghost" size="icon" title="Edit"
+                        <Button variant="ghost" size="icon" title={t('Edit')}
                           onClick={() => navigate(`/products/${product.id}/edit`)}>
                           <Pencil className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="icon" title="Delete"
+                        <Button variant="ghost" size="icon" title={t('Delete')}
                           className="text-destructive hover:text-destructive"
                           onClick={() => setToDelete(product)}>
                           <Trash2 className="h-4 w-4" />
@@ -160,7 +161,7 @@ export function ProductsPage() {
       <ConfirmDialog
         open={!!toDelete}
         onOpenChange={open => !open && setToDelete(null)}
-        title="Delete product?"
+        title={t('Delete product?')}
         description={`"${toDelete?.name}" and all its data will be permanently deleted.`}
         onConfirm={handleDelete}
         loading={deleting}

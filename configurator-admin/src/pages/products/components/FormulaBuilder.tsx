@@ -1,5 +1,6 @@
 import type { FormulaNode } from '@/types/database'
 import type { Characteristic, CharacteristicValue } from '@/types/database'
+import { t } from '@/i18n'
 
 // ── Node type helpers ─────────────────────────────────────────────────────────
 
@@ -44,16 +45,16 @@ function isBinaryNode(node: FormulaNode): node is Extract<FormulaNode, { left: F
   return ['add','subtract','multiply','divide','gt','gte','lt','lte','eq','and','or'].includes(node.type)
 }
 
-function defaultNode(type: NodeType, firstCharId = '', firstValueId = ''): FormulaNode {
+function defaultNode(nodeType: NodeType, firstCharId = '', firstValueId = ''): FormulaNode {
   const zero: FormulaNode = { type: 'number', value: 0 }
-  switch (type) {
+  switch (nodeType) {
     case 'number':      return { type: 'number', value: 0 }
     case 'base_price':  return { type: 'base_price' }
     case 'modifier':    return { type: 'modifier', char_id: firstCharId }
     case 'input':       return { type: 'input', char_id: firstCharId }
     case 'is_selected': return { type: 'is_selected', char_id: firstCharId, value_id: firstValueId }
     case 'if':          return { type: 'if', condition: zero, then: zero, else_node: zero }
-    default:            return { type, left: zero, right: zero } as FormulaNode
+    default:            return { type: nodeType, left: zero, right: zero } as FormulaNode
   }
 }
 
@@ -70,7 +71,7 @@ function formulaToString(
 
   switch (node.type) {
     case 'number':      return String(node.value)
-    case 'base_price':  return 'base price'
+    case 'base_price':  return t('base price')
     case 'modifier':    return node.char_id ? `[${charName(node.char_id)} modifier]` : '[modifier ?]'
     case 'input':       return node.char_id ? `[${charName(node.char_id)}]` : '[input ?]'
     case 'is_selected': return node.char_id
@@ -220,7 +221,7 @@ function CharPicker({ value, chars, onChange }: {
   onChange: (id: string) => void
 }) {
   if (chars.length === 0) {
-    return <span className="text-xs text-muted-foreground italic">No characteristics available</span>
+    return <span className="text-xs text-muted-foreground italic">{t('No characteristics available')}</span>
   }
   return (
     <div className="flex flex-wrap gap-1">
@@ -251,7 +252,7 @@ function ValuePicker({ charId, value, valuesMap, onChange }: {
 }) {
   const vals = valuesMap[charId] ?? []
   if (vals.length === 0) {
-    return <span className="text-xs text-muted-foreground italic">No values for this characteristic</span>
+    return <span className="text-xs text-muted-foreground italic">{t('No values for this characteristic')}</span>
   }
   return (
     <div className="flex flex-wrap gap-1">
@@ -311,17 +312,17 @@ export function FormulaBuilder({ node, onChange, characteristics, valuesMap, isR
   const firstValueId = valuesMap[firstCharId]?.[0]?.id ?? ''
   const firstNumId   = numberChars[0]?.id ?? ''
 
-  function changeType(type: NodeType) {
-    onChange(defaultNode(type, firstCharId, firstValueId))
+  function changeType(nodeType: NodeType) {
+    onChange(defaultNode(nodeType, firstCharId, firstValueId))
   }
 
   // Node-type escape hatch (de-emphasised — power users only)
   const typeSelector = (
-    <SmallSelect value={node.type} onChange={t => changeType(t as NodeType)}>
+    <SmallSelect value={node.type} onChange={nodeType => changeType(nodeType as NodeType)}>
       {NODE_GROUPS.map(group => (
-        <optgroup key={group.label} label={group.label}>
-          {group.types.map(t => (
-            <option key={t} value={t}>{NODE_LABELS[t]}</option>
+        <optgroup key={group.label} label={t(group.label)}>
+          {group.types.map(nodeType => (
+            <option key={nodeType} value={nodeType}>{t(NODE_LABELS[nodeType])}</option>
           ))}
         </optgroup>
       ))}
@@ -344,29 +345,28 @@ export function FormulaBuilder({ node, onChange, characteristics, valuesMap, isR
         {/* Templates */}
         {characteristics.length > 0 && (
           <div className="space-y-3">
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Quick templates</p>
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{t('Quick templates')}</p>
             {TEMPLATE_GROUPS.map(grp => {
               const visibleItems = grp.group.includes('Simple')
-                ? grp.items.filter(t => {
-                    // hide numeric templates when no numeric chars exist
-                    const needsNum = t.label.toLowerCase().includes('input')
+                ? grp.items.filter(item => {
+                    const needsNum = item.label.toLowerCase().includes('input')
                     return needsNum ? numberChars.length > 0 : true
                   })
                 : grp.items
               if (visibleItems.length === 0) return null
               return (
                 <div key={grp.group} className="space-y-1">
-                  <p className="text-xs text-muted-foreground">{grp.group}</p>
+                  <p className="text-xs text-muted-foreground">{t(grp.group)}</p>
                   <div className="flex flex-wrap gap-1.5">
                     {visibleItems.map(tpl => (
                       <button
                         key={tpl.label}
                         type="button"
-                        title={tpl.description}
+                        title={t(tpl.description)}
                         onClick={() => onChange(tpl.build(firstCharId, firstValueId, firstNumId))}
                         className="px-2.5 py-1 rounded border border-input bg-background text-xs hover:bg-muted transition-colors"
                       >
-                        {tpl.label}
+                        {t(tpl.label)}
                       </button>
                     ))}
                   </div>
@@ -409,7 +409,7 @@ export function FormulaBuilder({ node, onChange, characteristics, valuesMap, isR
       return (
         <div className="flex items-center gap-2">
           {typeSelector}
-          <span className="text-xs text-muted-foreground">base price</span>
+          <span className="text-xs text-muted-foreground">{t('base price')}</span>
         </div>
       )
     }
@@ -481,16 +481,16 @@ export function FormulaBuilder({ node, onChange, characteristics, valuesMap, isR
       const [leftLabel, rightLabel] = ((): [string, string] => {
         switch (node.type) {
           case 'add':
-          case 'subtract':    return ['Start with', 'Adjustment']
+          case 'subtract':    return [t('Start with'), t('Adjustment')]
           case 'multiply':
-          case 'divide':      return ['Base', 'Factor']
+          case 'divide':      return [t('Base'), t('Factor')]
           case 'gt':
           case 'gte':
           case 'lt':
           case 'lte':
-          case 'eq':          return ['Characteristic value', 'Compare to']
+          case 'eq':          return [t('Characteristic value'), t('Compare to')]
           case 'and':
-          case 'or':          return ['First condition', 'Second condition']
+          case 'or':          return [t('First condition'), t('Second condition')]
         }
       })()
       return (
@@ -528,9 +528,9 @@ export function FormulaBuilder({ node, onChange, characteristics, valuesMap, isR
     // ── IF / THEN / ELSE ──────────────────────────────────────────────────────
     if (node.type === 'if') {
       const fields = [
-        { key: 'condition' as const, label: 'IF',   color: 'border-blue-400/50' },
-        { key: 'then'      as const, label: 'THEN', color: 'border-green-400/50' },
-        { key: 'else_node' as const, label: 'ELSE', color: 'border-muted' },
+        { key: 'condition' as const, label: t('IF'),   color: 'border-blue-400/50' },
+        { key: 'then'      as const, label: t('THEN'), color: 'border-green-400/50' },
+        { key: 'else_node' as const, label: t('ELSE'), color: 'border-muted' },
       ]
       return (
         <div className="space-y-2">

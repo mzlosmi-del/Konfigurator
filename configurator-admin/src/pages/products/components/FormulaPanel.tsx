@@ -9,6 +9,7 @@ import { Spinner } from '@/components/ui/spinner'
 import { useToast } from '@/hooks/useToast'
 import { Toaster } from '@/components/ui/toast'
 import { FormulaBuilder } from './FormulaBuilder'
+import { t } from '@/i18n'
 
 interface Props {
   productId: string
@@ -25,13 +26,11 @@ export function FormulaPanel({ productId }: Props) {
   const [valuesMap, setValuesMap]           = useState<Record<string, CharacteristicValue[]>>({})
   const [expanded, setExpanded]             = useState<Record<string, boolean>>({})
 
-  // New-formula form state
   const [showNew, setShowNew]               = useState(false)
   const [newName, setNewName]               = useState('')
   const [newFormula, setNewFormula]         = useState<FormulaNode>(DEFAULT_FORMULA)
   const [saving, setSaving]                 = useState(false)
 
-  // Edit state per formula id
   const [editFormulas, setEditFormulas]     = useState<Record<string, FormulaNode>>({})
   const [editNames, setEditNames]           = useState<Record<string, string>>({})
   const [savingId, setSavingId]             = useState<string | null>(null)
@@ -53,7 +52,7 @@ export function FormulaPanel({ productId }: Props) {
       )
       setValuesMap(Object.fromEntries(entries))
     } catch {
-      toast({ title: 'Failed to load formulas', variant: 'destructive' })
+      toast({ title: t('Failed to load formulas'), variant: 'destructive' })
     } finally {
       setLoading(false)
     }
@@ -61,7 +60,7 @@ export function FormulaPanel({ productId }: Props) {
 
   async function handleCreate() {
     if (!newName.trim()) {
-      toast({ title: 'Enter a formula name', variant: 'destructive' })
+      toast({ title: t('Enter a formula name'), variant: 'destructive' })
       return
     }
     setSaving(true)
@@ -71,9 +70,9 @@ export function FormulaPanel({ productId }: Props) {
       setNewName('')
       setNewFormula(DEFAULT_FORMULA)
       setShowNew(false)
-      toast({ title: 'Formula created' })
+      toast({ title: t('Formula created') })
     } catch (e) {
-      toast({ title: 'Failed to create formula', description: e instanceof Error ? e.message : undefined, variant: 'destructive' })
+      toast({ title: t('Failed to create formula'), description: e instanceof Error ? e.message : undefined, variant: 'destructive' })
     } finally {
       setSaving(false)
     }
@@ -89,9 +88,9 @@ export function FormulaPanel({ productId }: Props) {
       setFormulas(prev => prev.map(f => f.id === id ? updated : f))
       setEditFormulas(prev => { const n = { ...prev }; delete n[id]; return n })
       setEditNames(prev =>    { const n = { ...prev }; delete n[id]; return n })
-      toast({ title: 'Formula saved' })
+      toast({ title: t('Formula saved') })
     } catch (e) {
-      toast({ title: 'Failed to save formula', description: e instanceof Error ? e.message : undefined, variant: 'destructive' })
+      toast({ title: t('Failed to save formula'), description: e instanceof Error ? e.message : undefined, variant: 'destructive' })
     } finally {
       setSavingId(null)
     }
@@ -102,7 +101,7 @@ export function FormulaPanel({ productId }: Props) {
       const updated = await updateFormula(formula.id, { is_active: !formula.is_active })
       setFormulas(prev => prev.map(f => f.id === formula.id ? updated : f))
     } catch {
-      toast({ title: 'Failed to update formula', variant: 'destructive' })
+      toast({ title: t('Failed to update formula'), variant: 'destructive' })
     }
   }
 
@@ -111,7 +110,7 @@ export function FormulaPanel({ productId }: Props) {
       await deleteFormula(id)
       setFormulas(prev => prev.filter(f => f.id !== id))
     } catch {
-      toast({ title: 'Failed to delete formula', variant: 'destructive' })
+      toast({ title: t('Failed to delete formula'), variant: 'destructive' })
     }
   }
 
@@ -133,9 +132,8 @@ export function FormulaPanel({ productId }: Props) {
 
   return (
     <div className="space-y-4">
-      {/* Existing formulas */}
       {formulas.length === 0 && !showNew && (
-        <p className="text-sm text-muted-foreground py-2">No formulas yet. Add one below.</p>
+        <p className="text-sm text-muted-foreground py-2">{t('No formulas yet. Add one below.')}</p>
       )}
 
       {formulas.map(f => {
@@ -161,8 +159,8 @@ export function FormulaPanel({ productId }: Props) {
                 }`}
               >
                 {f.is_active
-                  ? <><ToggleRight className="h-3 w-3" /> Active</>
-                  : <><ToggleLeft className="h-3 w-3" /> Inactive</>}
+                  ? <><ToggleRight className="h-3 w-3" /> {t('Active')}</>
+                  : <><ToggleLeft className="h-3 w-3" /> {t('Inactive')}</>}
               </button>
               <Button
                 variant="ghost"
@@ -180,11 +178,11 @@ export function FormulaPanel({ productId }: Props) {
                 <Input
                   value={currentName(f)}
                   onChange={e => setEditNames(prev => ({ ...prev, [f.id]: e.target.value }))}
-                  placeholder="Formula name"
+                  placeholder={t('Formula name')}
                   className="max-w-xs text-sm"
                 />
                 <div className="rounded-lg border bg-background p-4">
-                  <p className="text-xs text-muted-foreground mb-3 font-medium uppercase tracking-wide">Formula expression</p>
+                  <p className="text-xs text-muted-foreground mb-3 font-medium uppercase tracking-wide">{t('Formula expression')}</p>
                   <FormulaBuilder
                     node={currentFormula(f)}
                     onChange={node => setEditFormulas(prev => ({ ...prev, [f.id]: node }))}
@@ -201,7 +199,7 @@ export function FormulaPanel({ productId }: Props) {
                       loading={savingId === f.id}
                       disabled={savingId === f.id}
                     >
-                      Save formula
+                      {t('Save formula')}
                     </Button>
                   </div>
                 )}
@@ -214,15 +212,15 @@ export function FormulaPanel({ productId }: Props) {
       {/* New formula form */}
       {showNew ? (
         <div className="rounded-lg border p-4 space-y-4 bg-muted/10">
-          <p className="text-sm font-medium">New formula</p>
+          <p className="text-sm font-medium">{t('New formula')}</p>
           <Input
             value={newName}
             onChange={e => setNewName(e.target.value)}
-            placeholder="Formula name (e.g. 'Size surcharge', 'Material discount')"
+            placeholder={t("Formula name (e.g. 'Size surcharge', 'Material discount')")}
             autoFocus
           />
           <div className="rounded-lg border bg-background p-4">
-            <p className="text-xs text-muted-foreground mb-3 font-medium uppercase tracking-wide">Formula expression</p>
+            <p className="text-xs text-muted-foreground mb-3 font-medium uppercase tracking-wide">{t('Formula expression')}</p>
             <FormulaBuilder
               node={newFormula}
               onChange={setNewFormula}
@@ -233,10 +231,10 @@ export function FormulaPanel({ productId }: Props) {
           </div>
           <div className="flex gap-2 justify-end">
             <Button size="sm" variant="ghost" onClick={() => { setShowNew(false); setNewName(''); setNewFormula(DEFAULT_FORMULA) }}>
-              Cancel
+              {t('Cancel')}
             </Button>
             <Button size="sm" onClick={handleCreate} loading={saving} disabled={saving || !newName.trim()}>
-              Create formula
+              {t('Create formula')}
             </Button>
           </div>
         </div>
@@ -247,7 +245,7 @@ export function FormulaPanel({ productId }: Props) {
           className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
         >
           <Plus className="h-4 w-4" />
-          Add formula
+          {t('Add formula')}
         </button>
       )}
 

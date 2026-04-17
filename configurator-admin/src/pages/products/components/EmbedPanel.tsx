@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Check, Copy, ExternalLink, RefreshCw } from 'lucide-react'
 import { useAuthContext } from '@/components/auth/AuthContext'
 import type { Product } from '@/types/database'
+import { t } from '@/i18n'
 
 interface Props {
   product: Product
@@ -18,8 +19,6 @@ export function EmbedPanel({ product }: Props) {
 
   const isPublished = product.status === 'published'
 
-  // Build the iframe src — points to the static widget-preview.html in /public,
-  // passing all config as query params. Works in dev and prod with no CDN needed.
   const previewSrc = (() => {
     const p = new URLSearchParams({
       supabase_url: SUPABASE_URL,
@@ -52,22 +51,22 @@ export function EmbedPanel({ product }: Props) {
     <div className="space-y-6">
       {!isPublished && (
         <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-          This product is not published. Publish it first so the widget can load it.
+          {t('This product is not published. Publish it first so the widget can load it.')}
         </div>
       )}
 
       {/* ── Live preview ───────────────────────────────────────────── */}
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <p className="text-sm font-medium">Live preview</p>
+          <p className="text-sm font-medium">{t('Live preview')}</p>
           {isPublished && (
             <button
               onClick={() => setPreviewKey(k => k + 1)}
               className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
-              title="Reload preview"
+              title={t('Reload')}
             >
               <RefreshCw className="h-3 w-3" />
-              Reload
+              {t('Reload')}
             </button>
           )}
         </div>
@@ -83,7 +82,7 @@ export function EmbedPanel({ product }: Props) {
             />
           ) : (
             <div className="flex items-center justify-center h-36 text-sm text-muted-foreground">
-              Publish the product to see a live preview.
+              {t('Publish the product to see a live preview.')}
             </div>
           )}
         </div>
@@ -95,7 +94,7 @@ export function EmbedPanel({ product }: Props) {
             rel="noopener noreferrer"
             className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
           >
-            Open in new tab
+            {t('Open in new tab')}
             <ExternalLink className="h-3 w-3" />
           </a>
         )}
@@ -103,9 +102,9 @@ export function EmbedPanel({ product }: Props) {
 
       {/* ── Embed snippet ──────────────────────────────────────────── */}
       <div className="space-y-2">
-        <p className="text-sm font-medium">Embed code</p>
+        <p className="text-sm font-medium">{t('Embed code')}</p>
         <p className="text-sm text-muted-foreground">
-          Paste this into any HTML page to embed the configurator.
+          {t('Paste this into any HTML page to embed the configurator.')}
         </p>
         <div className="relative">
           <pre className="rounded-lg border bg-muted/40 p-4 text-xs font-mono overflow-x-auto whitespace-pre-wrap break-all leading-relaxed">
@@ -116,15 +115,15 @@ export function EmbedPanel({ product }: Props) {
             className="absolute top-3 right-3 flex items-center gap-1.5 rounded-md border bg-background px-2.5 py-1.5 text-xs font-medium shadow-sm hover:bg-accent transition-colors"
           >
             {copied
-              ? <><Check className="h-3 w-3 text-emerald-600" /> Copied</>
-              : <><Copy className="h-3 w-3" /> Copy</>}
+              ? <><Check className="h-3 w-3 text-emerald-600" /> {t('Copied')}</>
+              : <><Copy className="h-3 w-3" /> {t('Copy')}</>}
           </button>
         </div>
       </div>
 
       {/* ── Deploy instructions ────────────────────────────────────── */}
       <div className="rounded-md border bg-card p-4 space-y-2">
-        <p className="text-sm font-semibold">Deploying the widget to your site</p>
+        <p className="text-sm font-semibold">{t('Deploying the widget to your site')}</p>
         <ol className="text-sm text-muted-foreground space-y-1.5 list-decimal list-inside">
           <li>
             Build: <code className="font-mono text-xs bg-muted px-1 py-0.5 rounded">
