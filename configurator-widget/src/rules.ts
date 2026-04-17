@@ -135,17 +135,18 @@ export function sanitizeSelection(
 
 /**
  * Apply default values from rules to selection.
- * Skips characteristics that the user has explicitly changed (tracked via userSelections).
- * During initialisation pass an empty set so all defaults are applied unconditionally.
+ * Always applies when condition is met, except for characteristics in `skip`
+ * (the one the user is actively changing, so their click is not overridden).
+ * Pass an empty skip set during initialisation to apply all defaults freely.
  */
 export function applyDefaultValues(
   selection: Selection,
   effect: RuleEffect,
-  userSelections: Set<string> = new Set()
+  skip: Set<string> = new Set()
 ): Selection {
   const next = { ...selection }
   for (const [charId, valueId] of Object.entries(effect.defaultValues)) {
-    if (!userSelections.has(charId)) {
+    if (!skip.has(charId)) {
       next[charId] = valueId
     }
   }
