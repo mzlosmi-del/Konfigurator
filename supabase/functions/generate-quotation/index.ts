@@ -68,10 +68,11 @@ Deno.serve(async (req: Request) => {
   if (!authHeader) {
     return new Response('Unauthorized', { status: 401, headers: corsHeaders })
   }
-  const userClient = createClient(supabaseUrl, Deno.env.get('SUPABASE_ANON_KEY')!, {
-    global: { headers: { Authorization: authHeader } },
-  })
-  const { data: { user }, error: authErr } = await userClient.auth.getUser()
+
+  const sb = createClient(supabaseUrl, serviceRoleKey)
+
+  const jwt = authHeader.replace('Bearer ', '')
+  const { data: { user }, error: authErr } = await sb.auth.getUser(jwt)
   if (authErr || !user) {
     return new Response('Unauthorized', { status: 401, headers: corsHeaders })
   }
@@ -84,8 +85,6 @@ Deno.serve(async (req: Request) => {
   } catch {
     return new Response('Bad request', { status: 400, headers: corsHeaders })
   }
-
-  const sb = createClient(supabaseUrl, serviceRoleKey)
 
   try {
     const { data: qData, error: qErr } = await sb
