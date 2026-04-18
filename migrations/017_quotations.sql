@@ -1,6 +1,15 @@
 -- 017_quotations.sql
 -- Admin-initiated quotations with line items, adjustments (surcharge/discount/tax), and PDF generation
 
+-- Create the trigger helper if it doesn't already exist (other tables may have it from Supabase defaults)
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER LANGUAGE plpgsql AS $$
+BEGIN
+  NEW.updated_at = now();
+  RETURN NEW;
+END;
+$$;
+
 CREATE TABLE quotations (
   id               uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id        uuid NOT NULL DEFAULT auth_tenant_id() REFERENCES tenants(id) ON DELETE CASCADE,
