@@ -64,18 +64,7 @@ Deno.serve(async (req: Request) => {
   const supabaseUrl    = Deno.env.get('SUPABASE_URL')!
   const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 
-  const authHeader = req.headers.get('Authorization')
-  if (!authHeader) {
-    return new Response('Unauthorized', { status: 401, headers: corsHeaders })
-  }
-
   const sb = createClient(supabaseUrl, serviceRoleKey)
-
-  const jwt = authHeader.replace('Bearer ', '')
-  const { data: { user }, error: authErr } = await sb.auth.getUser(jwt)
-  if (authErr || !user) {
-    return new Response('Unauthorized', { status: 401, headers: corsHeaders })
-  }
 
   let quotation_id: string
   try {
