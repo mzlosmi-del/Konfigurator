@@ -15,6 +15,9 @@ import { InquiryDetailPage } from '@/pages/inquiries/InquiryDetailPage'
 import { SettingsPage } from '@/pages/settings/SettingsPage'
 import { PreviewPage } from '@/pages/preview/PreviewPage'
 import { LibraryPage } from '@/pages/library/LibraryPage'
+import { QuotationsPage } from '@/pages/quotations/QuotationsPage'
+import { QuotationFormPage } from '@/pages/quotations/QuotationFormPage'
+import { QuotationDetailPage } from '@/pages/quotations/QuotationDetailPage'
 
 export function App() {
   const [lang, setLangState] = useState<Lang>(getLang())
@@ -45,6 +48,10 @@ export function App() {
               <Route path="/library" element={<LibraryPage />} />
               <Route path="/inquiries" element={<InquiriesPage />} />
               <Route path="/inquiries/:id" element={<InquiryDetailPage />} />
+              <Route path="/quotations" element={<QuotationsPage />} />
+              <Route path="/quotations/new" element={<QuotationFormPage />} />
+              <Route path="/quotations/:id" element={<QuotationDetailPage />} />
+              <Route path="/quotations/:id/edit" element={<QuotationFormPage />} />
               <Route path="/settings" element={<SettingsPage />} />
             </Route>
           </Route>

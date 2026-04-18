@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { NavLink } from 'react-router-dom'
-import { LayoutDashboard, Package, Inbox, Settings, LogOut, Boxes, Layers } from 'lucide-react'
+import { LayoutDashboard, Package, Inbox, Settings, LogOut, Boxes, Layers, FileText } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuthContext } from '@/components/auth/AuthContext'
 import { Separator } from '@/components/ui/separator'
@@ -18,11 +18,12 @@ export function Sidebar() {
   }
 
   const navItems = [
-    { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', badge: 0 },
-    { to: '/products',  icon: Package,         label: 'Products',  badge: 0 },
-    { to: '/library',   icon: Layers,           label: 'Library',   badge: 0 },
-    { to: '/inquiries', icon: Inbox,            label: 'Inquiries', badge: newCount },
-    { to: '/settings',  icon: Settings,         label: 'Settings',  badge: 0 },
+    { to: '/dashboard',  icon: LayoutDashboard, label: 'Dashboard',   badge: 0 },
+    { to: '/products',   icon: Package,         label: 'Products',    badge: 0 },
+    { to: '/library',    icon: Layers,          label: 'Library',     badge: 0 },
+    { to: '/inquiries',  icon: Inbox,           label: 'Inquiries',   badge: newCount },
+    { to: '/quotations', icon: FileText,        label: 'Quotations',  badge: 0 },
+    { to: '/settings',   icon: Settings,        label: 'Settings',    badge: 0 },
   ]
 
   return (

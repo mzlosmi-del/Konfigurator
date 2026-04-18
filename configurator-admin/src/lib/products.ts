@@ -18,6 +18,15 @@ export type ProductClassWithChars = CharacteristicClass & {
   characteristics: Characteristic[]
 }
 
+export type CharacteristicWithValues = Characteristic & {
+  characteristic_values: CharacteristicValue[]
+}
+
+export type ProductCharacteristicWithDetails = {
+  sort_order: number
+  characteristic: CharacteristicWithValues
+}
+
 // ─── Products ────────────────────────────────────────────────────────────────
 
 export async function fetchProducts(): Promise<Product[]> {
@@ -332,4 +341,22 @@ export async function detachCharacteristicFromProduct(
     .eq('product_id', productId)
     .eq('characteristic_id', characteristicId)
   if (error) throw new Error(error.message)
+}
+
+export async function fetchProductWithDetails(
+  productId: string
+): Promise<ProductCharacteristicWithDetails[]> {
+  const { data, error } = await supabase
+    .from('product_characteristics')
+    .select(`
+      sort_order,
+      characteristic:characteristics(
+        id, tenant_id, name, display_type, sort_order, created_at, updated_at,
+        characteristic_values(id, characteristic_id, tenant_id, label, price_modifier, sort_order, created_at, updated_at)
+      )
+    `)
+    .eq('product_id', productId)
+    .order('sort_order', { ascending: true })
+  if (error) throw new Error(error.message)
+  return (data ?? []) as ProductCharacteristicWithDetails[]
 }

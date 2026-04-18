@@ -11,6 +11,31 @@ export type AssetType = 'image' | 'render' | '3d_model'
 export type RuleType = 'hide_value' | 'disable_value' | 'price_override' | 'set_value_default' | 'set_value_locked'
 export type InquiryStatus = 'new' | 'read' | 'replied' | 'closed'
 export type QuoteStatus = 'sent' | 'expired'
+export type QuotationStatus = 'draft' | 'sent' | 'accepted' | 'rejected' | 'expired'
+export type AdjustmentType = 'surcharge' | 'discount' | 'tax'
+
+export interface QuotationConfigItem {
+  characteristic_id:   string
+  characteristic_name: string
+  value_id:            string
+  value_label:         string
+  price_modifier:      number
+}
+
+export interface QuotationLineItem {
+  product_id:    string
+  product_name:  string
+  quantity:      number
+  unit_price:    number
+  configuration: QuotationConfigItem[]
+}
+
+export interface QuotationAdjustment {
+  type:  AdjustmentType
+  label: string
+  mode:  'percent' | 'fixed'
+  value: number
+}
 
 // ── Formula AST ─────────────────────────────────────────────────────────────
 // Stored as JSONB in pricing_formulas.formula.
@@ -217,6 +242,31 @@ export interface Database {
         Insert: Omit<Database['public']['Tables']['quotes']['Row'], 'created_at' | 'updated_at' | 'sent_at'> & { id?: string; sent_at?: string }
         Update: Partial<Database['public']['Tables']['quotes']['Insert']>
       }
+      quotations: {
+        Row: {
+          id: string
+          tenant_id: string
+          reference_number: string
+          customer_name: string
+          customer_email: string
+          customer_company: string | null
+          customer_phone: string | null
+          customer_address: string | null
+          notes: string | null
+          valid_until: string | null
+          currency: string
+          subtotal: number
+          total_price: number
+          status: QuotationStatus
+          line_items: Json      // QuotationLineItem[]
+          adjustments: Json     // QuotationAdjustment[]
+          pdf_url: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: Omit<Database['public']['Tables']['quotations']['Row'], 'id' | 'created_at' | 'updated_at'> & { id?: string }
+        Update: Partial<Database['public']['Tables']['quotations']['Insert']>
+      }
     }
     Functions: {
       auth_tenant_id: {
@@ -265,3 +315,4 @@ export type CharacteristicClass  = Database['public']['Tables']['characteristic_
 export type ClassMember          = Database['public']['Tables']['characteristic_class_members']['Row']
 export type ProductClass         = Database['public']['Tables']['product_classes']['Row']
 export type PricingFormula       = Database['public']['Tables']['pricing_formulas']['Row']
+export type Quotation            = Database['public']['Tables']['quotations']['Row']
