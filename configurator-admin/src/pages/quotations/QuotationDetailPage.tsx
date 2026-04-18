@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, Pencil, FileText, ExternalLink } from 'lucide-react'
-import { fetchQuotation, updateQuotation, generateQuotationPdf, calcSubtotal, calcTotal } from '@/lib/quotations'
+import { ArrowLeft, Pencil, FileText } from 'lucide-react'
+import { fetchQuotation, updateQuotation, calcSubtotal, calcTotal } from '@/lib/quotations'
+import { buildQuotationPdfBytes, openPdfBlob } from '@/lib/quotationPdf'
+import { useAuthContext } from '@/components/auth/AuthContext'
 import type { Quotation, QuotationStatus, QuotationLineItem, QuotationAdjustment } from '@/types/database'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Button } from '@/components/ui/button'
@@ -28,6 +30,7 @@ export function QuotationDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const { toasts, toast, dismiss } = useToast()
+  const { tenant } = useAuthContext()
 
   const [quotation,      setQuotation]      = useState<Quotation | null>(null)
   const [loading,        setLoading]        = useState(true)
@@ -58,12 +61,11 @@ export function QuotationDetailPage() {
   }
 
   async function handleGeneratePdf() {
-    if (!id) return
+    if (!quotation) return
     setGeneratingPdf(true)
     try {
-      const { pdf_url } = await generateQuotationPdf(id)
-      setQuotation(prev => prev ? { ...prev, pdf_url } : prev)
-      window.open(pdf_url, '_blank', 'noopener')
+      const bytes = await buildQuotationPdfBytes(tenant?.name ?? 'Your store', quotation)
+      openPdfBlob(bytes)
     } catch (err) {
       toast({ title: t('Failed to generate PDF'), description: String(err), variant: 'destructive' })
     } finally {
@@ -120,16 +122,8 @@ export function QuotationDetailPage() {
             </Button>
             <Button onClick={handleGeneratePdf} loading={generatingPdf}>
               <FileText className="h-4 w-4 mr-1.5" />
-              {quotation.pdf_url ? t('Regenerate PDF') : t('Generate PDF')}
+              {t('Generate PDF')}
             </Button>
-            {quotation.pdf_url && (
-              <Button variant="outline" asChild>
-                <a href={quotation.pdf_url} target="_blank" rel="noopener noreferrer">
-                  <ExternalLink className="h-4 w-4 mr-1.5" />
-                  {t('View PDF')}
-                </a>
-              </Button>
-            )}
           </div>
         }
       />

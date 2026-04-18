@@ -5,12 +5,13 @@ import {
   fetchQuotation,
   createQuotation,
   updateQuotation,
-  generateQuotationPdf,
   calcSubtotal,
   calcTotal,
   generateReferenceNumber,
 } from '@/lib/quotations'
 import { fetchProducts, fetchProductWithDetails } from '@/lib/products'
+import { buildQuotationPdfBytes, openPdfBlob } from '@/lib/quotationPdf'
+import { useAuthContext } from '@/components/auth/AuthContext'
 import type {
   Product,
   Json,
@@ -68,6 +69,7 @@ export function QuotationFormPage() {
   const isEdit  = Boolean(id)
   const navigate = useNavigate()
   const { toasts, toast, dismiss } = useToast()
+  const { tenant } = useAuthContext()
 
   // ── Data ───────────────────────────────────────────────────────────────────
   const [pageLoading, setPageLoading] = useState(isEdit)
@@ -325,8 +327,9 @@ export function QuotationFormPage() {
     if (!savedId) return
     setGeneratingPdf(true)
     try {
-      const { pdf_url } = await generateQuotationPdf(savedId)
-      window.open(pdf_url, '_blank', 'noopener')
+      const savedQuotation = await fetchQuotation(savedId)
+      const bytes = await buildQuotationPdfBytes(tenant?.name ?? 'Your store', savedQuotation)
+      openPdfBlob(bytes)
       navigate(`/quotations/${savedId}`)
     } catch (err) {
       toast({ title: t('Failed to generate PDF'), description: String(err), variant: 'destructive' })
