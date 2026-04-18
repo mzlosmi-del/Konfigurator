@@ -1,6 +1,12 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { PDFDocument, rgb, StandardFonts } from 'npm:pdf-lib@1.17.1'
 
+const corsHeaders = {
+  'Access-Control-Allow-Origin':  '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+}
+
 // ── Types ──────────────────────────────────────────────────────────────────
 
 interface ConfigLineItem {
@@ -48,8 +54,11 @@ interface TenantRow { name: string }
 // ── Main handler ───────────────────────────────────────────────────────────
 
 Deno.serve(async (req: Request) => {
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders })
+  }
   if (req.method !== 'POST') {
-    return new Response('Method not allowed', { status: 405 })
+    return new Response('Method not allowed', { status: 405, headers: corsHeaders })
   }
 
   const supabaseUrl    = Deno.env.get('SUPABASE_URL')!
@@ -57,14 +66,14 @@ Deno.serve(async (req: Request) => {
 
   const authHeader = req.headers.get('Authorization')
   if (!authHeader) {
-    return new Response('Unauthorized', { status: 401 })
+    return new Response('Unauthorized', { status: 401, headers: corsHeaders })
   }
   const userClient = createClient(supabaseUrl, Deno.env.get('SUPABASE_ANON_KEY')!, {
     global: { headers: { Authorization: authHeader } },
   })
   const { data: { user }, error: authErr } = await userClient.auth.getUser()
   if (authErr || !user) {
-    return new Response('Unauthorized', { status: 401 })
+    return new Response('Unauthorized', { status: 401, headers: corsHeaders })
   }
 
   let quotation_id: string
@@ -73,7 +82,7 @@ Deno.serve(async (req: Request) => {
     quotation_id = body.quotation_id
     if (!quotation_id) throw new Error('missing quotation_id')
   } catch {
-    return new Response('Bad request', { status: 400 })
+    return new Response('Bad request', { status: 400, headers: corsHeaders })
   }
 
   const sb = createClient(supabaseUrl, serviceRoleKey)
@@ -86,7 +95,7 @@ Deno.serve(async (req: Request) => {
       .single()
 
     if (qErr || !qData) {
-      return new Response('Quotation not found', { status: 404 })
+      return new Response('Quotation not found', { status: 404, headers: corsHeaders })
     }
     const quotation = qData as QuotationRow
 
@@ -110,7 +119,7 @@ Deno.serve(async (req: Request) => {
 
     if (uploadErr) {
       console.error('generate-quotation: storage upload failed', uploadErr)
-      return new Response('Failed to store PDF', { status: 500 })
+      return new Response('Failed to store PDF', { status: 500, headers: corsHeaders })
     }
 
     const { data: { publicUrl } } = sb.storage.from('quotes').getPublicUrl(filePath)
@@ -118,12 +127,12 @@ Deno.serve(async (req: Request) => {
     await sb.from('quotations').update({ pdf_url: publicUrl }).eq('id', quotation_id)
 
     return new Response(JSON.stringify({ pdf_url: publicUrl }), {
-      headers: { 'Content-Type': 'application/json' },
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
 
   } catch (err) {
     console.error('generate-quotation: unexpected error', err)
-    return new Response('Internal error', { status: 500 })
+    return new Response('Internal error', { status: 500, headers: corsHeaders })
   }
 })
 
