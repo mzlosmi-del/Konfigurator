@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { FileText, Plus } from 'lucide-react'
+import { BarChart2, FileText, Plus } from 'lucide-react'
 import { fetchQuotations } from '@/lib/quotations'
 import type { Quotation, QuotationStatus } from '@/types/database'
 import { PageHeader } from '@/components/layout/PageHeader'
@@ -11,14 +11,7 @@ import { Spinner } from '@/components/ui/spinner'
 import { useToast } from '@/hooks/useToast'
 import { Toaster } from '@/components/ui/toast'
 import { t } from '@/i18n'
-
-const statusVariant: Record<QuotationStatus, 'secondary' | 'warning' | 'success' | 'destructive' | 'outline'> = {
-  draft:    'secondary',
-  sent:     'warning',
-  accepted: 'success',
-  rejected: 'destructive',
-  expired:  'outline',
-}
+import { STATUS_LABELS, statusVariant } from './quotationStatusConfig'
 
 export function QuotationsPage() {
   const navigate = useNavigate()
@@ -45,10 +38,16 @@ export function QuotationsPage() {
         title={t('Quotations')}
         description={t('Create and manage quotations for your customers.')}
         action={
-          <Button onClick={() => navigate('/quotations/new')}>
-            <Plus className="h-4 w-4 mr-1.5" />
-            {t('New Quotation')}
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={() => navigate('/quotations/report')}>
+              <BarChart2 className="h-4 w-4 mr-1.5" />
+              {t('Report')}
+            </Button>
+            <Button onClick={() => navigate('/quotations/new')}>
+              <Plus className="h-4 w-4 mr-1.5" />
+              {t('New Quotation')}
+            </Button>
+          </div>
         }
       />
 
@@ -105,8 +104,8 @@ export function QuotationsPage() {
                         {q.total_price.toFixed(2)} {q.currency}
                       </td>
                       <td className="px-4 py-3">
-                        <Badge variant={statusVariant[q.status]} className="capitalize">
-                          {t(q.status)}
+                        <Badge variant={statusVariant[q.status as QuotationStatus] ?? 'secondary'}>
+                          {STATUS_LABELS[q.status as QuotationStatus] ?? q.status}
                         </Badge>
                       </td>
                       <td className="px-4 py-3 text-right text-xs text-muted-foreground">

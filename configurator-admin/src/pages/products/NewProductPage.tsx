@@ -14,10 +14,12 @@ export function NewProductPage() {
   async function handleSubmit(values: ProductFormValues) {
     try {
       const product = await createProduct({
-        name: values.name,
-        description: values.description ?? null,
-        base_price: values.base_price,
-        currency: values.currency,
+        name:            values.name,
+        description:     values.description ?? null,
+        base_price:      values.base_price,
+        currency:        values.currency,
+        sku:             values.sku?.trim() || null,
+        unit_of_measure: values.unit_of_measure?.trim() || null,
       })
       navigate(`/products/${product.id}/edit`, { replace: true })
     } catch (e) {

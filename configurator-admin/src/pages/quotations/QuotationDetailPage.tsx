@@ -1,53 +1,87 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, Pencil, FileText, ExternalLink } from 'lucide-react'
-import { fetchQuotation, updateQuotation, generateQuotationPdf, calcSubtotal, calcTotal } from '@/lib/quotations'
-import type { Quotation, QuotationStatus, QuotationLineItem, QuotationAdjustment } from '@/types/database'
+import { AlertCircle, ArrowLeft, CloudUpload, Download, Pencil, FileText } from 'lucide-react'
+import {
+  fetchQuotation, updateQuotation, uploadQuotationPdf,
+  fetchRejectionReasons, calcSubtotal, calcTotal,
+} from '@/lib/quotations'
+import { buildQuotationPdfBytes, openPdfBlob, type TenantProfile } from '@/lib/quotationPdf'
+import { useAuthContext } from '@/components/auth/AuthContext'
+import type { Quotation, QuotationStatus, QuotationLineItem, QuotationAdjustment, QuotationRejectionReason } from '@/types/database'
+import { STATUS_OPTIONS, STATUS_LABELS, statusVariant } from './quotationStatusConfig'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Select } from '@/components/ui/select'
+import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 import { Spinner } from '@/components/ui/spinner'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog'
 import { useToast } from '@/hooks/useToast'
 import { Toaster } from '@/components/ui/toast'
 import { t } from '@/i18n'
-
-const STATUS_OPTIONS: QuotationStatus[] = ['draft', 'sent', 'accepted', 'rejected', 'expired']
-
-const statusVariant: Record<QuotationStatus, 'secondary' | 'warning' | 'success' | 'destructive' | 'outline'> = {
-  draft:    'secondary',
-  sent:     'warning',
-  accepted: 'success',
-  rejected: 'destructive',
-  expired:  'outline',
-}
 
 export function QuotationDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const { toasts, toast, dismiss } = useToast()
+  const { tenant } = useAuthContext()
 
   const [quotation,      setQuotation]      = useState<Quotation | null>(null)
   const [loading,        setLoading]        = useState(true)
   const [updatingStatus, setUpdatingStatus] = useState(false)
   const [generatingPdf,  setGeneratingPdf]  = useState(false)
+  const [savingPdf,      setSavingPdf]      = useState(false)
+  const [pendingBytes,   setPendingBytes]   = useState<Uint8Array | null>(null)
+  const [confirmSave,    setConfirmSave]    = useState(false)
+
+  // Rejection dialog state
+  const [rejectionReasons,    setRejectionReasons]    = useState<QuotationRejectionReason[]>([])
+  const [showRejectionDialog, setShowRejectionDialog] = useState(false)
+  const [selectedReasonId,    setSelectedReasonId]    = useState('')
+  const [rejectionNote,       setRejectionNote]       = useState('')
+  const [confirmingRejection, setConfirmingRejection] = useState(false)
 
   useEffect(() => {
     if (!id) return
     setLoading(true)
-    fetchQuotation(id)
-      .then(setQuotation)
+    Promise.all([fetchQuotation(id), fetchRejectionReasons()])
+      .then(([q, reasons]) => { setQuotation(q); setRejectionReasons(reasons) })
       .catch(() => toast({ title: t('Failed to load quotation'), variant: 'destructive' }))
       .finally(() => setLoading(false))
   }, [id])
 
+  function buildTenantProfile(): TenantProfile {
+    return {
+      name:            tenant?.name            ?? 'Your store',
+      logo_url:        (tenant as any)?.logo_url,
+      company_address: (tenant as any)?.company_address,
+      company_phone:   (tenant as any)?.company_phone,
+      company_email:   (tenant as any)?.company_email,
+      company_website: (tenant as any)?.company_website,
+      contact_person:  (tenant as any)?.contact_person,
+    }
+  }
+
   async function handleStatusChange(status: QuotationStatus) {
     if (!id || !quotation) return
+    if (status === 'rejected') {
+      setSelectedReasonId(quotation.rejection_reason_id ?? '')
+      setRejectionNote(quotation.rejection_note ?? '')
+      setShowRejectionDialog(true)
+      return
+    }
     setUpdatingStatus(true)
     try {
-      const updated = await updateQuotation(id, { status })
+      const updated = await updateQuotation(id, { status, rejection_reason_id: null, rejection_note: null })
       setQuotation(updated)
       toast({ title: t('Status updated') })
     } catch {
@@ -57,17 +91,53 @@ export function QuotationDetailPage() {
     }
   }
 
+  async function handleConfirmRejection() {
+    if (!id || !quotation) return
+    setConfirmingRejection(true)
+    try {
+      const updated = await updateQuotation(id, {
+        status: 'rejected',
+        rejection_reason_id: selectedReasonId || null,
+        rejection_note:      rejectionNote.trim() || null,
+      })
+      setQuotation(updated)
+      setShowRejectionDialog(false)
+      toast({ title: t('Quotation marked as rejected') })
+    } catch {
+      toast({ title: t('Failed to update status'), variant: 'destructive' })
+    } finally {
+      setConfirmingRejection(false)
+    }
+  }
+
   async function handleGeneratePdf() {
-    if (!id) return
+    if (!quotation) return
     setGeneratingPdf(true)
     try {
-      const { pdf_url } = await generateQuotationPdf(id)
-      setQuotation(prev => prev ? { ...prev, pdf_url } : prev)
-      window.open(pdf_url, '_blank', 'noopener')
+      const bytes = await buildQuotationPdfBytes(buildTenantProfile(), quotation)
+      openPdfBlob(bytes)
+      setPendingBytes(bytes)
+      setConfirmSave(true)
     } catch (err) {
       toast({ title: t('Failed to generate PDF'), description: String(err), variant: 'destructive' })
     } finally {
       setGeneratingPdf(false)
+    }
+  }
+
+  async function handleSavePdf() {
+    if (!id || !quotation || !pendingBytes) return
+    setSavingPdf(true)
+    try {
+      const url = await uploadQuotationPdf(id, quotation.tenant_id, pendingBytes)
+      setQuotation(prev => prev ? { ...prev, pdf_url: url } : prev)
+      setPendingBytes(null)
+      toast({ title: t('PDF saved to cloud') })
+    } catch (err) {
+      toast({ title: t('Failed to save PDF'), description: String(err), variant: 'destructive' })
+    } finally {
+      setSavingPdf(false)
+      setConfirmSave(false)
     }
   }
 
@@ -99,6 +169,8 @@ export function QuotationDetailPage() {
   const subtotal = calcSubtotal(items)
   const total    = calcTotal(subtotal, adjs)
 
+  const rejectionReason = rejectionReasons.find(r => r.id === quotation.rejection_reason_id)
+
   return (
     <div className="animate-fade-in">
       <PageHeader
@@ -114,22 +186,22 @@ export function QuotationDetailPage() {
         }
         action={
           <div className="flex items-center gap-2">
+            {quotation.pdf_url && (
+              <Button variant="outline" asChild>
+                <a href={quotation.pdf_url} target="_blank" rel="noopener noreferrer">
+                  <Download className="h-4 w-4 mr-1.5" />
+                  {t('Download PDF')}
+                </a>
+              </Button>
+            )}
             <Button variant="outline" onClick={() => navigate(`/quotations/${id}/edit`)}>
               <Pencil className="h-4 w-4 mr-1.5" />
               {t('Edit')}
             </Button>
             <Button onClick={handleGeneratePdf} loading={generatingPdf}>
               <FileText className="h-4 w-4 mr-1.5" />
-              {quotation.pdf_url ? t('Regenerate PDF') : t('Generate PDF')}
+              {t('Generate PDF')}
             </Button>
-            {quotation.pdf_url && (
-              <Button variant="outline" asChild>
-                <a href={quotation.pdf_url} target="_blank" rel="noopener noreferrer">
-                  <ExternalLink className="h-4 w-4 mr-1.5" />
-                  {t('View PDF')}
-                </a>
-              </Button>
-            )}
           </div>
         }
       />
@@ -137,18 +209,18 @@ export function QuotationDetailPage() {
       <div className="p-6 space-y-6 max-w-4xl">
 
         {/* ── Status + meta ──────────────────────────────────────────────── */}
-        <div className="flex items-center gap-4">
-          <Badge variant={statusVariant[quotation.status]} className="capitalize text-sm px-3 py-1">
-            {t(quotation.status)}
+        <div className="flex items-center gap-4 flex-wrap">
+          <Badge variant={statusVariant[quotation.status as QuotationStatus] ?? 'secondary'} className="text-sm px-3 py-1">
+            {STATUS_LABELS[quotation.status as QuotationStatus] ?? quotation.status}
           </Badge>
           <Select
             value={quotation.status}
             onChange={e => handleStatusChange(e.target.value as QuotationStatus)}
             disabled={updatingStatus}
-            className="w-36"
+            className="w-52"
           >
             {STATUS_OPTIONS.map(s => (
-              <option key={s} value={s}>{t(s.charAt(0).toUpperCase() + s.slice(1))}</option>
+              <option key={s} value={s}>{t(STATUS_LABELS[s])}</option>
             ))}
           </Select>
           <span className="text-sm text-muted-foreground">
@@ -159,7 +231,28 @@ export function QuotationDetailPage() {
               {t('Valid until')}: {new Date(quotation.valid_until).toLocaleDateString()}
             </span>
           )}
+          {quotation.pdf_url && (
+            <Badge variant="outline" className="text-xs text-muted-foreground gap-1">
+              <CloudUpload className="h-3 w-3" />
+              {t('PDF saved')}
+            </Badge>
+          )}
         </div>
+
+        {/* ── Rejection info ─────────────────────────────────────────────── */}
+        {quotation.status === 'rejected' && (rejectionReason || quotation.rejection_note) && (
+          <div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm">
+            <AlertCircle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
+            <div className="space-y-0.5">
+              {rejectionReason && (
+                <p className="font-medium text-destructive">{rejectionReason.label}</p>
+              )}
+              {quotation.rejection_note && (
+                <p className="text-muted-foreground">{quotation.rejection_note}</p>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* ── Customer ───────────────────────────────────────────────────── */}
         <Card>
@@ -203,6 +296,7 @@ export function QuotationDetailPage() {
                 <tr className="border-b bg-muted/40">
                   <th className="px-4 py-3 text-left font-medium text-muted-foreground">#</th>
                   <th className="px-4 py-3 text-left font-medium text-muted-foreground">{t('Product')}</th>
+                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">{t('SKU')}</th>
                   <th className="px-4 py-3 text-left font-medium text-muted-foreground">{t('Configuration')}</th>
                   <th className="px-4 py-3 text-right font-medium text-muted-foreground">{t('Qty')}</th>
                   <th className="px-4 py-3 text-right font-medium text-muted-foreground">{t('Unit Price')}</th>
@@ -214,6 +308,9 @@ export function QuotationDetailPage() {
                   <tr key={i}>
                     <td className="px-4 py-3 text-muted-foreground">{i + 1}</td>
                     <td className="px-4 py-3 font-medium">{item.product_name}</td>
+                    <td className="px-4 py-3 font-mono text-sm text-muted-foreground">
+                      {item.product_sku ?? <span className="opacity-40">—</span>}
+                    </td>
                     <td className="px-4 py-3">
                       {item.configuration.length > 0 ? (
                         <div className="space-y-0.5">
@@ -233,6 +330,9 @@ export function QuotationDetailPage() {
                     <td className="px-4 py-3 text-right tabular-nums">{item.quantity}</td>
                     <td className="px-4 py-3 text-right tabular-nums">
                       {item.unit_price.toFixed(2)} {quotation.currency}
+                      {item.unit_of_measure && (
+                        <span className="text-xs text-muted-foreground ml-1">/ {item.unit_of_measure}</span>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-right tabular-nums font-medium">
                       {(item.unit_price * item.quantity).toFixed(2)} {quotation.currency}
@@ -251,7 +351,6 @@ export function QuotationDetailPage() {
               <span className="text-muted-foreground">{t('Subtotal')}</span>
               <span>{subtotal.toFixed(2)} {quotation.currency}</span>
             </div>
-
             {(() => {
               let running = subtotal
               return adjs.map((adj, i) => {
@@ -269,7 +368,6 @@ export function QuotationDetailPage() {
                 )
               })
             })()}
-
             <Separator />
             <div className="flex justify-between font-semibold">
               <span>{t('Total')}</span>
@@ -288,6 +386,68 @@ export function QuotationDetailPage() {
           </Card>
         )}
       </div>
+
+      {/* ── Rejection dialog ───────────────────────────────────────────────── */}
+      <Dialog open={showRejectionDialog} onOpenChange={setShowRejectionDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{t('Mark as Rejected')}</DialogTitle>
+            <DialogDescription>
+              {t('Select a reason and optionally add a note.')}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-1">
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">{t('Reason')}</label>
+              <Select
+                value={selectedReasonId}
+                onChange={e => setSelectedReasonId(e.target.value)}
+                className="w-full"
+              >
+                <option value="">{t('— select a reason —')}</option>
+                {rejectionReasons.map(r => (
+                  <option key={r.id} value={r.id}>{r.label}</option>
+                ))}
+              </Select>
+              {rejectionReasons.length === 0 && (
+                <p className="text-xs text-muted-foreground">
+                  {t('No predefined reasons yet. Add some in Settings.')}
+                </p>
+              )}
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">
+                {t('Additional note')} <span className="text-muted-foreground font-normal">({t('optional')})</span>
+              </label>
+              <Textarea
+                value={rejectionNote}
+                onChange={e => setRejectionNote(e.target.value)}
+                rows={3}
+                placeholder={t('e.g. Customer requested a revised offer instead.')}
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 pt-1">
+            <Button variant="outline" onClick={() => setShowRejectionDialog(false)} disabled={confirmingRejection}>
+              {t('Cancel')}
+            </Button>
+            <Button variant="destructive" onClick={handleConfirmRejection} loading={confirmingRejection}>
+              {t('Confirm rejection')}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Save PDF confirm ───────────────────────────────────────────────── */}
+      <ConfirmDialog
+        open={confirmSave}
+        onOpenChange={open => { if (!open) setConfirmSave(false) }}
+        title={t('Save PDF to cloud?')}
+        description={t('The PDF will be stored in Supabase storage and a permanent download link will be attached to this quotation.')}
+        confirmLabel={t('Save PDF')}
+        onConfirm={handleSavePdf}
+        loading={savingPdf}
+      />
 
       <Toaster toasts={toasts} onDismiss={dismiss} />
     </div>
