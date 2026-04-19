@@ -222,7 +222,7 @@ export async function buildQuotationPdfBytes(
   if (items.length > 0) {
     ensureSpace(40)
     text('LINE ITEMS', margin, y, 7.5, fontB, C.muted)
-    y -= 14
+    y -= 22
 
     // Table header
     ensureSpace(26)
