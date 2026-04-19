@@ -50,32 +50,22 @@ export function RegisterPage() {
     setServerError(null)
     const slug = toSlug(values.companyName)
 
-    // Step 1: create auth user
     const { data, error: signUpError } = await supabase.auth.signUp({
       email: values.email,
       password: values.password,
+      options: {
+        data: {
+          tenant_name: values.companyName,
+          tenant_slug: slug,
+        },
+      },
     })
 
     if (signUpError || !data.user) {
-      setServerError(signUpError?.message ?? t('Sign up failed. Please try again.'))
-      return
-    }
-
-    // Step 2: provision tenant + profile via RPC (SECURITY DEFINER function)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { error: rpcError } = await (supabase.rpc as any)('create_tenant_for_user', {
-      user_id: data.user.id,
-      tenant_name: values.companyName,
-      tenant_slug: slug,
-    })
-
-    if (rpcError) {
-      // Clean up: sign out the orphaned auth user
-      await supabase.auth.signOut()
       setServerError(
-        rpcError.message.includes('unique')
+        signUpError?.message?.includes('unique') || signUpError?.message?.includes('duplicate')
           ? t('A company with that name already exists. Try a different name.')
-          : t('Account setup failed. Please try again.')
+          : signUpError?.message ?? t('Sign up failed. Please try again.')
       )
       return
     }
