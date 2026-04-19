@@ -412,7 +412,7 @@ export function QuotationFormPage() {
     }
   }
 
-  async function handleLayoutConfirm(sections: PdfSection[]) {
+  async function handleLayoutConfirm(sections: PdfSection[], lang: 'en' | 'sr') {
     if (!pendingPdfData) return
     const { savedId, savedQuotation, tenantProfile } = pendingPdfData
     setGeneratingPdf(true)
@@ -421,7 +421,7 @@ export function QuotationFormPage() {
       for (const [pid, texts] of Object.entries(productTextsCache)) {
         pdfProductTexts[pid] = texts
       }
-      const bytes = await buildQuotationPdfBytes(tenantProfile, savedQuotation, pdfProductTexts, globalTexts, sections)
+      const bytes = await buildQuotationPdfBytes(tenantProfile, savedQuotation, pdfProductTexts, globalTexts, sections, lang)
       setLayoutDialogOpen(false)
       openPdfBlob(bytes)
       setPendingSave({ bytes, quotationId: savedId, tenantId: savedQuotation.tenant_id })

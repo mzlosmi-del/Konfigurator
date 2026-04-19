@@ -39,7 +39,7 @@ interface Props {
   onOpenChange:  (open: boolean) => void
   globalTexts:   ProductText[]
   quotationHasNotes: boolean
-  onConfirm:     (sections: PdfSection[]) => void
+  onConfirm:     (sections: PdfSection[], lang: 'en' | 'sr') => void
   loading:       boolean
 }
 
@@ -126,11 +126,13 @@ export function PdfLayoutDialog({ open, onOpenChange, globalTexts, quotationHasN
   const [sections, setSections] = useState<PdfSection[]>(() =>
     buildDefaultSections(globalTexts, quotationHasNotes)
   )
+  const [lang, setLang] = useState<'en' | 'sr'>('en')
 
   // Reset when dialog opens
   const [lastOpen, setLastOpen] = useState(false)
   if (open && !lastOpen) {
     setSections(buildDefaultSections(globalTexts, quotationHasNotes))
+    setLang('en')
     setLastOpen(true)
   }
   if (!open && lastOpen) setLastOpen(false)
@@ -164,6 +166,26 @@ export function PdfLayoutDialog({ open, onOpenChange, globalTexts, quotationHasN
           </DialogDescription>
         </DialogHeader>
 
+        <div className="flex items-center gap-2 pb-1">
+          <span className="text-xs font-medium text-muted-foreground">{t('PDF Language')}:</span>
+          <div className="flex rounded-md border overflow-hidden text-xs font-medium">
+            <button
+              type="button"
+              onClick={() => setLang('en')}
+              className={`px-3 py-1 transition-colors ${lang === 'en' ? 'bg-primary text-primary-foreground' : 'bg-background hover:bg-muted text-foreground'}`}
+            >
+              {t('English')}
+            </button>
+            <button
+              type="button"
+              onClick={() => setLang('sr')}
+              className={`px-3 py-1 transition-colors border-l ${lang === 'sr' ? 'bg-primary text-primary-foreground' : 'bg-background hover:bg-muted text-foreground'}`}
+            >
+              {t('Serbian')}
+            </button>
+          </div>
+        </div>
+
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
           <SortableContext items={sections.map(s => s.id)} strategy={verticalListSortingStrategy}>
             <div className="space-y-2 py-1">
@@ -182,7 +204,7 @@ export function PdfLayoutDialog({ open, onOpenChange, globalTexts, quotationHasN
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>
             {t('Cancel')}
           </Button>
-          <Button onClick={() => onConfirm(sections)} loading={loading}>
+          <Button onClick={() => onConfirm(sections, lang)} loading={loading}>
             <FileText className="h-4 w-4 mr-1.5" />
             {t('Generate PDF')}
           </Button>

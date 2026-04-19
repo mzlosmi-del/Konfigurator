@@ -35,6 +35,16 @@ const TYPE_BADGE: Record<string, string> = {
   terms:         'bg-emerald-100 text-emerald-700',
 }
 
+const LANGS = [
+  { value: 'en', label: 'English' },
+  { value: 'sr', label: 'Serbian' },
+]
+
+const LANG_BADGE: Record<string, string> = {
+  en: 'bg-gray-100 text-gray-600',
+  sr: 'bg-sky-100 text-sky-700',
+}
+
 export function TextsPage() {
   const { toasts, toast, dismiss } = useToast()
 
@@ -45,12 +55,14 @@ export function TextsPage() {
   const [addLabel,    setAddLabel]    = useState('')
   const [addContent,  setAddContent]  = useState('')
   const [addType,     setAddType]     = useState<ProductTextType>('note')
+  const [addLang,     setAddLang]     = useState('en')
   const [adding,      setAdding]      = useState(false)
 
   const [editingId,   setEditingId]   = useState<string | null>(null)
   const [editLabel,   setEditLabel]   = useState('')
   const [editContent, setEditContent] = useState('')
   const [editType,    setEditType]    = useState<ProductTextType>('note')
+  const [editLang,    setEditLang]    = useState('en')
   const [saving,      setSaving]      = useState(false)
 
   const [toDelete,  setToDelete]  = useState<ProductText | null>(null)
@@ -77,12 +89,14 @@ export function TextsPage() {
         label:      addLabel.trim(),
         content:    addContent.trim(),
         text_type:  addType,
+        language:   addLang,
         sort_order: globalTexts.length,
       })
       setGlobalTexts(prev => [...prev, created])
       setAddLabel('')
       setAddContent('')
       setAddType('note')
+      setAddLang('en')
       setShowAdd(false)
       toast({ title: t('Text block added') })
     } catch (e) {
@@ -97,6 +111,7 @@ export function TextsPage() {
     setEditLabel(text.label)
     setEditContent(text.content)
     setEditType((text.text_type ?? 'note') as ProductTextType)
+    setEditLang(text.language ?? 'en')
   }
 
   async function handleSaveEdit() {
@@ -111,6 +126,7 @@ export function TextsPage() {
         label:     editLabel.trim(),
         content:   editContent.trim(),
         text_type: editType,
+        language:  editLang,
       })
       setGlobalTexts(prev => prev.map(t => t.id === editingId ? updated : t))
       setEditingId(null)
@@ -180,7 +196,7 @@ export function TextsPage() {
           <CardContent className="space-y-2">
             {showAdd && (
               <div className="border rounded-lg p-3 space-y-2 bg-muted/10 mb-4">
-                <div className="flex gap-2">
+                <div className="flex gap-2 flex-wrap">
                   <Select
                     value={addType}
                     onChange={e => setAddType(e.target.value as ProductTextType)}
@@ -189,6 +205,9 @@ export function TextsPage() {
                     {GLOBAL_TYPES.map(v => (
                       <option key={v} value={v}>{t(ALL_TYPES.find(t => t.value === v)?.label ?? v)}</option>
                     ))}
+                  </Select>
+                  <Select value={addLang} onChange={e => setAddLang(e.target.value)} className="w-28">
+                    {LANGS.map(l => <option key={l.value} value={l.value}>{t(l.label)}</option>)}
                   </Select>
                   <Input
                     value={addLabel}
@@ -225,7 +244,7 @@ export function TextsPage() {
             {globalTexts.map(text => (
               editingId === text.id ? (
                 <div key={text.id} className="border rounded-lg p-3 space-y-2 bg-muted/20">
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 flex-wrap">
                     <Select
                       value={editType}
                       onChange={e => setEditType(e.target.value as ProductTextType)}
@@ -234,6 +253,9 @@ export function TextsPage() {
                       {GLOBAL_TYPES.map(v => (
                         <option key={v} value={v}>{t(ALL_TYPES.find(t => t.value === v)?.label ?? v)}</option>
                       ))}
+                    </Select>
+                    <Select value={editLang} onChange={e => setEditLang(e.target.value)} className="w-28">
+                      {LANGS.map(l => <option key={l.value} value={l.value}>{t(l.label)}</option>)}
                     </Select>
                     <Input
                       value={editLabel}
@@ -263,9 +285,12 @@ export function TextsPage() {
                 <div key={text.id} className="flex items-start gap-3 border rounded-lg p-3">
                   <GripVertical className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-0.5">
+                    <div className="flex items-center gap-2 mb-0.5 flex-wrap">
                       <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${TYPE_BADGE[text.text_type] ?? ''}`}>
                         {t(ALL_TYPES.find(tt => tt.value === text.text_type)?.label ?? text.text_type)}
+                      </span>
+                      <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${LANG_BADGE[text.language] ?? 'bg-gray-100 text-gray-600'}`}>
+                        {t(LANGS.find(l => l.value === text.language)?.label ?? text.language)}
                       </span>
                       <p className="text-sm font-medium">{text.label}</p>
                     </div>

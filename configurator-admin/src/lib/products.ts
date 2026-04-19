@@ -461,7 +461,7 @@ export async function fetchGlobalTexts(): Promise<ProductText[]> {
 }
 
 export async function createProductText(
-  input: Pick<ProductText, 'product_id' | 'label' | 'content' | 'text_type' | 'sort_order'>
+  input: Pick<ProductText, 'product_id' | 'label' | 'content' | 'text_type' | 'language' | 'sort_order'>
 ): Promise<ProductText> {
   const { data, error } = await supabase
     .from('product_texts')
@@ -474,7 +474,7 @@ export async function createProductText(
 
 export async function updateProductText(
   id: string,
-  input: Partial<Pick<ProductText, 'label' | 'content' | 'text_type' | 'sort_order'>>
+  input: Partial<Pick<ProductText, 'label' | 'content' | 'text_type' | 'language' | 'sort_order'>>
 ): Promise<ProductText> {
   const { data, error } = await supabase
     .from('product_texts')

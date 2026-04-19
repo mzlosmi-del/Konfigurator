@@ -118,6 +118,7 @@ export interface Database {
           label: string
           content: string
           text_type: string
+          language: string
           sort_order: number
           created_at: string
           updated_at: string
