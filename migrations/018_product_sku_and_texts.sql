@@ -5,8 +5,8 @@
 -- ── Products: SKU and unit of measure ────────────────────────────────────────
 
 ALTER TABLE public.products
-  ADD COLUMN sku             text,
-  ADD COLUMN unit_of_measure text;
+  ADD COLUMN IF NOT EXISTS sku             text,
+  ADD COLUMN IF NOT EXISTS unit_of_measure text;
 
 -- Uniqueness of SKU is scoped per tenant; nulls are exempt (partial index)
 CREATE UNIQUE INDEX products_tenant_sku_uniq
