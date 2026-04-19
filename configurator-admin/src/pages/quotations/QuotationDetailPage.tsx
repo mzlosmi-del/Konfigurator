@@ -197,6 +197,7 @@ export function QuotationDetailPage() {
                 <tr className="border-b bg-muted/40">
                   <th className="px-4 py-3 text-left font-medium text-muted-foreground">#</th>
                   <th className="px-4 py-3 text-left font-medium text-muted-foreground">{t('Product')}</th>
+                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">{t('SKU')}</th>
                   <th className="px-4 py-3 text-left font-medium text-muted-foreground">{t('Configuration')}</th>
                   <th className="px-4 py-3 text-right font-medium text-muted-foreground">{t('Qty')}</th>
                   <th className="px-4 py-3 text-right font-medium text-muted-foreground">{t('Unit Price')}</th>
@@ -207,7 +208,12 @@ export function QuotationDetailPage() {
                 {items.map((item, i) => (
                   <tr key={i}>
                     <td className="px-4 py-3 text-muted-foreground">{i + 1}</td>
-                    <td className="px-4 py-3 font-medium">{item.product_name}</td>
+                    <td className="px-4 py-3 font-medium">
+                      {item.product_name}
+                    </td>
+                    <td className="px-4 py-3 font-mono text-sm text-muted-foreground">
+                      {item.product_sku ?? <span className="opacity-40">—</span>}
+                    </td>
                     <td className="px-4 py-3">
                       {item.configuration.length > 0 ? (
                         <div className="space-y-0.5">
@@ -227,6 +233,9 @@ export function QuotationDetailPage() {
                     <td className="px-4 py-3 text-right tabular-nums">{item.quantity}</td>
                     <td className="px-4 py-3 text-right tabular-nums">
                       {item.unit_price.toFixed(2)} {quotation.currency}
+                      {item.unit_of_measure && (
+                        <span className="text-xs text-muted-foreground ml-1">/ {item.unit_of_measure}</span>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-right tabular-nums font-medium">
                       {(item.unit_price * item.quantity).toFixed(2)} {quotation.currency}

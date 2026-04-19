@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Plus, Trash2, ArrowLeft, FileText } from 'lucide-react'
+import { Plus, Trash2, ArrowLeft, FileText, Settings2 } from 'lucide-react'
 import {
   fetchQuotation,
   createQuotation,
@@ -9,9 +9,13 @@ import {
   calcTotal,
   generateReferenceNumber,
 } from '@/lib/quotations'
-import { fetchProducts, fetchProductWithDetails } from '@/lib/products'
+import {
+  fetchProducts,
+  fetchProductCharacteristicsWithValues,
+} from '@/lib/products'
 import { buildQuotationPdfBytes, openPdfBlob } from '@/lib/quotationPdf'
 import { useAuthContext } from '@/components/auth/AuthContext'
+import { supabase } from '@/lib/supabase'
 import type {
   Product,
   Json,
@@ -19,8 +23,10 @@ import type {
   QuotationAdjustment,
   AdjustmentType,
   QuotationConfigItem,
+  ConfigurationRule,
 } from '@/types/database'
-import type { ProductCharacteristicWithDetails } from '@/lib/products'
+import type { CharacteristicWithValues } from '@/lib/products'
+import { ConfigureProductDialog } from './ConfigureProductDialog'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -45,7 +51,7 @@ interface AdjustmentDraft {
   type:  AdjustmentType
   label: string
   mode:  'percent' | 'fixed'
-  value: string  // string for controlled input, parsed on save
+  value: string
 }
 
 const CURRENCIES = ['EUR', 'USD', 'GBP', 'CHF', 'RSD']
@@ -74,7 +80,8 @@ export function QuotationFormPage() {
   // ── Data ───────────────────────────────────────────────────────────────────
   const [pageLoading, setPageLoading] = useState(isEdit)
   const [products, setProducts] = useState<Product[]>([])
-  const [detailsCache, setDetailsCache] = useState<Record<string, ProductCharacteristicWithDetails[]>>({})
+  const [detailsCache, setDetailsCache] = useState<Record<string, CharacteristicWithValues[]>>({})
+  const [rulesCache,   setRulesCache]   = useState<Record<string, ConfigurationRule[]>>({})
 
   // ── Customer fields ────────────────────────────────────────────────────────
   const [customerName,    setCustomerName]    = useState('')
@@ -120,17 +127,10 @@ export function QuotationFormPage() {
         const items = (Array.isArray(q.line_items) ? q.line_items : []) as unknown as QuotationLineItem[]
         const adjs  = (Array.isArray(q.adjustments) ? q.adjustments : []) as unknown as QuotationAdjustment[]
 
-        // Build details cache for all products in this quotation
+        // Build details + rules cache for all products in this quotation
         const uniqueIds = [...new Set(items.map(i => i.product_id))]
-        const fetched: Record<string, ProductCharacteristicWithDetails[]> = {}
-        await Promise.all(uniqueIds.map(async pid => {
-          try {
-            fetched[pid] = await fetchProductWithDetails(pid)
-          } catch { /* ignore */ }
-        }))
-        setDetailsCache(fetched)
+        await Promise.all(uniqueIds.map(pid => ensureProductData(pid)))
 
-        // Reconstruct drafts from saved data
         setLineItems(items.map(item => ({
           product_id: item.product_id,
           quantity:   item.quantity,
@@ -150,16 +150,23 @@ export function QuotationFormPage() {
       .finally(() => setPageLoading(false))
   }, [id])
 
-  // ── Load product details on demand ─────────────────────────────────────────
-  const ensureDetails = useCallback(async (productId: string) => {
-    if (!productId || detailsCache[productId]) return
+  // ── Load product details + rules on demand ─────────────────────────────────
+  const ensureProductData = useCallback(async (productId: string) => {
+    if (!productId) return
+    const needDetails = !detailsCache[productId]
+    const needRules   = !rulesCache[productId]
+    if (!needDetails && !needRules) return
     try {
-      const details = await fetchProductWithDetails(productId)
+      const [details, rulesData] = await Promise.all([
+        needDetails ? fetchProductCharacteristicsWithValues(productId) : Promise.resolve(detailsCache[productId]),
+        needRules   ? supabase.from('configuration_rules').select('*').eq('product_id', productId).eq('is_active', true) : Promise.resolve({ data: rulesCache[productId] }),
+      ])
       setDetailsCache(prev => ({ ...prev, [productId]: details }))
+      setRulesCache(prev  => ({ ...prev, [productId]: ((rulesData as any).data ?? []) as ConfigurationRule[] }))
     } catch {
       toast({ title: t('Failed to load product details'), variant: 'destructive' })
     }
-  }, [detailsCache])
+  }, [detailsCache, rulesCache])
 
   // ── Line item helpers ───────────────────────────────────────────────────────
   function addLineItem() {
@@ -176,14 +183,7 @@ export function QuotationFormPage() {
 
   async function handleProductChange(index: number, productId: string) {
     updateLineItem(index, { product_id: productId, selection: {} })
-    if (productId) await ensureDetails(productId)
-  }
-
-  function handleCharSelect(lineIndex: number, charId: string, valueId: string) {
-    setLineItems(prev => prev.map((item, i) => {
-      if (i !== lineIndex) return item
-      return { ...item, selection: { ...item.selection, [charId]: valueId } }
-    }))
+    if (productId) await ensureProductData(productId)
   }
 
   // ── Adjustment helpers ─────────────────────────────────────────────────────
@@ -205,12 +205,11 @@ export function QuotationFormPage() {
       .filter(li => li.product_id)
       .map(li => {
         const product  = products.find(p => p.id === li.product_id)
-        const details  = detailsCache[li.product_id] ?? []
+        const chars    = detailsCache[li.product_id] ?? []
         const config: QuotationConfigItem[] = []
         let   unitPrice = product?.base_price ?? 0
 
-        for (const row of details) {
-          const char    = row.characteristic
+        for (const char of chars) {
           const valueId = li.selection[char.id]
           if (!valueId) continue
           const value = char.characteristic_values.find(v => v.id === valueId)
@@ -226,11 +225,13 @@ export function QuotationFormPage() {
         }
 
         return {
-          product_id:   li.product_id,
-          product_name: product?.name ?? '',
-          quantity:     li.quantity,
-          unit_price:   Math.max(0, unitPrice),
-          configuration: config,
+          product_id:      li.product_id,
+          product_name:    product?.name ?? '',
+          product_sku:     product?.sku ?? null,
+          unit_of_measure: product?.unit_of_measure ?? null,
+          quantity:        li.quantity,
+          unit_price:      Math.max(0, unitPrice),
+          configuration:   config,
         }
       })
   }
@@ -339,7 +340,7 @@ export function QuotationFormPage() {
     }
   }
 
-  // ── Render helpers ─────────────────────────────────────────────────────────
+  // ── Render ─────────────────────────────────────────────────────────────────
   if (pageLoading) {
     return (
       <div className="animate-fade-in">
@@ -374,44 +375,23 @@ export function QuotationFormPage() {
           <CardContent className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <label className="text-sm font-medium">{t('Name')} *</label>
-              <Input
-                value={customerName}
-                onChange={e => setCustomerName(e.target.value)}
-                placeholder={t('Customer name')}
-              />
+              <Input value={customerName} onChange={e => setCustomerName(e.target.value)} placeholder={t('Customer name')} />
             </div>
             <div className="space-y-1.5">
               <label className="text-sm font-medium">{t('Email')} *</label>
-              <Input
-                type="email"
-                value={customerEmail}
-                onChange={e => setCustomerEmail(e.target.value)}
-                placeholder="customer@example.com"
-              />
+              <Input type="email" value={customerEmail} onChange={e => setCustomerEmail(e.target.value)} placeholder="customer@example.com" />
             </div>
             <div className="space-y-1.5">
               <label className="text-sm font-medium">{t('Company')}</label>
-              <Input
-                value={customerCompany}
-                onChange={e => setCustomerCompany(e.target.value)}
-                placeholder={t('Company name')}
-              />
+              <Input value={customerCompany} onChange={e => setCustomerCompany(e.target.value)} placeholder={t('Company name')} />
             </div>
             <div className="space-y-1.5">
               <label className="text-sm font-medium">{t('Phone')}</label>
-              <Input
-                value={customerPhone}
-                onChange={e => setCustomerPhone(e.target.value)}
-                placeholder="+1 234 567 890"
-              />
+              <Input value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} placeholder="+1 234 567 890" />
             </div>
             <div className="col-span-2 space-y-1.5">
               <label className="text-sm font-medium">{t('Address')}</label>
-              <Input
-                value={customerAddress}
-                onChange={e => setCustomerAddress(e.target.value)}
-                placeholder={t('Street, city, country')}
-              />
+              <Input value={customerAddress} onChange={e => setCustomerAddress(e.target.value)} placeholder={t('Street, city, country')} />
             </div>
           </CardContent>
         </Card>
@@ -422,11 +402,7 @@ export function QuotationFormPage() {
           <CardContent className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <label className="text-sm font-medium">{t('Valid Until')}</label>
-              <Input
-                type="date"
-                value={validUntil}
-                onChange={e => setValidUntil(e.target.value)}
-              />
+              <Input type="date" value={validUntil} onChange={e => setValidUntil(e.target.value)} />
             </div>
             <div className="space-y-1.5">
               <label className="text-sm font-medium">{t('Currency')}</label>
@@ -436,12 +412,7 @@ export function QuotationFormPage() {
             </div>
             <div className="col-span-2 space-y-1.5">
               <label className="text-sm font-medium">{t('Notes')}</label>
-              <Textarea
-                value={notes}
-                onChange={e => setNotes(e.target.value)}
-                placeholder={t('Internal notes or terms…')}
-                rows={3}
-              />
+              <Textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder={t('Internal notes or terms…')} rows={3} />
             </div>
           </CardContent>
         </Card>
@@ -464,13 +435,14 @@ export function QuotationFormPage() {
             {lineItems.map((item, idx) => (
               <LineItemRow
                 key={idx}
-                index={idx}
                 item={item}
                 products={products}
                 details={detailsCache[item.product_id] ?? []}
+                rules={rulesCache[item.product_id] ?? []}
+                currency={currency}
                 onProductChange={pid => handleProductChange(idx, pid)}
                 onQtyChange={qty => updateLineItem(idx, { quantity: qty })}
-                onCharSelect={(charId, valueId) => handleCharSelect(idx, charId, valueId)}
+                onSelectionChange={sel => updateLineItem(idx, { selection: sel })}
                 onRemove={() => removeLineItem(idx)}
               />
             ))}
@@ -494,44 +466,22 @@ export function QuotationFormPage() {
             )}
             {adjustments.map((adj, idx) => (
               <div key={idx} className="flex items-center gap-2">
-                <Select
-                  value={adj.type}
-                  onChange={e => updateAdjustment(idx, { type: e.target.value as AdjustmentType })}
-                  className="w-32"
-                >
+                <Select value={adj.type} onChange={e => updateAdjustment(idx, { type: e.target.value as AdjustmentType })} className="w-32">
                   {(Object.keys(ADJ_TYPE_LABELS) as AdjustmentType[]).map(k => (
                     <option key={k} value={k}>{t(ADJ_TYPE_LABELS[k])}</option>
                   ))}
                 </Select>
-                <Input
-                  value={adj.label}
-                  onChange={e => updateAdjustment(idx, { label: e.target.value })}
-                  placeholder={t('Label (e.g. VAT 20%)')}
-                  className="flex-1"
-                />
-                <Select
-                  value={adj.mode}
-                  onChange={e => updateAdjustment(idx, { mode: e.target.value as 'percent' | 'fixed' })}
-                  className="w-24"
-                >
+                <Input value={adj.label} onChange={e => updateAdjustment(idx, { label: e.target.value })} placeholder={t('Label (e.g. VAT 20%)')} className="flex-1" />
+                <Select value={adj.mode} onChange={e => updateAdjustment(idx, { mode: e.target.value as 'percent' | 'fixed' })} className="w-24">
                   <option value="percent">%</option>
                   <option value="fixed">{currency}</option>
                 </Select>
                 <Input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={adj.value}
-                  onChange={e => updateAdjustment(idx, { value: e.target.value })}
-                  className="w-28 text-right"
-                  placeholder="0"
+                  type="number" min="0" step="0.01"
+                  value={adj.value} onChange={e => updateAdjustment(idx, { value: e.target.value })}
+                  className="w-28 text-right" placeholder="0"
                 />
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => removeAdjustment(idx)}
-                  className="text-muted-foreground hover:text-destructive"
-                >
+                <Button variant="ghost" size="icon" onClick={() => removeAdjustment(idx)} className="text-muted-foreground hover:text-destructive">
                   <Trash2 className="h-4 w-4" />
                 </Button>
               </div>
@@ -593,31 +543,36 @@ export function QuotationFormPage() {
 // ── LineItemRow sub-component ──────────────────────────────────────────────────
 
 interface LineItemRowProps {
-  index:           number
-  item:            LineItemDraft
-  products:        Product[]
-  details:         ProductCharacteristicWithDetails[]
-  onProductChange: (pid: string) => void
-  onQtyChange:     (qty: number) => void
-  onCharSelect:    (charId: string, valueId: string) => void
-  onRemove:        () => void
+  item:              LineItemDraft
+  products:          Product[]
+  details:           CharacteristicWithValues[]
+  rules:             ConfigurationRule[]
+  currency:          string
+  onProductChange:   (pid: string) => void
+  onQtyChange:       (qty: number) => void
+  onSelectionChange: (sel: Record<string, string>) => void
+  onRemove:          () => void
 }
 
 function LineItemRow({
-  item, products, details,
-  onProductChange, onQtyChange, onCharSelect, onRemove,
+  item, products, details, rules, currency,
+  onProductChange, onQtyChange, onSelectionChange, onRemove,
 }: LineItemRowProps) {
+  const [dialogOpen, setDialogOpen] = useState(false)
   const product = products.find(p => p.id === item.product_id)
 
-  // Compute unit price
+  // Compute current unit price from selection
   let unitPrice = product?.base_price ?? 0
-  for (const row of details) {
-    const valueId = item.selection[row.characteristic.id]
+  for (const char of details) {
+    const valueId = item.selection[char.id]
     if (!valueId) continue
-    const v = row.characteristic.characteristic_values.find(v => v.id === valueId)
+    const v = char.characteristic_values.find(v => v.id === valueId)
     if (v) unitPrice += v.price_modifier
   }
   unitPrice = Math.max(0, unitPrice)
+
+  const configuredCount = Object.keys(item.selection).length
+  const hasCharacteristics = details.length > 0
 
   return (
     <div className="border rounded-lg p-4 space-y-3">
@@ -625,13 +580,10 @@ function LineItemRow({
         {/* Product selector */}
         <div className="flex-1 space-y-1.5">
           <label className="text-xs font-medium text-muted-foreground">{t('Product')}</label>
-          <Select
-            value={item.product_id}
-            onChange={e => onProductChange(e.target.value)}
-          >
+          <Select value={item.product_id} onChange={e => onProductChange(e.target.value)}>
             <option value="">{t('Select a product…')}</option>
             {products.map(p => (
-              <option key={p.id} value={p.id}>{p.name}</option>
+              <option key={p.id} value={p.id}>{p.name}{p.sku ? ` (${p.sku})` : ''}</option>
             ))}
           </Select>
         </div>
@@ -640,9 +592,7 @@ function LineItemRow({
         <div className="w-24 space-y-1.5">
           <label className="text-xs font-medium text-muted-foreground">{t('Qty')}</label>
           <Input
-            type="number"
-            min="1"
-            step="1"
+            type="number" min="1" step="1"
             value={item.quantity}
             onChange={e => onQtyChange(Math.max(1, parseInt(e.target.value) || 1))}
             className="text-center"
@@ -653,7 +603,7 @@ function LineItemRow({
         <div className="w-36 space-y-1.5">
           <label className="text-xs font-medium text-muted-foreground">{t('Unit Price')}</label>
           <Input
-            value={product ? unitPrice.toFixed(2) : '—'}
+            value={product ? `${unitPrice.toFixed(2)}${product.unit_of_measure ? ' / ' + product.unit_of_measure : ''}` : '—'}
             readOnly
             className="bg-muted/30 text-right"
           />
@@ -667,37 +617,55 @@ function LineItemRow({
         </div>
       </div>
 
-      {/* Characteristics */}
-      {item.product_id && details.length > 0 && (
-        <div className="grid grid-cols-2 gap-3 pt-1">
-          {details.map(row => {
-            const char   = row.characteristic
-            const values = [...char.characteristic_values].sort((a, b) => a.sort_order - b.sort_order)
-            return (
-              <div key={char.id} className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">{char.name}</label>
-                <Select
-                  value={item.selection[char.id] ?? ''}
-                  onChange={e => onCharSelect(char.id, e.target.value)}
-                >
-                  <option value="">{t('Select…')}</option>
-                  {values.map(v => (
-                    <option key={v.id} value={v.id}>
-                      {v.label}{v.price_modifier !== 0 ? ` (${v.price_modifier > 0 ? '+' : ''}${v.price_modifier.toFixed(2)})` : ''}
-                    </option>
-                  ))}
-                </Select>
-              </div>
-            )
-          })}
+      {/* Configure button + summary chips */}
+      {item.product_id && hasCharacteristics && (
+        <div className="flex items-center gap-3 flex-wrap pt-1">
+          <Button type="button" variant="outline" size="sm" onClick={() => setDialogOpen(true)}>
+            <Settings2 className="h-3.5 w-3.5 mr-1.5" />
+            {configuredCount > 0 ? t('Reconfigure') : t('Configure')}
+          </Button>
+
+          {configuredCount > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {details
+                .filter(char => item.selection[char.id])
+                .map(char => {
+                  const val = char.characteristic_values.find(v => v.id === item.selection[char.id])
+                  return val ? (
+                    <span key={char.id} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border bg-muted/50">
+                      <span className="text-muted-foreground">{char.name}:</span>
+                      <span className="font-medium">{val.label}</span>
+                    </span>
+                  ) : null
+                })}
+            </div>
+          )}
         </div>
       )}
 
       {/* Row total */}
       {item.product_id && (
         <div className="text-right text-sm text-muted-foreground">
-          {t('Line total')}: <span className="font-medium text-foreground">{(unitPrice * item.quantity).toFixed(2)}</span>
+          {t('Line total')}: <span className="font-medium text-foreground">{(unitPrice * item.quantity).toFixed(2)} {currency}</span>
         </div>
+      )}
+
+      {/* Configure dialog */}
+      {item.product_id && hasCharacteristics && (
+        <ConfigureProductDialog
+          open={dialogOpen}
+          onOpenChange={setDialogOpen}
+          productName={product?.name ?? ''}
+          basePrice={product?.base_price ?? 0}
+          currency={currency}
+          characteristics={details}
+          rules={rules}
+          initialSelection={item.selection}
+          onApply={sel => {
+            onSelectionChange(sel)
+            setDialogOpen(false)
+          }}
+        />
       )}
     </div>
   )

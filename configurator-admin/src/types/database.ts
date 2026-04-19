@@ -23,11 +23,13 @@ export interface QuotationConfigItem {
 }
 
 export interface QuotationLineItem {
-  product_id:    string
-  product_name:  string
-  quantity:      number
-  unit_price:    number
-  configuration: QuotationConfigItem[]
+  product_id:      string
+  product_name:    string
+  product_sku:     string | null
+  unit_of_measure: string | null
+  quantity:        number
+  unit_price:      number
+  configuration:   QuotationConfigItem[]
 }
 
 export interface QuotationAdjustment {
@@ -88,11 +90,27 @@ export interface Database {
           currency: string
           status: ProductStatus
           sort_order: number
+          sku: string | null
+          unit_of_measure: string | null
           created_at: string
           updated_at: string
         }
         Insert: Omit<Database['public']['Tables']['products']['Row'], 'id' | 'created_at' | 'updated_at'> & { id?: string }
         Update: Partial<Database['public']['Tables']['products']['Insert']>
+      }
+      product_texts: {
+        Row: {
+          id: string
+          tenant_id: string
+          product_id: string
+          label: string
+          content: string
+          sort_order: number
+          created_at: string
+          updated_at: string
+        }
+        Insert: Omit<Database['public']['Tables']['product_texts']['Row'], 'id' | 'created_at' | 'updated_at'> & { id?: string }
+        Update: Partial<Database['public']['Tables']['product_texts']['Insert']>
       }
       characteristic_classes: {
         Row: {
@@ -316,3 +334,4 @@ export type ClassMember          = Database['public']['Tables']['characteristic_
 export type ProductClass         = Database['public']['Tables']['product_classes']['Row']
 export type PricingFormula       = Database['public']['Tables']['pricing_formulas']['Row']
 export type Quotation            = Database['public']['Tables']['quotations']['Row']
+export type ProductText          = Database['public']['Tables']['product_texts']['Row']

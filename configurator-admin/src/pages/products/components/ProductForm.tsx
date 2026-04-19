@@ -11,7 +11,14 @@ import { t } from '@/i18n'
 
 const CURRENCIES = ['EUR', 'USD', 'GBP', 'CHF', 'HRK', 'RSD']
 
-export type ProductFormValues = { name: string; description?: string; base_price: number; currency: string }
+export type ProductFormValues = {
+  name: string
+  description?: string
+  base_price: number
+  currency: string
+  sku?: string
+  unit_of_measure?: string
+}
 
 interface ProductFormProps {
   defaultValues?: Partial<ProductFormValues>
@@ -27,10 +34,12 @@ export function ProductForm({
   onCancel,
 }: ProductFormProps) {
   const schema = z.object({
-    name: z.string().min(1, t('Name is required')).max(300),
-    description: z.string().optional(),
-    base_price: z.coerce.number().min(0, t('Price must be 0 or more')),
-    currency: z.string().length(3),
+    name:             z.string().min(1, t('Name is required')).max(300),
+    description:      z.string().optional(),
+    base_price:       z.coerce.number().min(0, t('Price must be 0 or more')),
+    currency:         z.string().length(3),
+    sku:              z.string().max(100).optional().or(z.literal('')),
+    unit_of_measure:  z.string().max(50).optional().or(z.literal('')),
   })
 
   const {
@@ -40,7 +49,7 @@ export function ProductForm({
   } = useForm<ProductFormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
-      currency: 'EUR',
+      currency:   'EUR',
       base_price: 0,
       ...defaultValues,
     },
@@ -69,6 +78,34 @@ export function ProductForm({
           {...register('description')}
         />
       </FormField>
+
+      <div className="grid grid-cols-2 gap-4">
+        <FormField
+          label={t('SKU / Code')}
+          htmlFor="sku"
+          error={errors.sku?.message}
+          hint={t('Optional unique product identifier')}
+        >
+          <Input
+            id="sku"
+            placeholder="e.g. PROD-001"
+            {...register('sku')}
+          />
+        </FormField>
+
+        <FormField
+          label={t('Unit of Measure')}
+          htmlFor="unit_of_measure"
+          error={errors.unit_of_measure?.message}
+          hint={t('e.g. pcs, m², kg, m')}
+        >
+          <Input
+            id="unit_of_measure"
+            placeholder="pcs"
+            {...register('unit_of_measure')}
+          />
+        </FormField>
+      </div>
 
       <div className="grid grid-cols-2 gap-4">
         <FormField
@@ -111,12 +148,13 @@ export function ProductForm({
   )
 }
 
-// Helper to map a Product row back to form values
 export function productToFormValues(p: Product): ProductFormValues {
   return {
-    name: p.name,
-    description: p.description ?? '',
-    base_price: p.base_price,
-    currency: p.currency,
+    name:            p.name,
+    description:     p.description ?? '',
+    base_price:      p.base_price,
+    currency:        p.currency,
+    sku:             p.sku ?? '',
+    unit_of_measure: p.unit_of_measure ?? '',
   }
 }

@@ -10,6 +10,7 @@ import type {
   ClassMember,
   CharacteristicValue,
   ProductCharacteristic,
+  ProductText,
 } from '@/types/database'
 
 // Enriched type returned by fetchProductClassesWithChars
@@ -51,6 +52,7 @@ export async function fetchProduct(id: string): Promise<Product> {
 
 export async function createProduct(
   input: Pick<Product, 'name' | 'description' | 'base_price' | 'currency'>
+    & { sku?: string | null; unit_of_measure?: string | null }
 ): Promise<Product> {
   const { data, error } = await supabase
     .from('products')
@@ -63,7 +65,7 @@ export async function createProduct(
 
 export async function updateProduct(
   id: string,
-  input: Partial<Pick<Product, 'name' | 'description' | 'base_price' | 'currency' | 'status'>>
+  input: Partial<Pick<Product, 'name' | 'description' | 'base_price' | 'currency' | 'status' | 'sku' | 'unit_of_measure'>>
 ): Promise<Product> {
   const { data, error } = await supabase
     .from('products')
@@ -359,4 +361,109 @@ export async function fetchProductWithDetails(
     .order('sort_order', { ascending: true })
   if (error) throw new Error(error.message)
   return (data ?? []) as ProductCharacteristicWithDetails[]
+}
+
+// ─── Characteristics via the active classes path ──────────────────────────────
+// Uses product_classes → characteristic_class_members → characteristics → values.
+// This is the current model; fetchProductWithDetails uses the legacy direct table.
+
+export async function fetchProductCharacteristicsWithValues(
+  productId: string
+): Promise<CharacteristicWithValues[]> {
+  const { data: pcData, error: pcError } = await supabase
+    .from('product_classes')
+    .select('class_id, sort_order')
+    .eq('product_id', productId)
+    .order('sort_order', { ascending: true })
+  if (pcError) throw new Error(pcError.message)
+  if (!pcData || pcData.length === 0) return []
+
+  const classIds = (pcData as any[]).map(pc => pc.class_id as string)
+
+  const { data: memberData, error: memberError } = await supabase
+    .from('characteristic_class_members')
+    .select('class_id, characteristic_id, sort_order')
+    .in('class_id', classIds)
+    .order('sort_order', { ascending: true })
+  if (memberError) throw new Error(memberError.message)
+
+  // Build an ordered, deduplicated list of characteristic IDs
+  const seen = new Set<string>()
+  const orderedCharIds: string[] = []
+  for (const pc of (pcData as any[])) {
+    const members = ((memberData ?? []) as any[])
+      .filter(m => m.class_id === pc.class_id)
+      .sort((a, b) => a.sort_order - b.sort_order)
+    for (const m of members) {
+      if (!seen.has(m.characteristic_id)) {
+        seen.add(m.characteristic_id)
+        orderedCharIds.push(m.characteristic_id)
+      }
+    }
+  }
+  if (orderedCharIds.length === 0) return []
+
+  const [charResult, valueResult] = await Promise.all([
+    supabase.from('characteristics').select('*').in('id', orderedCharIds),
+    supabase.from('characteristic_values').select('*').in('characteristic_id', orderedCharIds).order('sort_order', { ascending: true }),
+  ])
+  if (charResult.error) throw new Error(charResult.error.message)
+  if (valueResult.error) throw new Error(valueResult.error.message)
+
+  const charById: Record<string, Characteristic> = {}
+  for (const c of (charResult.data ?? []) as Characteristic[]) charById[c.id] = c
+
+  const valuesByChar: Record<string, CharacteristicValue[]> = {}
+  for (const v of (valueResult.data ?? []) as CharacteristicValue[]) {
+    if (!valuesByChar[v.characteristic_id]) valuesByChar[v.characteristic_id] = []
+    valuesByChar[v.characteristic_id].push(v)
+  }
+
+  return orderedCharIds
+    .filter(id => charById[id])
+    .map(id => ({ ...charById[id], characteristic_values: valuesByChar[id] ?? [] }))
+}
+
+// ─── Product Texts ────────────────────────────────────────────────────────────
+
+export async function fetchProductTexts(productId: string): Promise<ProductText[]> {
+  const { data, error } = await supabase
+    .from('product_texts')
+    .select('*')
+    .eq('product_id', productId)
+    .order('sort_order', { ascending: true })
+    .order('created_at', { ascending: true })
+  if (error) throw new Error(error.message)
+  return (data ?? []) as ProductText[]
+}
+
+export async function createProductText(
+  input: Pick<ProductText, 'product_id' | 'label' | 'content' | 'sort_order'>
+): Promise<ProductText> {
+  const { data, error } = await supabase
+    .from('product_texts')
+    .insert(input as any)
+    .select()
+    .single()
+  if (error) throw new Error(error.message)
+  return data as ProductText
+}
+
+export async function updateProductText(
+  id: string,
+  input: Partial<Pick<ProductText, 'label' | 'content' | 'sort_order'>>
+): Promise<ProductText> {
+  const { data, error } = await supabase
+    .from('product_texts')
+    .update(input as unknown as never)
+    .eq('id', id)
+    .select()
+    .single()
+  if (error) throw new Error(error.message)
+  return data as ProductText
+}
+
+export async function deleteProductText(id: string): Promise<void> {
+  const { error } = await supabase.from('product_texts').delete().eq('id', id)
+  if (error) throw new Error(error.message)
 }

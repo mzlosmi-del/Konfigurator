@@ -14,13 +14,14 @@ import { RulesPanel } from './components/RulesPanel'
 import { FormulaPanel } from './components/FormulaPanel'
 import { VisualizationPanel } from './components/VisualizationPanel'
 import { EmbedPanel } from './components/EmbedPanel'
+import { TextsPanel } from './components/TextsPanel'
 import { useToast } from '@/hooks/useToast'
 import { Toaster } from '@/components/ui/toast'
 import { t } from '@/i18n'
 
-type Tab = 'details' | 'characteristics' | 'rules' | 'formulas' | 'visualization' | 'embed'
+type Tab = 'details' | 'characteristics' | 'rules' | 'formulas' | 'visualization' | 'embed' | 'texts'
 
-const TAB_KEYS: Tab[] = ['details', 'characteristics', 'rules', 'formulas', 'visualization', 'embed']
+const TAB_KEYS: Tab[] = ['details', 'characteristics', 'rules', 'formulas', 'visualization', 'embed', 'texts']
 
 const TAB_LABELS: Record<Tab, string> = {
   details:         'Details',
@@ -29,6 +30,7 @@ const TAB_LABELS: Record<Tab, string> = {
   formulas:        'Formula pricing',
   visualization:   'Visualization',
   embed:           'Embed',
+  texts:           'Texts',
 }
 
 const statusVariant: Record<Product['status'], 'success' | 'warning' | 'secondary'> = {
@@ -58,10 +60,12 @@ export function EditProductPage() {
     if (!product) return
     try {
       const updated = await updateProduct(product.id, {
-        name: values.name,
-        description: values.description ?? null,
-        base_price: values.base_price,
-        currency: values.currency,
+        name:            values.name,
+        description:     values.description ?? null,
+        base_price:      values.base_price,
+        currency:        values.currency,
+        sku:             values.sku?.trim() || null,
+        unit_of_measure: values.unit_of_measure?.trim() || null,
       })
       setProduct(updated as Product)
       toast({ title: t('Product saved') })
@@ -244,6 +248,20 @@ export function EditProductPage() {
             </CardHeader>
             <CardContent>
               <EmbedPanel product={product} />
+            </CardContent>
+          </Card>
+        )}
+
+        {activeTab === 'texts' && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">{t('Product Texts')}</CardTitle>
+              <CardDescription>
+                {t('Named text blocks included in PDF quotations. Use these for product descriptions, specifications, or terms.')}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <TextsPanel productId={product.id} />
             </CardContent>
           </Card>
         )}
