@@ -19,8 +19,8 @@ CREATE POLICY "tenant isolation"
 
 -- 2. Add rejection columns to quotations
 ALTER TABLE public.quotations
-  ADD COLUMN rejection_reason_id uuid REFERENCES public.quotation_rejection_reasons(id) ON DELETE SET NULL,
-  ADD COLUMN rejection_note      text;
+  ADD COLUMN IF NOT EXISTS rejection_reason_id uuid REFERENCES public.quotation_rejection_reasons(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS rejection_note      text;
 
 -- 3. Migrate existing status values to new slugs
 UPDATE public.quotations SET status = 'in_preparation'     WHERE status = 'draft';
