@@ -63,6 +63,12 @@ export interface Database {
           slug: string
           plan: Plan
           notification_email: string | null
+          company_address: string | null
+          company_phone:   string | null
+          company_email:   string | null
+          company_website: string | null
+          contact_person:  string | null
+          logo_url:        string | null
           created_at: string
           updated_at: string
         }

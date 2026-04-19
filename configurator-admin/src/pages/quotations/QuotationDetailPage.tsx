@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, Pencil, FileText } from 'lucide-react'
 import { fetchQuotation, updateQuotation, calcSubtotal, calcTotal } from '@/lib/quotations'
-import { buildQuotationPdfBytes, openPdfBlob } from '@/lib/quotationPdf'
+import { buildQuotationPdfBytes, openPdfBlob, type TenantProfile } from '@/lib/quotationPdf'
 import { useAuthContext } from '@/components/auth/AuthContext'
 import type { Quotation, QuotationStatus, QuotationLineItem, QuotationAdjustment } from '@/types/database'
 import { PageHeader } from '@/components/layout/PageHeader'
@@ -64,7 +64,16 @@ export function QuotationDetailPage() {
     if (!quotation) return
     setGeneratingPdf(true)
     try {
-      const bytes = await buildQuotationPdfBytes(tenant?.name ?? 'Your store', quotation)
+      const tenantProfile: TenantProfile = {
+        name:            tenant?.name            ?? 'Your store',
+        logo_url:        (tenant as any)?.logo_url,
+        company_address: (tenant as any)?.company_address,
+        company_phone:   (tenant as any)?.company_phone,
+        company_email:   (tenant as any)?.company_email,
+        company_website: (tenant as any)?.company_website,
+        contact_person:  (tenant as any)?.contact_person,
+      }
+      const bytes = await buildQuotationPdfBytes(tenantProfile, quotation)
       openPdfBlob(bytes)
     } catch (err) {
       toast({ title: t('Failed to generate PDF'), description: String(err), variant: 'destructive' })

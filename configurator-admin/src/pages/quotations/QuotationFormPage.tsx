@@ -13,7 +13,7 @@ import {
   fetchProducts,
   fetchProductCharacteristicsWithValues,
 } from '@/lib/products'
-import { buildQuotationPdfBytes, openPdfBlob } from '@/lib/quotationPdf'
+import { buildQuotationPdfBytes, openPdfBlob, type TenantProfile } from '@/lib/quotationPdf'
 import { useAuthContext } from '@/components/auth/AuthContext'
 import { supabase } from '@/lib/supabase'
 import type {
@@ -329,7 +329,16 @@ export function QuotationFormPage() {
     setGeneratingPdf(true)
     try {
       const savedQuotation = await fetchQuotation(savedId)
-      const bytes = await buildQuotationPdfBytes(tenant?.name ?? 'Your store', savedQuotation)
+      const tenantProfile: TenantProfile = {
+        name:            tenant?.name            ?? 'Your store',
+        logo_url:        (tenant as any)?.logo_url,
+        company_address: (tenant as any)?.company_address,
+        company_phone:   (tenant as any)?.company_phone,
+        company_email:   (tenant as any)?.company_email,
+        company_website: (tenant as any)?.company_website,
+        contact_person:  (tenant as any)?.contact_person,
+      }
+      const bytes = await buildQuotationPdfBytes(tenantProfile, savedQuotation)
       openPdfBlob(bytes)
       navigate(`/quotations/${savedId}`)
     } catch (err) {
