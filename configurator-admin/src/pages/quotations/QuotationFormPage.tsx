@@ -15,6 +15,7 @@ import {
   fetchProductCharacteristicsWithValues,
 } from '@/lib/products'
 import { evaluateRules } from '@/lib/configurationRules'
+import { calculateFormulaTotal, type FormulaContext } from '@/lib/formulaEngine'
 import { buildQuotationPdfBytes, openPdfBlob, type TenantProfile } from '@/lib/quotationPdf'
 import { useAuthContext } from '@/components/auth/AuthContext'
 import { supabase } from '@/lib/supabase'
@@ -26,6 +27,7 @@ import type {
   AdjustmentType,
   QuotationConfigItem,
   ConfigurationRule,
+  PricingFormula,
 } from '@/types/database'
 import type { CharacteristicWithValues } from '@/lib/products'
 import { ConfigureProductDialog } from './ConfigureProductDialog'
@@ -83,8 +85,9 @@ export function QuotationFormPage() {
   // ── Data ───────────────────────────────────────────────────────────────────
   const [pageLoading, setPageLoading] = useState(isEdit)
   const [products, setProducts] = useState<Product[]>([])
-  const [detailsCache, setDetailsCache] = useState<Record<string, CharacteristicWithValues[]>>({})
-  const [rulesCache,   setRulesCache]   = useState<Record<string, ConfigurationRule[]>>({})
+  const [detailsCache,   setDetailsCache]   = useState<Record<string, CharacteristicWithValues[]>>({})
+  const [rulesCache,     setRulesCache]     = useState<Record<string, ConfigurationRule[]>>({})
+  const [formulasCache,  setFormulasCache]  = useState<Record<string, PricingFormula[]>>({})
 
   // ── Customer fields ────────────────────────────────────────────────────────
   const [customerName,    setCustomerName]    = useState('')
@@ -158,20 +161,23 @@ export function QuotationFormPage() {
   // ── Load product details + rules on demand ─────────────────────────────────
   const ensureProductData = useCallback(async (productId: string) => {
     if (!productId) return
-    const needDetails = !detailsCache[productId]
-    const needRules   = !rulesCache[productId]
-    if (!needDetails && !needRules) return
+    const needDetails  = !detailsCache[productId]
+    const needRules    = !rulesCache[productId]
+    const needFormulas = !formulasCache[productId]
+    if (!needDetails && !needRules && !needFormulas) return
     try {
-      const [details, rulesData] = await Promise.all([
-        needDetails ? fetchProductCharacteristicsWithValues(productId) : Promise.resolve(detailsCache[productId]),
-        needRules   ? supabase.from('configuration_rules').select('*').eq('product_id', productId).eq('is_active', true) : Promise.resolve({ data: rulesCache[productId] }),
+      const [details, rulesData, formulasData] = await Promise.all([
+        needDetails  ? fetchProductCharacteristicsWithValues(productId) : Promise.resolve(detailsCache[productId]),
+        needRules    ? supabase.from('configuration_rules').select('*').eq('product_id', productId).eq('is_active', true) : Promise.resolve({ data: rulesCache[productId] }),
+        needFormulas ? supabase.from('pricing_formulas').select('*').eq('product_id', productId).eq('is_active', true).order('sort_order') : Promise.resolve({ data: formulasCache[productId] }),
       ])
-      setDetailsCache(prev => ({ ...prev, [productId]: details }))
-      setRulesCache(prev  => ({ ...prev, [productId]: ((rulesData as any).data ?? []) as ConfigurationRule[] }))
+      setDetailsCache(prev   => ({ ...prev, [productId]: details }))
+      setRulesCache(prev     => ({ ...prev, [productId]: ((rulesData as any).data ?? []) as ConfigurationRule[] }))
+      setFormulasCache(prev  => ({ ...prev, [productId]: ((formulasData as any).data ?? []) as PricingFormula[] }))
     } catch {
       toast({ title: t('Failed to load product details'), variant: 'destructive' })
     }
-  }, [detailsCache, rulesCache])
+  }, [detailsCache, rulesCache, formulasCache])
 
   // ── Line item helpers ───────────────────────────────────────────────────────
   function addLineItem() {
@@ -205,18 +211,37 @@ export function QuotationFormPage() {
   }
 
   // ── Price calculation ──────────────────────────────────────────────────────
+  function buildFormulaCtx(
+    characteristics: CharacteristicWithValues[],
+    selection: Record<string, string>,
+    basePrice: number,
+  ): FormulaContext {
+    const numericInputs:  Record<string, number> = {}
+    const cleanSelection: Record<string, string> = {}
+    for (const char of characteristics) {
+      if (char.display_type === 'number') {
+        numericInputs[char.id] = Number(selection[char.id] ?? 0)
+      } else if (selection[char.id]) {
+        cleanSelection[char.id] = selection[char.id]
+      }
+    }
+    return { base_price: Number(basePrice), selection: cleanSelection, numericInputs, characteristics }
+  }
+
   function buildLineItemData(): QuotationLineItem[] {
     return lineItems
       .filter(li => li.product_id)
       .map(li => {
         const product    = products.find(p => p.id === li.product_id)
-        const chars      = detailsCache[li.product_id] ?? []
-        const rules      = rulesCache[li.product_id]   ?? []
+        const chars      = detailsCache[li.product_id]  ?? []
+        const rules      = rulesCache[li.product_id]    ?? []
+        const formulas   = formulasCache[li.product_id] ?? []
         const ruleEffect = evaluateRules(rules, li.selection)
         const config: QuotationConfigItem[] = []
         let   unitPrice = Number(product?.base_price ?? 0)
 
         for (const char of chars) {
+          if (char.display_type === 'number') continue
           const valueId = li.selection[char.id]
           if (!valueId) continue
           const value = char.characteristic_values.find(v => v.id === valueId)
@@ -232,13 +257,14 @@ export function QuotationFormPage() {
           unitPrice += effective
         }
 
+        const formulaAdj = calculateFormulaTotal(formulas, buildFormulaCtx(chars, li.selection, product?.base_price ?? 0))
         return {
           product_id:      li.product_id,
           product_name:    product?.name ?? '',
           product_sku:     product?.sku ?? null,
           unit_of_measure: product?.unit_of_measure ?? null,
           quantity:        li.quantity,
-          unit_price:      Math.max(0, unitPrice),
+          unit_price:      Math.max(0, unitPrice + formulaAdj),
           configuration:   config,
         }
       })
@@ -473,6 +499,7 @@ export function QuotationFormPage() {
                 products={products}
                 details={detailsCache[item.product_id] ?? []}
                 rules={rulesCache[item.product_id] ?? []}
+                formulas={formulasCache[item.product_id] ?? []}
                 currency={currency}
                 onProductChange={pid => handleProductChange(idx, pid)}
                 onQtyChange={qty => updateLineItem(idx, { quantity: qty })}
@@ -591,6 +618,7 @@ interface LineItemRowProps {
   products:          Product[]
   details:           CharacteristicWithValues[]
   rules:             ConfigurationRule[]
+  formulas:          PricingFormula[]
   currency:          string
   onProductChange:   (pid: string) => void
   onQtyChange:       (qty: number) => void
@@ -598,23 +626,42 @@ interface LineItemRowProps {
   onRemove:          () => void
 }
 
+function buildFormulaCtxLocal(
+  characteristics: CharacteristicWithValues[],
+  selection: Record<string, string>,
+  basePrice: number,
+): FormulaContext {
+  const numericInputs:  Record<string, number> = {}
+  const cleanSelection: Record<string, string> = {}
+  for (const char of characteristics) {
+    if (char.display_type === 'number') {
+      numericInputs[char.id] = Number(selection[char.id] ?? 0)
+    } else if (selection[char.id]) {
+      cleanSelection[char.id] = selection[char.id]
+    }
+  }
+  return { base_price: Number(basePrice), selection: cleanSelection, numericInputs, characteristics }
+}
+
 function LineItemRow({
-  item, products, details, rules, currency,
+  item, products, details, rules, formulas, currency,
   onProductChange, onQtyChange, onSelectionChange, onRemove,
 }: LineItemRowProps) {
   const [dialogOpen, setDialogOpen] = useState(false)
   const product = products.find(p => p.id === item.product_id)
 
-  // Compute current unit price from selection (respecting price_override rules)
+  // Compute current unit price from selection (respecting price_override rules + formulas)
   const lineRuleEffect = evaluateRules(rules, item.selection)
   let unitPrice = Number(product?.base_price ?? 0)
   for (const char of details) {
+    if (char.display_type === 'number') continue
     const valueId = item.selection[char.id]
     if (!valueId) continue
     const v = char.characteristic_values.find(v => v.id === valueId)
     if (!v) continue
     unitPrice += lineRuleEffect.priceOverrides[v.id] ?? Number(v.price_modifier)
   }
+  unitPrice += calculateFormulaTotal(formulas, buildFormulaCtxLocal(details, item.selection, product?.base_price ?? 0))
   unitPrice = Math.max(0, unitPrice)
 
   const configuredCount = Object.keys(item.selection).length
@@ -706,6 +753,7 @@ function LineItemRow({
           currency={currency}
           characteristics={details}
           rules={rules}
+          formulas={formulas}
           initialSelection={item.selection}
           onApply={sel => {
             onSelectionChange(sel)

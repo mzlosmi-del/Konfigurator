@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Settings2 } from 'lucide-react'
 import type { CharacteristicWithValues } from '@/lib/products'
-import type { ConfigurationRule } from '@/types/database'
+import type { ConfigurationRule, PricingFormula } from '@/types/database'
 import { evaluateRules, sanitizeSelection, applyDefaultValues } from '@/lib/configurationRules'
+import { calculateFormulaTotal } from '@/lib/formulaEngine'
 import {
   Dialog,
   DialogContent,
@@ -22,6 +23,7 @@ interface Props {
   currency:         string
   characteristics:  CharacteristicWithValues[]
   rules:            ConfigurationRule[]
+  formulas:         PricingFormula[]
   initialSelection: Record<string, string>
   onApply:          (selection: Record<string, string>) => void
 }
@@ -34,6 +36,7 @@ export function ConfigureProductDialog({
   currency,
   characteristics,
   rules,
+  formulas,
   initialSelection,
   onApply,
 }: Props) {
@@ -50,17 +53,30 @@ export function ConfigureProductDialog({
   )
 
   const configuredPrice = useMemo(() => {
+    const numericInputs:  Record<string, number> = {}
+    const cleanSelection: Record<string, string> = {}
+    for (const char of characteristics) {
+      if (char.display_type === 'number') {
+        numericInputs[char.id] = Number(selection[char.id] ?? 0)
+      } else if (selection[char.id]) {
+        cleanSelection[char.id] = selection[char.id]
+      }
+    }
     let price = Number(basePrice)
     for (const char of characteristics) {
-      const valueId = selection[char.id]
+      if (char.display_type === 'number') continue
+      const valueId = cleanSelection[char.id]
       if (!valueId) continue
       const val = char.characteristic_values.find(v => v.id === valueId)
       if (!val) continue
       const effective = ruleEffect.priceOverrides[val.id] ?? Number(val.price_modifier)
       price += effective
     }
-    return Math.max(0, price)
-  }, [basePrice, characteristics, selection, ruleEffect])
+    const formulaAdj = calculateFormulaTotal(formulas, {
+      base_price: Number(basePrice), selection: cleanSelection, numericInputs, characteristics,
+    })
+    return Math.max(0, price + formulaAdj)
+  }, [basePrice, characteristics, selection, ruleEffect, formulas])
 
   function handleSelect(charId: string, valueId: string) {
     const next     = { ...selection, [charId]: valueId }
