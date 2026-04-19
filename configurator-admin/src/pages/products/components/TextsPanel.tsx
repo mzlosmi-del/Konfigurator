@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
 import { Pencil, Trash2, Plus, Check, X } from 'lucide-react'
-import { fetchProductTexts, createProductText, updateProductText, deleteProductText } from '@/lib/products'
-import type { ProductText } from '@/types/database'
+import { fetchAllProductTexts, createProductText, updateProductText, deleteProductText } from '@/lib/products'
+import type { ProductText, ProductTextType } from '@/types/database'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
+import { Select } from '@/components/ui/select'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { Spinner } from '@/components/ui/spinner'
 import { useToast } from '@/hooks/useToast'
@@ -15,29 +16,42 @@ interface Props {
   productId: string
 }
 
+const TEXT_TYPES: { value: ProductTextType; label: string }[] = [
+  { value: 'product',       label: 'Product description' },
+  { value: 'specification', label: 'Specification'       },
+  { value: 'note',          label: 'Note'                },
+  { value: 'terms',         label: 'Terms'               },
+]
+
+const TYPE_BADGE: Record<string, string> = {
+  product:       'bg-blue-100 text-blue-700',
+  specification: 'bg-violet-100 text-violet-700',
+  note:          'bg-amber-100 text-amber-700',
+  terms:         'bg-emerald-100 text-emerald-700',
+}
+
 export function TextsPanel({ productId }: Props) {
   const { toasts, toast, dismiss } = useToast()
 
   const [texts,     setTexts]     = useState<ProductText[]>([])
   const [loading,   setLoading]   = useState(true)
 
-  // Add form
   const [addLabel,   setAddLabel]   = useState('')
   const [addContent, setAddContent] = useState('')
+  const [addType,    setAddType]    = useState<ProductTextType>('product')
   const [adding,     setAdding]     = useState(false)
 
-  // Inline edit
   const [editingId,   setEditingId]   = useState<string | null>(null)
   const [editLabel,   setEditLabel]   = useState('')
   const [editContent, setEditContent] = useState('')
+  const [editType,    setEditType]    = useState<ProductTextType>('product')
   const [saving,      setSaving]      = useState(false)
 
-  // Delete
   const [toDelete,  setToDelete]  = useState<ProductText | null>(null)
   const [deleting,  setDeleting]  = useState(false)
 
   useEffect(() => {
-    fetchProductTexts(productId)
+    fetchAllProductTexts(productId)
       .then(setTexts)
       .catch(() => toast({ title: t('Failed to load texts'), variant: 'destructive' }))
       .finally(() => setLoading(false))
@@ -54,11 +68,13 @@ export function TextsPanel({ productId }: Props) {
         product_id: productId,
         label:      addLabel.trim(),
         content:    addContent.trim(),
+        text_type:  addType,
         sort_order: texts.length,
       })
       setTexts(prev => [...prev, created])
       setAddLabel('')
       setAddContent('')
+      setAddType('product')
       toast({ title: t('Text block added') })
     } catch (e) {
       toast({ title: t('Failed to add text'), description: e instanceof Error ? e.message : undefined, variant: 'destructive' })
@@ -71,6 +87,7 @@ export function TextsPanel({ productId }: Props) {
     setEditingId(text.id)
     setEditLabel(text.label)
     setEditContent(text.content)
+    setEditType((text.text_type ?? 'product') as ProductTextType)
   }
 
   async function handleSaveEdit() {
@@ -81,7 +98,11 @@ export function TextsPanel({ productId }: Props) {
     }
     setSaving(true)
     try {
-      const updated = await updateProductText(editingId, { label: editLabel.trim(), content: editContent.trim() })
+      const updated = await updateProductText(editingId, {
+        label:     editLabel.trim(),
+        content:   editContent.trim(),
+        text_type: editType,
+      })
       setTexts(prev => prev.map(t => t.id === editingId ? updated : t))
       setEditingId(null)
       toast({ title: t('Text block saved') })
@@ -111,7 +132,6 @@ export function TextsPanel({ productId }: Props) {
 
   return (
     <div className="space-y-4">
-      {/* Existing text blocks */}
       {texts.length === 0 ? (
         <p className="text-sm text-muted-foreground py-2">{t('No text blocks yet. Add one below.')}</p>
       ) : (
@@ -119,11 +139,23 @@ export function TextsPanel({ productId }: Props) {
           {texts.map(text => (
             editingId === text.id ? (
               <div key={text.id} className="border rounded-lg p-3 space-y-2 bg-muted/20">
-                <Input
-                  value={editLabel}
-                  onChange={e => setEditLabel(e.target.value)}
-                  placeholder={t('Label')}
-                />
+                <div className="flex gap-2">
+                  <Select
+                    value={editType}
+                    onChange={e => setEditType(e.target.value as ProductTextType)}
+                    className="w-48"
+                  >
+                    {TEXT_TYPES.map(tt => (
+                      <option key={tt.value} value={tt.value}>{t(tt.label)}</option>
+                    ))}
+                  </Select>
+                  <Input
+                    value={editLabel}
+                    onChange={e => setEditLabel(e.target.value)}
+                    placeholder={t('Label')}
+                    className="flex-1"
+                  />
+                </div>
                 <Textarea
                   value={editContent}
                   onChange={e => setEditContent(e.target.value)}
@@ -144,8 +176,13 @@ export function TextsPanel({ productId }: Props) {
             ) : (
               <div key={text.id} className="flex items-start gap-3 border rounded-lg p-3">
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium">{text.label}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${TYPE_BADGE[text.text_type] ?? ''}`}>
+                      {TEXT_TYPES.find(tt => tt.value === text.text_type)?.label ?? text.text_type}
+                    </span>
+                    <p className="text-sm font-medium">{text.label}</p>
+                  </div>
+                  <p className="text-xs text-muted-foreground truncate">
                     {text.content ? text.content.slice(0, 100) + (text.content.length > 100 ? '…' : '') : <em>{t('(empty)')}</em>}
                   </p>
                 </div>
@@ -163,14 +200,25 @@ export function TextsPanel({ productId }: Props) {
         </div>
       )}
 
-      {/* Add new text block */}
       <div className="border rounded-lg p-3 space-y-2 bg-muted/10">
         <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{t('Add text block')}</p>
-        <Input
-          value={addLabel}
-          onChange={e => setAddLabel(e.target.value)}
-          placeholder={t('e.g. Header text, Technical specs, Warranty')}
-        />
+        <div className="flex gap-2">
+          <Select
+            value={addType}
+            onChange={e => setAddType(e.target.value as ProductTextType)}
+            className="w-48"
+          >
+            {TEXT_TYPES.map(tt => (
+              <option key={tt.value} value={tt.value}>{t(tt.label)}</option>
+            ))}
+          </Select>
+          <Input
+            value={addLabel}
+            onChange={e => setAddLabel(e.target.value)}
+            placeholder={t('e.g. Technical specs, Warranty, Note')}
+            className="flex-1"
+          />
+        </div>
         <Textarea
           value={addContent}
           onChange={e => setAddContent(e.target.value)}

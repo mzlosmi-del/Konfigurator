@@ -114,9 +114,10 @@ export interface Database {
         Row: {
           id: string
           tenant_id: string
-          product_id: string
+          product_id: string | null
           label: string
           content: string
+          text_type: string
           sort_order: number
           created_at: string
           updated_at: string
@@ -360,4 +361,5 @@ export type ProductClass         = Database['public']['Tables']['product_classes
 export type PricingFormula       = Database['public']['Tables']['pricing_formulas']['Row']
 export type Quotation                  = Database['public']['Tables']['quotations']['Row']
 export type ProductText                = Database['public']['Tables']['product_texts']['Row']
+export type ProductTextType            = 'product' | 'specification' | 'note' | 'terms'
 export type QuotationRejectionReason   = Database['public']['Tables']['quotation_rejection_reasons']['Row']

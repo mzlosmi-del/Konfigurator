@@ -13,6 +13,8 @@ import {
 import {
   fetchProducts,
   fetchProductCharacteristicsWithValues,
+  fetchProductTexts,
+  fetchGlobalTexts,
 } from '@/lib/products'
 import { evaluateRules } from '@/lib/configurationRules'
 import { calculateFormulaTotal, type FormulaContext } from '@/lib/formulaEngine'
@@ -28,9 +30,11 @@ import type {
   QuotationConfigItem,
   ConfigurationRule,
   PricingFormula,
+  ProductText,
 } from '@/types/database'
 import type { CharacteristicWithValues } from '@/lib/products'
 import { ConfigureProductDialog } from './ConfigureProductDialog'
+import { PdfLayoutDialog, type PdfSection } from './PdfLayoutDialog'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Button } from '@/components/ui/button'
@@ -85,9 +89,17 @@ export function QuotationFormPage() {
   // ── Data ───────────────────────────────────────────────────────────────────
   const [pageLoading, setPageLoading] = useState(isEdit)
   const [products, setProducts] = useState<Product[]>([])
-  const [detailsCache,   setDetailsCache]   = useState<Record<string, CharacteristicWithValues[]>>({})
-  const [rulesCache,     setRulesCache]     = useState<Record<string, ConfigurationRule[]>>({})
-  const [formulasCache,  setFormulasCache]  = useState<Record<string, PricingFormula[]>>({})
+  const [detailsCache,      setDetailsCache]      = useState<Record<string, CharacteristicWithValues[]>>({})
+  const [rulesCache,        setRulesCache]        = useState<Record<string, ConfigurationRule[]>>({})
+  const [formulasCache,     setFormulasCache]     = useState<Record<string, PricingFormula[]>>({})
+  const [productTextsCache, setProductTextsCache] = useState<Record<string, ProductText[]>>({})
+  const [globalTexts,       setGlobalTexts]       = useState<ProductText[]>([])
+  const [layoutDialogOpen,  setLayoutDialogOpen]  = useState(false)
+  const [pendingPdfData,    setPendingPdfData]    = useState<{
+    savedId: string
+    savedQuotation: Awaited<ReturnType<typeof fetchQuotation>>
+    tenantProfile: TenantProfile
+  } | null>(null)
 
   // ── Customer fields ────────────────────────────────────────────────────────
   const [customerName,    setCustomerName]    = useState('')
@@ -116,6 +128,9 @@ export function QuotationFormPage() {
     fetchProducts()
       .then(ps => setProducts(ps.filter(p => p.status === 'published')))
       .catch(() => toast({ title: t('Failed to load products'), variant: 'destructive' }))
+    fetchGlobalTexts()
+      .then(setGlobalTexts)
+      .catch(() => {/* non-critical */})
   }, [])
 
   useEffect(() => {
@@ -164,20 +179,23 @@ export function QuotationFormPage() {
     const needDetails  = !detailsCache[productId]
     const needRules    = !rulesCache[productId]
     const needFormulas = !formulasCache[productId]
-    if (!needDetails && !needRules && !needFormulas) return
+    const needTexts    = !productTextsCache[productId]
+    if (!needDetails && !needRules && !needFormulas && !needTexts) return
     try {
-      const [details, rulesData, formulasData] = await Promise.all([
+      const [details, rulesData, formulasData, texts] = await Promise.all([
         needDetails  ? fetchProductCharacteristicsWithValues(productId) : Promise.resolve(detailsCache[productId]),
         needRules    ? supabase.from('configuration_rules').select('*').eq('product_id', productId).eq('is_active', true) : Promise.resolve({ data: rulesCache[productId] }),
         needFormulas ? supabase.from('pricing_formulas').select('*').eq('product_id', productId).eq('is_active', true).order('sort_order') : Promise.resolve({ data: formulasCache[productId] }),
+        needTexts    ? fetchProductTexts(productId) : Promise.resolve(productTextsCache[productId]),
       ])
-      setDetailsCache(prev   => ({ ...prev, [productId]: details }))
-      setRulesCache(prev     => ({ ...prev, [productId]: ((rulesData as any).data ?? []) as ConfigurationRule[] }))
-      setFormulasCache(prev  => ({ ...prev, [productId]: ((formulasData as any).data ?? []) as PricingFormula[] }))
+      setDetailsCache(prev      => ({ ...prev, [productId]: details }))
+      setRulesCache(prev        => ({ ...prev, [productId]: ((rulesData as any).data ?? []) as ConfigurationRule[] }))
+      setFormulasCache(prev     => ({ ...prev, [productId]: ((formulasData as any).data ?? []) as PricingFormula[] }))
+      setProductTextsCache(prev => ({ ...prev, [productId]: texts }))
     } catch {
       toast({ title: t('Failed to load product details'), variant: 'destructive' })
     }
-  }, [detailsCache, rulesCache, formulasCache])
+  }, [detailsCache, rulesCache, formulasCache, productTextsCache])
 
   // ── Line item helpers ───────────────────────────────────────────────────────
   function addLineItem() {
@@ -241,7 +259,18 @@ export function QuotationFormPage() {
         let   unitPrice = Number(product?.base_price ?? 0)
 
         for (const char of chars) {
-          if (char.display_type === 'number') continue
+          if (char.display_type === 'number') {
+            const rawVal = li.selection[char.id]
+            if (rawVal === undefined || rawVal === '') continue
+            config.push({
+              characteristic_id:   char.id,
+              characteristic_name: char.name,
+              value_id:            rawVal,
+              value_label:         rawVal,
+              price_modifier:      0,
+            })
+            continue
+          }
           const valueId = li.selection[char.id]
           if (!valueId) continue
           const value = char.characteristic_values.find(v => v.id === valueId)
@@ -374,7 +403,26 @@ export function QuotationFormPage() {
         company_website: (tenant as any)?.company_website,
         contact_person:  (tenant as any)?.contact_person,
       }
-      const bytes = await buildQuotationPdfBytes(tenantProfile, savedQuotation)
+      setPendingPdfData({ savedId, savedQuotation, tenantProfile })
+      setLayoutDialogOpen(true)
+    } catch (err) {
+      toast({ title: t('Failed to save quotation'), description: String(err), variant: 'destructive' })
+    } finally {
+      setGeneratingPdf(false)
+    }
+  }
+
+  async function handleLayoutConfirm(sections: PdfSection[]) {
+    if (!pendingPdfData) return
+    const { savedId, savedQuotation, tenantProfile } = pendingPdfData
+    setGeneratingPdf(true)
+    try {
+      const pdfProductTexts: Record<string, ProductText[]> = {}
+      for (const [pid, texts] of Object.entries(productTextsCache)) {
+        pdfProductTexts[pid] = texts
+      }
+      const bytes = await buildQuotationPdfBytes(tenantProfile, savedQuotation, pdfProductTexts, globalTexts, sections)
+      setLayoutDialogOpen(false)
       openPdfBlob(bytes)
       setPendingSave({ bytes, quotationId: savedId, tenantId: savedQuotation.tenant_id })
     } catch (err) {
@@ -595,6 +643,18 @@ export function QuotationFormPage() {
           </Button>
         </div>
       </div>
+
+      <PdfLayoutDialog
+        open={layoutDialogOpen}
+        onOpenChange={open => {
+          setLayoutDialogOpen(open)
+          if (!open && pendingPdfData) navigate(`/quotations/${pendingPdfData.savedId}`)
+        }}
+        globalTexts={globalTexts}
+        quotationHasNotes={!!notes.trim()}
+        onConfirm={handleLayoutConfirm}
+        loading={generatingPdf}
+      />
 
       <ConfirmDialog
         open={!!pendingSave}

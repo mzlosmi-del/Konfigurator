@@ -1,5 +1,6 @@
 import { PDFDocument, PDFPage, PDFFont, rgb, StandardFonts } from 'pdf-lib'
 import type { Quotation, QuotationLineItem, QuotationAdjustment, ProductText } from '@/types/database'
+import type { PdfSection } from '@/pages/quotations/PdfLayoutDialog'
 
 export interface TenantProfile {
   name:             string
@@ -50,7 +51,9 @@ function wrapText(text: string, font: PDFFont, size: number, maxWidth: number): 
 export async function buildQuotationPdfBytes(
   tenant: TenantProfile,
   quotation: Quotation,
-  productTexts?: Record<string, ProductText[]>
+  productTexts?: Record<string, ProductText[]>,
+  globalTexts?: ProductText[],
+  layoutSections?: PdfSection[],
 ): Promise<Uint8Array> {
   const pdfDoc = await PDFDocument.create()
   const fontR  = await pdfDoc.embedFont(StandardFonts.Helvetica)
@@ -346,8 +349,16 @@ export async function buildQuotationPdfBytes(
   rText(totalStr, W - margin, y - 2, 18, fontB, C.black)
   y -= 38
 
-  // ── Section 6: Notes ───────────────────────────────────────────────────────
-  if (quotation.notes) {
+  // ── Sections 6+: layout-ordered notes, terms, and global text blocks ─────────
+
+  function isSectionVisible(id: string): boolean {
+    if (!layoutSections) return true
+    const s = layoutSections.find(s => s.id === id)
+    return s ? s.visible : true
+  }
+
+  function drawNotesSection() {
+    if (!quotation.notes) return
     ensureSpace(40)
     rule(y)
     y -= 18
@@ -361,30 +372,65 @@ export async function buildQuotationPdfBytes(
     y -= 6
   }
 
-  // ── Section 7: Terms & Conditions box ─────────────────────────────────────
-  const termsLines = [
-    'PAYMENT & TERMS',
-    '• Payment terms: 50% deposit on order confirmation, balance prior to delivery.',
-    '• Prices are exclusive of VAT / applicable taxes unless otherwise stated.',
-    '• This quotation is valid for 30 days unless a specific validity date is indicated above.',
-    '• Delivery timelines will be confirmed upon order placement.',
-    '• Thank you for your interest. We look forward to working with you.',
+  function drawTermsSection() {
+    const termsLines = [
+      'PAYMENT & TERMS',
+      '• Payment terms: 50% deposit on order confirmation, balance prior to delivery.',
+      '• Prices are exclusive of VAT / applicable taxes unless otherwise stated.',
+      '• This quotation is valid for 30 days unless a specific validity date is indicated above.',
+      '• Delivery timelines will be confirmed upon order placement.',
+      '• Thank you for your interest. We look forward to working with you.',
+    ]
+    const termsHeight = 12 + termsLines.length * 13
+    ensureSpace(termsHeight + 20)
+    rule(y)
+    y -= 18
+    page.drawRectangle({ x: margin, y: y - termsHeight + 14, width: col, height: termsHeight, color: C.termsBox })
+    page.drawRectangle({ x: margin, y: y - termsHeight + 14, width: col, height: termsHeight, borderColor: C.ruleLine, borderWidth: 0.5 })
+    y -= 4
+    for (let i = 0; i < termsLines.length; i++) {
+      const isHeader = i === 0
+      text(termsLines[i], margin + 10, y, isHeader ? 8 : 8.5, isHeader ? fontB : fontR, isHeader ? C.muted : C.black)
+      y -= 13
+    }
+  }
+
+  function drawGlobalTextSection(txt: ProductText) {
+    const contentLines = wrapText(txt.content, fontR, 9.5, col - 16)
+    const blockHeight  = 16 + 14 + contentLines.length * 14 + 10
+    ensureSpace(blockHeight + 20)
+    rule(y)
+    y -= 18
+    text(txt.label.toUpperCase(), margin, y, 7.5, fontB, C.muted)
+    y -= 14
+    for (const line of contentLines) {
+      ensureSpace(14)
+      text(line, margin, y, 9.5, fontR, C.black)
+      y -= 14
+    }
+    y -= 6
+  }
+
+  // Determine rendering order: either from layoutSections (user-configured) or default
+  const defaultOrder: PdfSection[] = [
+    { id: 'notes', label: 'Notes', visible: true },
+    { id: 'terms', label: 'Terms & Conditions', visible: true },
+    ...(globalTexts ?? []).map(gt => ({ id: `text-${gt.id}`, label: gt.label, visible: true, textId: gt.id })),
   ]
+  const orderedSections = layoutSections
+    ? layoutSections.filter(s => !s.locked)
+    : defaultOrder
 
-  const termsHeight = 12 + termsLines.length * 13
-  ensureSpace(termsHeight + 20)
-
-  rule(y)
-  y -= 18
-
-  page.drawRectangle({ x: margin, y: y - termsHeight + 14, width: col, height: termsHeight, color: C.termsBox })
-  page.drawRectangle({ x: margin, y: y - termsHeight + 14, width: col, height: termsHeight, borderColor: C.ruleLine, borderWidth: 0.5 })
-
-  y -= 4
-  for (let i = 0; i < termsLines.length; i++) {
-    const isHeader = i === 0
-    text(termsLines[i], margin + 10, y, isHeader ? 8 : 8.5, isHeader ? fontB : fontR, isHeader ? C.muted : C.black)
-    y -= 13
+  for (const section of orderedSections) {
+    if (!section.visible) continue
+    if (section.id === 'notes') {
+      if (isSectionVisible('notes')) drawNotesSection()
+    } else if (section.id === 'terms') {
+      if (isSectionVisible('terms')) drawTermsSection()
+    } else if (section.textId) {
+      const gt = (globalTexts ?? []).find(t => t.id === section.textId)
+      if (gt) drawGlobalTextSection(gt)
+    }
   }
 
   // ── Footer on last page ────────────────────────────────────────────────────

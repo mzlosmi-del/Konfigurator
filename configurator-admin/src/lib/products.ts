@@ -431,6 +431,29 @@ export async function fetchProductTexts(productId: string): Promise<ProductText[
     .from('product_texts')
     .select('*')
     .eq('product_id', productId)
+    .in('text_type', ['product', 'specification'])
+    .order('sort_order', { ascending: true })
+    .order('created_at', { ascending: true })
+  if (error) throw new Error(error.message)
+  return (data ?? []) as ProductText[]
+}
+
+export async function fetchAllProductTexts(productId: string): Promise<ProductText[]> {
+  const { data, error } = await supabase
+    .from('product_texts')
+    .select('*')
+    .eq('product_id', productId)
+    .order('sort_order', { ascending: true })
+    .order('created_at', { ascending: true })
+  if (error) throw new Error(error.message)
+  return (data ?? []) as ProductText[]
+}
+
+export async function fetchGlobalTexts(): Promise<ProductText[]> {
+  const { data, error } = await supabase
+    .from('product_texts')
+    .select('*')
+    .is('product_id', null)
     .order('sort_order', { ascending: true })
     .order('created_at', { ascending: true })
   if (error) throw new Error(error.message)
@@ -438,7 +461,7 @@ export async function fetchProductTexts(productId: string): Promise<ProductText[
 }
 
 export async function createProductText(
-  input: Pick<ProductText, 'product_id' | 'label' | 'content' | 'sort_order'>
+  input: Pick<ProductText, 'product_id' | 'label' | 'content' | 'text_type' | 'sort_order'>
 ): Promise<ProductText> {
   const { data, error } = await supabase
     .from('product_texts')
@@ -451,7 +474,7 @@ export async function createProductText(
 
 export async function updateProductText(
   id: string,
-  input: Partial<Pick<ProductText, 'label' | 'content' | 'sort_order'>>
+  input: Partial<Pick<ProductText, 'label' | 'content' | 'text_type' | 'sort_order'>>
 ): Promise<ProductText> {
   const { data, error } = await supabase
     .from('product_texts')
