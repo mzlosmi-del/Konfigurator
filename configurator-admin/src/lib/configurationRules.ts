@@ -52,6 +52,11 @@ export function evaluateRules(
     if (!conditionMet) continue
 
     switch (rule.rule_type) {
+      case 'price_override':
+        if (rule.effect.value_id && rule.effect.price_modifier !== undefined) {
+          result.priceOverrides[rule.effect.value_id] = rule.effect.price_modifier
+        }
+        break
       case 'hide_value':
         if (rule.effect.value_id) result.hiddenValues.add(rule.effect.value_id)
         break

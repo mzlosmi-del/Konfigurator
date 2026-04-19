@@ -55,10 +55,12 @@ export function ConfigureProductDialog({
       const valueId = selection[char.id]
       if (!valueId) continue
       const val = char.characteristic_values.find(v => v.id === valueId)
-      if (val) price += val.price_modifier
+      if (!val) continue
+      const effective = ruleEffect.priceOverrides[val.id] ?? val.price_modifier
+      price += effective
     }
     return Math.max(0, price)
-  }, [basePrice, characteristics, selection])
+  }, [basePrice, characteristics, selection, ruleEffect])
 
   function handleSelect(charId: string, valueId: string) {
     const next     = { ...selection, [charId]: valueId }
