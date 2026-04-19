@@ -11,7 +11,13 @@ export type AssetType = 'image' | 'render' | '3d_model'
 export type RuleType = 'hide_value' | 'disable_value' | 'price_override' | 'set_value_default' | 'set_value_locked'
 export type InquiryStatus = 'new' | 'read' | 'replied' | 'closed'
 export type QuoteStatus = 'sent' | 'expired'
-export type QuotationStatus = 'draft' | 'sent' | 'accepted' | 'rejected' | 'expired'
+export type QuotationStatus =
+  | 'in_preparation'
+  | 'confirmed_sent'
+  | 'accepted_no_changes'
+  | 'accepted_with_changes'
+  | 'rejected'
+  | 'expired'
 export type AdjustmentType = 'surcharge' | 'discount' | 'tax'
 
 export interface QuotationConfigItem {
@@ -266,6 +272,17 @@ export interface Database {
         Insert: Omit<Database['public']['Tables']['quotes']['Row'], 'created_at' | 'updated_at' | 'sent_at'> & { id?: string; sent_at?: string }
         Update: Partial<Database['public']['Tables']['quotes']['Insert']>
       }
+      quotation_rejection_reasons: {
+        Row: {
+          id:         string
+          tenant_id:  string
+          label:      string
+          sort_order: number
+          created_at: string
+        }
+        Insert: Omit<Database['public']['Tables']['quotation_rejection_reasons']['Row'], 'id' | 'created_at'> & { id?: string }
+        Update: Partial<Database['public']['Tables']['quotation_rejection_reasons']['Insert']>
+      }
       quotations: {
         Row: {
           id: string
@@ -285,6 +302,8 @@ export interface Database {
           line_items: Json      // QuotationLineItem[]
           adjustments: Json     // QuotationAdjustment[]
           pdf_url: string | null
+          rejection_reason_id: string | null
+          rejection_note:      string | null
           created_at: string
           updated_at: string
         }
@@ -339,5 +358,6 @@ export type CharacteristicClass  = Database['public']['Tables']['characteristic_
 export type ClassMember          = Database['public']['Tables']['characteristic_class_members']['Row']
 export type ProductClass         = Database['public']['Tables']['product_classes']['Row']
 export type PricingFormula       = Database['public']['Tables']['pricing_formulas']['Row']
-export type Quotation            = Database['public']['Tables']['quotations']['Row']
-export type ProductText          = Database['public']['Tables']['product_texts']['Row']
+export type Quotation                  = Database['public']['Tables']['quotations']['Row']
+export type ProductText                = Database['public']['Tables']['product_texts']['Row']
+export type QuotationRejectionReason   = Database['public']['Tables']['quotation_rejection_reasons']['Row']

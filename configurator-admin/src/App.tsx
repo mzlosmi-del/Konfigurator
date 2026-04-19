@@ -16,6 +16,7 @@ import { SettingsPage } from '@/pages/settings/SettingsPage'
 import { PreviewPage } from '@/pages/preview/PreviewPage'
 import { LibraryPage } from '@/pages/library/LibraryPage'
 import { QuotationsPage } from '@/pages/quotations/QuotationsPage'
+import { QuotationsReportPage } from '@/pages/quotations/QuotationsReportPage'
 import { QuotationFormPage } from '@/pages/quotations/QuotationFormPage'
 import { QuotationDetailPage } from '@/pages/quotations/QuotationDetailPage'
 
@@ -49,6 +50,7 @@ export function App() {
               <Route path="/inquiries" element={<InquiriesPage />} />
               <Route path="/inquiries/:id" element={<InquiryDetailPage />} />
               <Route path="/quotations" element={<QuotationsPage />} />
+              <Route path="/quotations/report" element={<QuotationsReportPage />} />
               <Route path="/quotations/new" element={<QuotationFormPage />} />
               <Route path="/quotations/:id" element={<QuotationDetailPage />} />
               <Route path="/quotations/:id/edit" element={<QuotationFormPage />} />

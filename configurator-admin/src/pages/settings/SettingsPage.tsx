@@ -1,13 +1,21 @@
-import { useRef, useState } from 'react'
-import { Upload } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { Check, Pencil, Plus, Trash2, Upload, X } from 'lucide-react'
 import { useAuthContext } from '@/components/auth/AuthContext'
 import { supabase } from '@/lib/supabase'
+import {
+  fetchRejectionReasons,
+  createRejectionReason,
+  updateRejectionReason,
+  deleteRejectionReason,
+} from '@/lib/quotations'
+import type { QuotationRejectionReason } from '@/types/database'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
 import { FormField } from '@/components/ui/form-field'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { useToast } from '@/hooks/useToast'
 import { Toaster } from '@/components/ui/toast'
 import { t } from '@/i18n'
@@ -75,6 +83,62 @@ export function SettingsPage() {
       toast({ title: t('Logo upload failed'), description: e instanceof Error ? e.message : undefined, variant: 'destructive' })
     } finally {
       setUploadingLogo(false)
+    }
+  }
+
+  // ── Rejection reasons ──────────────────────────────────────────────────────
+  const [reasons,    setReasons]    = useState<QuotationRejectionReason[]>([])
+  const [newLabel,   setNewLabel]   = useState('')
+  const [addingR,    setAddingR]    = useState(false)
+  const [editingRId, setEditingRId] = useState<string | null>(null)
+  const [editLabel,  setEditLabel]  = useState('')
+  const [savingR,    setSavingR]    = useState(false)
+  const [toDeleteR,  setToDeleteR]  = useState<QuotationRejectionReason | null>(null)
+  const [deletingR,  setDeletingR]  = useState(false)
+
+  useEffect(() => {
+    fetchRejectionReasons().then(setReasons).catch(() => {})
+  }, [])
+
+  async function handleAddReason() {
+    if (!newLabel.trim()) return
+    setAddingR(true)
+    try {
+      const r = await createRejectionReason(newLabel.trim(), reasons.length)
+      setReasons(prev => [...prev, r])
+      setNewLabel('')
+    } catch (e) {
+      toast({ title: t('Failed to add reason'), description: e instanceof Error ? e.message : undefined, variant: 'destructive' })
+    } finally {
+      setAddingR(false)
+    }
+  }
+
+  async function handleSaveReason() {
+    if (!editingRId || !editLabel.trim()) return
+    setSavingR(true)
+    try {
+      const r = await updateRejectionReason(editingRId, editLabel.trim())
+      setReasons(prev => prev.map(x => x.id === editingRId ? r : x))
+      setEditingRId(null)
+    } catch (e) {
+      toast({ title: t('Failed to save reason'), description: e instanceof Error ? e.message : undefined, variant: 'destructive' })
+    } finally {
+      setSavingR(false)
+    }
+  }
+
+  async function handleDeleteReason() {
+    if (!toDeleteR) return
+    setDeletingR(true)
+    try {
+      await deleteRejectionReason(toDeleteR.id)
+      setReasons(prev => prev.filter(x => x.id !== toDeleteR.id))
+      setToDeleteR(null)
+    } catch (e) {
+      toast({ title: t('Failed to delete reason'), description: e instanceof Error ? e.message : undefined, variant: 'destructive' })
+    } finally {
+      setDeletingR(false)
     }
   }
 
@@ -210,6 +274,82 @@ export function SettingsPage() {
             </Button>
           </CardContent>
         </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">{t('Rejection Reasons')}</CardTitle>
+            <CardDescription>
+              {t('Predefined reasons shown when marking a quotation as rejected.')}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {reasons.length === 0 && (
+              <p className="text-sm text-muted-foreground">{t('No reasons defined yet.')}</p>
+            )}
+            <div className="space-y-1.5">
+              {reasons.map(r => (
+                editingRId === r.id ? (
+                  <div key={r.id} className="flex items-center gap-2">
+                    <Input
+                      value={editLabel}
+                      onChange={e => setEditLabel(e.target.value)}
+                      className="flex-1 h-8 text-sm"
+                      autoFocus
+                      onKeyDown={e => { if (e.key === 'Enter') handleSaveReason(); if (e.key === 'Escape') setEditingRId(null) }}
+                    />
+                    <Button size="icon" className="h-8 w-8 shrink-0" onClick={handleSaveReason} loading={savingR}>
+                      <Check className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button size="icon" variant="ghost" className="h-8 w-8 shrink-0" onClick={() => setEditingRId(null)} disabled={savingR}>
+                      <X className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                ) : (
+                  <div key={r.id} className="flex items-center gap-2 group">
+                    <span className="flex-1 text-sm py-1">{r.label}</span>
+                    <Button
+                      size="icon" variant="ghost"
+                      className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
+                      onClick={() => { setEditingRId(r.id); setEditLabel(r.label) }}
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button
+                      size="icon" variant="ghost"
+                      className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
+                      onClick={() => setToDeleteR(r)}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                )
+              ))}
+            </div>
+            <div className="flex items-center gap-2 pt-1">
+              <Input
+                value={newLabel}
+                onChange={e => setNewLabel(e.target.value)}
+                placeholder={t('e.g. Price too high')}
+                className="flex-1 h-8 text-sm"
+                onKeyDown={e => { if (e.key === 'Enter') handleAddReason() }}
+              />
+              <Button size="sm" onClick={handleAddReason} loading={addingR} disabled={!newLabel.trim()}>
+                <Plus className="h-3.5 w-3.5 mr-1" />
+                {t('Add')}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        <ConfirmDialog
+          open={!!toDeleteR}
+          onOpenChange={open => { if (!open) setToDeleteR(null) }}
+          title={t('Delete rejection reason')}
+          description={t('This reason will be removed. Existing quotations linked to it will keep the reference but the label will no longer resolve.')}
+          confirmLabel={t('Delete')}
+          onConfirm={handleDeleteReason}
+          loading={deletingR}
+        />
 
         <Card>
           <CardHeader>

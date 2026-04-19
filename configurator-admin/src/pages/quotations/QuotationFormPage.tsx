@@ -278,7 +278,7 @@ export function QuotationFormPage() {
     return true
   }
 
-  async function doSave(status: 'draft' | 'sent' = 'draft'): Promise<string | null> {
+  async function doSave(status: 'in_preparation' | 'confirmed_sent' = 'in_preparation'): Promise<string | null> {
     if (!validate()) return null
     setSaving(true)
     try {
@@ -310,7 +310,9 @@ export function QuotationFormPage() {
         const q = await createQuotation({
           ...payload,
           reference_number: generateReferenceNumber(),
-          pdf_url:          null,
+          pdf_url:             null,
+          rejection_reason_id: null,
+          rejection_note:      null,
         })
         return q.id
       }
@@ -323,12 +325,12 @@ export function QuotationFormPage() {
   }
 
   async function handleSaveDraft() {
-    const savedId = await doSave('draft')
+    const savedId = await doSave('in_preparation')
     if (savedId) navigate(`/quotations/${savedId}`)
   }
 
   async function handleSaveAndPdf() {
-    const savedId = await doSave('sent')
+    const savedId = await doSave('confirmed_sent')
     if (!savedId) return
     setGeneratingPdf(true)
     try {
