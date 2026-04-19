@@ -209,19 +209,19 @@ export function QuotationFormPage() {
     return lineItems
       .filter(li => li.product_id)
       .map(li => {
-        const product  = products.find(p => p.id === li.product_id)
-        const chars    = detailsCache[li.product_id] ?? []
-        const rules    = rulesCache[li.product_id]   ?? []
+        const product    = products.find(p => p.id === li.product_id)
+        const chars      = detailsCache[li.product_id] ?? []
+        const rules      = rulesCache[li.product_id]   ?? []
         const ruleEffect = evaluateRules(rules, li.selection)
         const config: QuotationConfigItem[] = []
-        let   unitPrice = product?.base_price ?? 0
+        let   unitPrice = Number(product?.base_price ?? 0)
 
         for (const char of chars) {
           const valueId = li.selection[char.id]
           if (!valueId) continue
           const value = char.characteristic_values.find(v => v.id === valueId)
           if (!value) continue
-          const effective = ruleEffect.priceOverrides[value.id] ?? value.price_modifier
+          const effective = ruleEffect.priceOverrides[value.id] ?? Number(value.price_modifier)
           config.push({
             characteristic_id:   char.id,
             characteristic_name: char.name,
@@ -607,13 +607,13 @@ function LineItemRow({
 
   // Compute current unit price from selection (respecting price_override rules)
   const lineRuleEffect = evaluateRules(rules, item.selection)
-  let unitPrice = product?.base_price ?? 0
+  let unitPrice = Number(product?.base_price ?? 0)
   for (const char of details) {
     const valueId = item.selection[char.id]
     if (!valueId) continue
     const v = char.characteristic_values.find(v => v.id === valueId)
     if (!v) continue
-    unitPrice += lineRuleEffect.priceOverrides[v.id] ?? v.price_modifier
+    unitPrice += lineRuleEffect.priceOverrides[v.id] ?? Number(v.price_modifier)
   }
   unitPrice = Math.max(0, unitPrice)
 
