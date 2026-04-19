@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, Pencil, FileText } from 'lucide-react'
-import { fetchQuotation, updateQuotation, calcSubtotal, calcTotal } from '@/lib/quotations'
+import { ArrowLeft, Pencil, FileText, CloudUpload, Download } from 'lucide-react'
+import { fetchQuotation, updateQuotation, uploadQuotationPdf, calcSubtotal, calcTotal } from '@/lib/quotations'
 import { buildQuotationPdfBytes, openPdfBlob, type TenantProfile } from '@/lib/quotationPdf'
 import { useAuthContext } from '@/components/auth/AuthContext'
 import type { Quotation, QuotationStatus, QuotationLineItem, QuotationAdjustment } from '@/types/database'
@@ -12,6 +12,7 @@ import { Select } from '@/components/ui/select'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 import { Spinner } from '@/components/ui/spinner'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { useToast } from '@/hooks/useToast'
 import { Toaster } from '@/components/ui/toast'
 import { t } from '@/i18n'
@@ -36,6 +37,9 @@ export function QuotationDetailPage() {
   const [loading,        setLoading]        = useState(true)
   const [updatingStatus, setUpdatingStatus] = useState(false)
   const [generatingPdf,  setGeneratingPdf]  = useState(false)
+  const [savingPdf,      setSavingPdf]      = useState(false)
+  const [pendingBytes,   setPendingBytes]   = useState<Uint8Array | null>(null)
+  const [confirmSave,    setConfirmSave]    = useState(false)
 
   useEffect(() => {
     if (!id) return
@@ -45,6 +49,18 @@ export function QuotationDetailPage() {
       .catch(() => toast({ title: t('Failed to load quotation'), variant: 'destructive' }))
       .finally(() => setLoading(false))
   }, [id])
+
+  function buildTenantProfile(): TenantProfile {
+    return {
+      name:            tenant?.name            ?? 'Your store',
+      logo_url:        (tenant as any)?.logo_url,
+      company_address: (tenant as any)?.company_address,
+      company_phone:   (tenant as any)?.company_phone,
+      company_email:   (tenant as any)?.company_email,
+      company_website: (tenant as any)?.company_website,
+      contact_person:  (tenant as any)?.contact_person,
+    }
+  }
 
   async function handleStatusChange(status: QuotationStatus) {
     if (!id || !quotation) return
@@ -64,21 +80,30 @@ export function QuotationDetailPage() {
     if (!quotation) return
     setGeneratingPdf(true)
     try {
-      const tenantProfile: TenantProfile = {
-        name:            tenant?.name            ?? 'Your store',
-        logo_url:        (tenant as any)?.logo_url,
-        company_address: (tenant as any)?.company_address,
-        company_phone:   (tenant as any)?.company_phone,
-        company_email:   (tenant as any)?.company_email,
-        company_website: (tenant as any)?.company_website,
-        contact_person:  (tenant as any)?.contact_person,
-      }
-      const bytes = await buildQuotationPdfBytes(tenantProfile, quotation)
+      const bytes = await buildQuotationPdfBytes(buildTenantProfile(), quotation)
       openPdfBlob(bytes)
+      setPendingBytes(bytes)
+      setConfirmSave(true)
     } catch (err) {
       toast({ title: t('Failed to generate PDF'), description: String(err), variant: 'destructive' })
     } finally {
       setGeneratingPdf(false)
+    }
+  }
+
+  async function handleSavePdf() {
+    if (!id || !quotation || !pendingBytes) return
+    setSavingPdf(true)
+    try {
+      const url = await uploadQuotationPdf(id, quotation.tenant_id, pendingBytes)
+      setQuotation(prev => prev ? { ...prev, pdf_url: url } : prev)
+      setPendingBytes(null)
+      toast({ title: t('PDF saved to cloud') })
+    } catch (err) {
+      toast({ title: t('Failed to save PDF'), description: String(err), variant: 'destructive' })
+    } finally {
+      setSavingPdf(false)
+      setConfirmSave(false)
     }
   }
 
@@ -125,6 +150,14 @@ export function QuotationDetailPage() {
         }
         action={
           <div className="flex items-center gap-2">
+            {quotation.pdf_url && (
+              <Button variant="outline" asChild>
+                <a href={quotation.pdf_url} target="_blank" rel="noopener noreferrer">
+                  <Download className="h-4 w-4 mr-1.5" />
+                  {t('Download PDF')}
+                </a>
+              </Button>
+            )}
             <Button variant="outline" onClick={() => navigate(`/quotations/${id}/edit`)}>
               <Pencil className="h-4 w-4 mr-1.5" />
               {t('Edit')}
@@ -161,6 +194,12 @@ export function QuotationDetailPage() {
             <span className="text-sm text-muted-foreground">
               {t('Valid until')}: {new Date(quotation.valid_until).toLocaleDateString()}
             </span>
+          )}
+          {quotation.pdf_url && (
+            <Badge variant="outline" className="text-xs text-muted-foreground gap-1">
+              <CloudUpload className="h-3 w-3" />
+              {t('PDF saved')}
+            </Badge>
           )}
         </div>
 
@@ -300,6 +339,16 @@ export function QuotationDetailPage() {
           </Card>
         )}
       </div>
+
+      <ConfirmDialog
+        open={confirmSave}
+        onOpenChange={open => { if (!open) setConfirmSave(false) }}
+        title={t('Save PDF to cloud?')}
+        description={t('The PDF will be stored in Supabase storage and a permanent download link will be attached to this quotation.')}
+        confirmLabel={t('Save PDF')}
+        onConfirm={handleSavePdf}
+        loading={savingPdf}
+      />
 
       <Toaster toasts={toasts} onDismiss={dismiss} />
     </div>

@@ -55,6 +55,22 @@ export async function generateQuotationPdf(id: string): Promise<{ pdf_url: strin
   return data as { pdf_url: string }
 }
 
+export async function uploadQuotationPdf(
+  quotationId: string,
+  tenantId: string,
+  bytes: Uint8Array,
+): Promise<string> {
+  const path = `${tenantId}/quotations/${quotationId}.pdf`
+  const { error } = await supabase.storage
+    .from('quotes')
+    .upload(path, bytes.buffer as ArrayBuffer, { upsert: true, contentType: 'application/pdf' })
+  if (error) throw new Error(error.message)
+  const { data } = supabase.storage.from('quotes').getPublicUrl(path)
+  const url = data.publicUrl
+  await updateQuotation(quotationId, { pdf_url: url })
+  return url
+}
+
 export function calcSubtotal(items: QuotationLineItem[]): number {
   return items.reduce((sum, item) => sum + item.unit_price * item.quantity, 0)
 }

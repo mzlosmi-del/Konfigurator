@@ -5,6 +5,7 @@ import {
   fetchQuotation,
   createQuotation,
   updateQuotation,
+  uploadQuotationPdf,
   calcSubtotal,
   calcTotal,
   generateReferenceNumber,
@@ -27,6 +28,7 @@ import type {
 } from '@/types/database'
 import type { CharacteristicWithValues } from '@/lib/products'
 import { ConfigureProductDialog } from './ConfigureProductDialog'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -102,6 +104,8 @@ export function QuotationFormPage() {
   // ── Saving state ───────────────────────────────────────────────────────────
   const [saving,        setSaving]        = useState(false)
   const [generatingPdf, setGeneratingPdf] = useState(false)
+  const [savingPdf,     setSavingPdf]     = useState(false)
+  const [pendingSave,   setPendingSave]   = useState<{ bytes: Uint8Array; quotationId: string; tenantId: string } | null>(null)
 
   // ── Load products + (in edit mode) existing quotation ─────────────────────
   useEffect(() => {
@@ -340,12 +344,27 @@ export function QuotationFormPage() {
       }
       const bytes = await buildQuotationPdfBytes(tenantProfile, savedQuotation)
       openPdfBlob(bytes)
-      navigate(`/quotations/${savedId}`)
+      setPendingSave({ bytes, quotationId: savedId, tenantId: savedQuotation.tenant_id })
     } catch (err) {
       toast({ title: t('Failed to generate PDF'), description: String(err), variant: 'destructive' })
       navigate(`/quotations/${savedId}`)
     } finally {
       setGeneratingPdf(false)
+    }
+  }
+
+  async function handleConfirmSavePdf() {
+    if (!pendingSave) return
+    setSavingPdf(true)
+    try {
+      await uploadQuotationPdf(pendingSave.quotationId, pendingSave.tenantId, pendingSave.bytes)
+      toast({ title: t('PDF saved to cloud') })
+    } catch (err) {
+      toast({ title: t('Failed to save PDF'), description: String(err), variant: 'destructive' })
+    } finally {
+      setSavingPdf(false)
+      navigate(`/quotations/${pendingSave.quotationId}`)
+      setPendingSave(null)
     }
   }
 
@@ -543,6 +562,16 @@ export function QuotationFormPage() {
           </Button>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={!!pendingSave}
+        onOpenChange={open => { if (!open) { navigate(`/quotations/${pendingSave?.quotationId}`); setPendingSave(null) } }}
+        title={t('Save PDF to cloud?')}
+        description={t('The PDF will be stored in Supabase storage and a permanent download link will be attached to this quotation.')}
+        confirmLabel={t('Save PDF')}
+        onConfirm={handleConfirmSavePdf}
+        loading={savingPdf}
+      />
 
       <Toaster toasts={toasts} onDismiss={dismiss} />
     </div>
