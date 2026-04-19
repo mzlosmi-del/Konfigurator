@@ -29,13 +29,15 @@ ALTER TABLE public.quotations
   ADD COLUMN IF NOT EXISTS rejection_reason_id uuid REFERENCES public.quotation_rejection_reasons(id) ON DELETE SET NULL,
   ADD COLUMN IF NOT EXISTS rejection_note      text;
 
--- 3. Migrate existing status values to new slugs
-UPDATE public.quotations SET status = 'in_preparation'     WHERE status = 'draft';
-UPDATE public.quotations SET status = 'confirmed_sent'      WHERE status = 'sent';
-UPDATE public.quotations SET status = 'accepted_no_changes' WHERE status = 'accepted';
-
--- 4. Replace the CHECK constraint
+-- 3. Drop the old CHECK constraint first so the status UPDATEs below are not blocked
 ALTER TABLE public.quotations DROP CONSTRAINT IF EXISTS quotations_status_check;
+
+-- 4. Migrate existing status values to new slugs
+UPDATE public.quotations SET status = 'in_preparation'      WHERE status = 'draft';
+UPDATE public.quotations SET status = 'confirmed_sent'       WHERE status = 'sent';
+UPDATE public.quotations SET status = 'accepted_no_changes'  WHERE status = 'accepted';
+
+-- 5. Add the new CHECK constraint (validates all existing rows)
 ALTER TABLE public.quotations
   ADD CONSTRAINT quotations_status_check
   CHECK (status IN (
