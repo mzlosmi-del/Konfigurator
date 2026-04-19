@@ -9,13 +9,13 @@ ALTER TABLE public.products
   ADD COLUMN IF NOT EXISTS unit_of_measure text;
 
 -- Uniqueness of SKU is scoped per tenant; nulls are exempt (partial index)
-CREATE UNIQUE INDEX products_tenant_sku_uniq
+CREATE UNIQUE INDEX IF NOT EXISTS products_tenant_sku_uniq
   ON public.products (tenant_id, sku)
   WHERE sku IS NOT NULL;
 
 -- ── product_texts ─────────────────────────────────────────────────────────────
 
-CREATE TABLE public.product_texts (
+CREATE TABLE IF NOT EXISTS public.product_texts (
   id         uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id  uuid        NOT NULL DEFAULT auth_tenant_id()
                REFERENCES public.tenants(id) ON DELETE CASCADE,
@@ -28,16 +28,30 @@ CREATE TABLE public.product_texts (
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE INDEX idx_product_texts_product_id ON public.product_texts (product_id);
+CREATE INDEX IF NOT EXISTS idx_product_texts_product_id ON public.product_texts (product_id);
 
 ALTER TABLE public.product_texts ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "product_texts: tenant access"
-  ON public.product_texts FOR ALL
-  TO authenticated
-  USING  (tenant_id = auth_tenant_id())
-  WITH CHECK (tenant_id = auth_tenant_id());
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'public' AND tablename = 'product_texts' AND policyname = 'product_texts: tenant access'
+  ) THEN
+    CREATE POLICY "product_texts: tenant access"
+      ON public.product_texts FOR ALL
+      TO authenticated
+      USING  (tenant_id = auth_tenant_id())
+      WITH CHECK (tenant_id = auth_tenant_id());
+  END IF;
+END $$;
 
-CREATE TRIGGER product_texts_updated_at
-  BEFORE UPDATE ON public.product_texts
-  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_trigger
+    WHERE tgname = 'product_texts_updated_at'
+  ) THEN
+    CREATE TRIGGER product_texts_updated_at
+      BEFORE UPDATE ON public.product_texts
+      FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+  END IF;
+END $$;

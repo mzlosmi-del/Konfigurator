@@ -1,7 +1,7 @@
 -- Migration 021: Extended quotation statuses + rejection reasons
 
 -- 1. Create rejection reasons lookup table (must exist before FK)
-CREATE TABLE public.quotation_rejection_reasons (
+CREATE TABLE IF NOT EXISTS public.quotation_rejection_reasons (
   id         uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id  uuid        NOT NULL DEFAULT auth_tenant_id()
                          REFERENCES public.tenants(id) ON DELETE CASCADE,
@@ -12,10 +12,17 @@ CREATE TABLE public.quotation_rejection_reasons (
 
 ALTER TABLE public.quotation_rejection_reasons ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "tenant isolation"
-  ON public.quotation_rejection_reasons
-  USING (tenant_id = auth_tenant_id())
-  WITH CHECK (tenant_id = auth_tenant_id());
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'public' AND tablename = 'quotation_rejection_reasons' AND policyname = 'tenant isolation'
+  ) THEN
+    CREATE POLICY "tenant isolation"
+      ON public.quotation_rejection_reasons
+      USING (tenant_id = auth_tenant_id())
+      WITH CHECK (tenant_id = auth_tenant_id());
+  END IF;
+END $$;
 
 -- 2. Add rejection columns to quotations
 ALTER TABLE public.quotations

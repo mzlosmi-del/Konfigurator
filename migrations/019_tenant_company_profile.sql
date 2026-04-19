@@ -14,8 +14,15 @@ VALUES ('logos', 'logos', true)
 ON CONFLICT (id) DO NOTHING;
 
 -- Authenticated users may manage objects in this bucket
-CREATE POLICY "logos: authenticated access"
-  ON storage.objects FOR ALL
-  TO authenticated
-  USING  (bucket_id = 'logos')
-  WITH CHECK (bucket_id = 'logos');
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'storage' AND tablename = 'objects' AND policyname = 'logos: authenticated access'
+  ) THEN
+    CREATE POLICY "logos: authenticated access"
+      ON storage.objects FOR ALL
+      TO authenticated
+      USING  (bucket_id = 'logos')
+      WITH CHECK (bucket_id = 'logos');
+  END IF;
+END $$;
