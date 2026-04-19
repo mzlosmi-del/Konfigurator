@@ -98,7 +98,7 @@ export async function buildQuotationPdfBytes(
   }
 
   // ── Section 1: Header — logo left, quotation title right ──────────────────
-  const logoBoxW = 140, logoBoxH = 56
+  const logoBoxW = 140, logoBoxH = 76
   const logoBoxX = margin, logoBoxY = H - margin - logoBoxH
 
   // Try to embed logo image; fall back to gray placeholder
@@ -247,14 +247,21 @@ export async function buildQuotationPdfBytes(
       const cfg       = Array.isArray(item.configuration) ? item.configuration : []
       const texts_    = productTexts?.[item.product_id] ?? []
 
-      // Estimate row height
-      const skuLines  = item.product_sku ? 1 : 0
-      const rowHeight = 14 + (skuLines * 11) + cfg.length * 11 + texts_.length * 14 + 10
+      // Compute exact row height
+      const wrapW = col - 28 - colUnit
+      let rowHeight = 12  // product name line
+      if (item.product_sku) rowHeight += 11
+      rowHeight += cfg.length * 11
+      for (const pt of texts_) {
+        rowHeight += 11  // label
+        rowHeight += wrapText(pt.content, fontR, 8, wrapW).length * 11
+      }
+      rowHeight += 10  // bottom padding
       ensureSpace(rowHeight)
 
-      // Alternating row bg
+      // Alternating row bg (covers full row plus 4pt top padding)
       const bgColor = i % 2 === 1 ? C.rowAlt : undefined
-      if (bgColor) page.drawRectangle({ x: margin, y: y - rowHeight + 14, width: col, height: rowHeight, color: bgColor })
+      if (bgColor) page.drawRectangle({ x: margin, y: y - rowHeight + 4, width: col, height: rowHeight + 4, color: bgColor })
 
       const rowStartY = y
 
