@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 import { Plus, Trash2, Star, StarOff, Upload, Link, ArrowUp, ArrowDown } from 'lucide-react'
-import { supabase } from '@/lib/supabase'
 import {
   fetchAssetsForProduct,
   createAsset,
@@ -9,8 +8,8 @@ import {
   reorderAssets,
   uploadAssetFile,
 } from '@/lib/assets'
-import { fetchProductCharacteristics } from '@/lib/products'
-import type { VisualizationAsset, AssetType, ProductCharacteristic, Characteristic } from '@/types/database'
+import { fetchProductCharacteristicsWithValues, type CharacteristicWithValues } from '@/lib/products'
+import type { VisualizationAsset, AssetType } from '@/types/database'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
@@ -22,9 +21,6 @@ import { Toaster } from '@/components/ui/toast'
 import { useAuthContext } from '@/components/auth/AuthContext'
 import { t } from '@/i18n'
 
-type AttachedChar = ProductCharacteristic & {
-  characteristic: Characteristic & { values: { id: string; label: string }[] }
-}
 
 interface Props {
   productId: string
@@ -62,7 +58,7 @@ export function VisualizationPanel({ productId }: Props) {
 
   const [loading, setLoading] = useState(true)
   const [assets, setAssets] = useState<VisualizationAsset[]>([])
-  const [chars, setChars] = useState<AttachedChar[]>([])
+  const [chars, setChars] = useState<CharacteristicWithValues[]>([])
   const [showAddForm, setShowAddForm] = useState(false)
   const [form, setForm] = useState<AddFormState>(emptyForm())
   const [saving, setSaving] = useState(false)
@@ -76,28 +72,12 @@ export function VisualizationPanel({ productId }: Props) {
   async function load() {
     setLoading(true)
     try {
-      const [assetData, charData] = await Promise.all([
+      const [assetData, charsData] = await Promise.all([
         fetchAssetsForProduct(productId),
-        fetchProductCharacteristics(productId),
+        fetchProductCharacteristicsWithValues(productId),
       ])
       setAssets(assetData)
-      const fullChars: AttachedChar[] = await Promise.all(
-        charData.map(async (pc) => {
-          const { data: vals } = await supabase
-            .from('characteristic_values')
-            .select('id, label')
-            .eq('characteristic_id', pc.characteristic_id)
-            .order('sort_order', { ascending: true })
-          return {
-            ...pc,
-            characteristic: {
-              ...(pc as any).characteristic,
-              values: vals ?? [],
-            },
-          } as AttachedChar
-        })
-      )
-      setChars(fullChars)
+      setChars(charsData)
     } catch {
       toast({ title: 'Failed to load visualization assets', variant: 'destructive' })
     } finally {
@@ -105,10 +85,10 @@ export function VisualizationPanel({ productId }: Props) {
     }
   }
 
-  const allValues = chars.flatMap(pc =>
-    pc.characteristic.values.map(v => ({
+  const allValues = chars.flatMap(c =>
+    c.characteristic_values.map(v => ({
       id: v.id,
-      label: `${pc.characteristic.name} → ${v.label}`,
+      label: `${c.name} → ${v.label}`,
     }))
   )
 

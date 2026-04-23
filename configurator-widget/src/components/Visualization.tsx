@@ -20,11 +20,7 @@ export function Visualization({ assets, selection }: Props) {
   }, [url])
 
   if (!url || failed) {
-    return (
-      <div class="cw-visual">
-        <div class="cw-visual-placeholder">{t('No image available')}</div>
-      </div>
-    )
+    return null
   }
 
   return (
