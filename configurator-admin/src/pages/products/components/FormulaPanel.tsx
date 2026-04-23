@@ -188,6 +188,7 @@ export function FormulaPanel({ productId }: Props) {
                     onChange={node => setEditFormulas(prev => ({ ...prev, [f.id]: node }))}
                     characteristics={characteristics}
                     valuesMap={valuesMap}
+                    otherFormulas={formulas.filter(other => other.id !== f.id)}
                     isRoot
                   />
                 </div>
@@ -226,6 +227,7 @@ export function FormulaPanel({ productId }: Props) {
               onChange={setNewFormula}
               characteristics={characteristics}
               valuesMap={valuesMap}
+              otherFormulas={formulas}
               isRoot
             />
           </div>

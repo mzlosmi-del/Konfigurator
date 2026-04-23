@@ -54,6 +54,7 @@ export type FormulaNode =
   | { type: 'modifier'; char_id: string }                                  // price_modifier of selected value
   | { type: 'input'; char_id: string }                                     // numeric user input
   | { type: 'is_selected'; char_id: string; value_id: string }             // boolean: is value selected
+  | { type: 'formula_result'; formula_id: string }                         // result of another formula
   | { type: 'add' | 'subtract' | 'multiply' | 'divide'; left: FormulaNode; right: FormulaNode }
   | { type: 'gt' | 'gte' | 'lt' | 'lte' | 'eq'; left: FormulaNode; right: FormulaNode }
   | { type: 'and' | 'or'; left: FormulaNode; right: FormulaNode }

@@ -1,4 +1,4 @@
-import type { FormulaNode } from '@/types/database'
+import type { FormulaNode, PricingFormula } from '@/types/database'
 import type { Characteristic, CharacteristicValue } from '@/types/database'
 import { t } from '@/i18n'
 
@@ -7,7 +7,7 @@ import { t } from '@/i18n'
 type NodeType = FormulaNode['type']
 
 const NODE_GROUPS: { label: string; types: NodeType[] }[] = [
-  { label: 'Values',      types: ['number', 'base_price', 'modifier', 'input'] },
+  { label: 'Values',      types: ['number', 'base_price', 'modifier', 'input', 'formula_result'] },
   { label: 'Selection',   types: ['is_selected'] },
   { label: 'Arithmetic',  types: ['add', 'subtract', 'multiply', 'divide'] },
   { label: 'Compare',     types: ['gt', 'gte', 'lt', 'lte', 'eq'] },
@@ -20,7 +20,8 @@ const NODE_LABELS: Record<NodeType, string> = {
   base_price:  'Base price',
   modifier:    'Price modifier of',
   input:       'Numeric input',
-  is_selected: 'Is selected',
+  is_selected:     'Is selected',
+  formula_result:  'Result of formula',
   add:         'Add (+)',
   subtract:    'Subtract (−)',
   multiply:    'Multiply (×)',
@@ -52,8 +53,9 @@ function defaultNode(nodeType: NodeType, firstCharId = '', firstValueId = ''): F
     case 'base_price':  return { type: 'base_price' }
     case 'modifier':    return { type: 'modifier', char_id: firstCharId }
     case 'input':       return { type: 'input', char_id: firstCharId }
-    case 'is_selected': return { type: 'is_selected', char_id: firstCharId, value_id: firstValueId }
-    case 'if':          return { type: 'if', condition: zero, then: zero, else_node: zero }
+    case 'is_selected':     return { type: 'is_selected', char_id: firstCharId, value_id: firstValueId }
+    case 'formula_result':  return { type: 'formula_result', formula_id: '' }
+    case 'if':              return { type: 'if', condition: zero, then: zero, else_node: zero }
     default:            return { type: nodeType, left: zero, right: zero } as FormulaNode
   }
 }
@@ -63,11 +65,13 @@ function defaultNode(nodeType: NodeType, firstCharId = '', firstValueId = ''): F
 function formulaToString(
   node: FormulaNode,
   chars: Characteristic[],
-  valuesMap: Record<string, CharacteristicValue[]>
+  valuesMap: Record<string, CharacteristicValue[]>,
+  formulas: Pick<PricingFormula, 'id' | 'name'>[] = []
 ): string {
-  const charName  = (id: string) => chars.find(c => c.id === id)?.name ?? '?'
-  const valueName = (cId: string, vId: string) => valuesMap[cId]?.find(v => v.id === vId)?.label ?? '?'
-  const s = (n: FormulaNode): string => formulaToString(n, chars, valuesMap)
+  const charName    = (id: string) => chars.find(c => c.id === id)?.name ?? '?'
+  const valueName   = (cId: string, vId: string) => valuesMap[cId]?.find(v => v.id === vId)?.label ?? '?'
+  const formulaName = (id: string) => formulas.find(f => f.id === id)?.name ?? '?'
+  const s = (n: FormulaNode): string => formulaToString(n, chars, valuesMap, formulas)
 
   switch (node.type) {
     case 'number':      return String(node.value)
@@ -88,7 +92,8 @@ function formulaToString(
     case 'eq':          return `(${s(node.left)} = ${s(node.right)})`
     case 'and':         return `(${s(node.left)} AND ${s(node.right)})`
     case 'or':          return `(${s(node.left)} OR ${s(node.right)})`
-    case 'if':          return `IF ${s(node.condition)} THEN ${s(node.then)} ELSE ${s(node.else_node)}`
+    case 'formula_result': return node.formula_id ? `[${formulaName(node.formula_id)}]` : '[formula ?]'
+    case 'if':             return `IF ${s(node.condition)} THEN ${s(node.then)} ELSE ${s(node.else_node)}`
   }
 }
 
@@ -299,13 +304,15 @@ interface FormulaBuilderProps {
   onChange: (node: FormulaNode) => void
   characteristics: Characteristic[]
   valuesMap: Record<string, CharacteristicValue[]>
+  /** Other formulas available to reference; exclude self to prevent cycles */
+  otherFormulas?: Pick<PricingFormula, 'id' | 'name'>[]
   /** When true, show the preview string and templates (only at root level) */
   isRoot?: boolean
 }
 
 // ── Main recursive component ──────────────────────────────────────────────────
 
-export function FormulaBuilder({ node, onChange, characteristics, valuesMap, isRoot = false }: FormulaBuilderProps) {
+export function FormulaBuilder({ node, onChange, characteristics, valuesMap, otherFormulas = [], isRoot = false }: FormulaBuilderProps) {
   const selectChars  = characteristics.filter(c => c.display_type !== 'number')
   const numberChars  = characteristics.filter(c => c.display_type === 'number')
   const firstCharId  = selectChars[0]?.id ?? characteristics[0]?.id ?? ''
@@ -329,7 +336,7 @@ export function FormulaBuilder({ node, onChange, characteristics, valuesMap, isR
     </SmallSelect>
   )
 
-  const childProps = { characteristics, valuesMap }
+  const childProps = { characteristics, valuesMap, otherFormulas }
 
   // ── Root wrapper: preview + templates ─────────────────────────────────────
   const inner = renderNode()
@@ -339,7 +346,7 @@ export function FormulaBuilder({ node, onChange, characteristics, valuesMap, isR
       <div className="space-y-4">
         {/* Preview */}
         <div className="rounded bg-muted/40 px-3 py-2 font-mono text-xs text-foreground break-all">
-          {formulaToString(node, characteristics, valuesMap)}
+          {formulaToString(node, characteristics, valuesMap, otherFormulas)}
         </div>
 
         {/* Templates */}
@@ -472,6 +479,37 @@ export function FormulaBuilder({ node, onChange, characteristics, valuesMap, isR
               </>
             )}
           </div>
+        </div>
+      )
+    }
+
+    // ── formula_result ────────────────────────────────────────────────────────
+    if (node.type === 'formula_result') {
+      return (
+        <div className="flex items-center gap-2 flex-wrap">
+          {typeSelector}
+          <span className="text-xs text-muted-foreground">→</span>
+          {otherFormulas.length === 0 ? (
+            <span className="text-xs text-muted-foreground italic">{t('No other formulas available')}</span>
+          ) : (
+            <div className="flex flex-wrap gap-1">
+              {otherFormulas.map(f => (
+                <button
+                  key={f.id}
+                  type="button"
+                  onClick={() => onChange({ type: 'formula_result', formula_id: f.id })}
+                  className={[
+                    'px-2 py-0.5 rounded-full text-xs border font-medium transition-colors',
+                    node.formula_id === f.id
+                      ? 'bg-primary text-primary-foreground border-primary'
+                      : 'bg-background border-input hover:bg-muted',
+                  ].join(' ')}
+                >
+                  {f.name}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       )
     }

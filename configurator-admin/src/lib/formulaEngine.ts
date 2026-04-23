@@ -6,6 +6,7 @@ export interface FormulaContext {
   selection:       Record<string, string>
   numericInputs:   Record<string, number>
   characteristics: CharacteristicWithValues[]
+  formulaResults?: Record<string, number>  // accumulated results of preceding formulas
 }
 
 export function evaluateFormula(node: FormulaNode, ctx: FormulaContext): number | boolean {
@@ -29,6 +30,9 @@ export function evaluateFormula(node: FormulaNode, ctx: FormulaContext): number 
 
     case 'is_selected':
       return ctx.selection[node.char_id] === node.value_id
+
+    case 'formula_result':
+      return ctx.formulaResults?.[node.formula_id] ?? 0
 
     case 'add':
       return (evaluateFormula(node.left, ctx) as number) + (evaluateFormula(node.right, ctx) as number)
@@ -78,10 +82,13 @@ export function evaluateFormula(node: FormulaNode, ctx: FormulaContext): number 
 
 export function calculateFormulaTotal(formulas: PricingFormula[], ctx: FormulaContext): number {
   let total = 0
+  const formulaResults: Record<string, number> = { ...ctx.formulaResults }
   for (const f of formulas) {
     if (!f.is_active) continue
     try {
-      total += evaluateFormula(f.formula as FormulaNode, ctx) as number
+      const result = evaluateFormula(f.formula as FormulaNode, { ...ctx, formulaResults }) as number
+      formulaResults[f.id] = result
+      total += result
     } catch {
       // malformed formula — skip
     }

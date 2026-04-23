@@ -5,6 +5,7 @@ export interface FormulaContext {
   selection: Selection
   numericInputs: NumericInputs
   characteristics: Characteristic[]
+  formulaResults?: Record<string, number>
 }
 
 /**
@@ -33,6 +34,9 @@ export function evaluateFormula(node: FormulaNode, ctx: FormulaContext): number 
 
     case 'is_selected':
       return ctx.selection[node.char_id] === node.value_id
+
+    case 'formula_result':
+      return ctx.formulaResults?.[node.formula_id] ?? 0
 
     case 'add':
       return (evaluateFormula(node.left, ctx) as number) + (evaluateFormula(node.right, ctx) as number)
@@ -85,14 +89,17 @@ export function evaluateFormula(node: FormulaNode, ctx: FormulaContext): number 
  * Each formula contributes a surcharge (positive) or discount (negative).
  */
 export function calculateFormulaTotal(
-  formulas: Array<{ formula: FormulaNode; is_active: boolean }>,
+  formulas: Array<{ id: string; formula: FormulaNode; is_active: boolean }>,
   ctx: FormulaContext
 ): number {
   let total = 0
+  const formulaResults: Record<string, number> = { ...ctx.formulaResults }
   for (const f of formulas) {
     if (!f.is_active) continue
     try {
-      total += evaluateFormula(f.formula, ctx) as number
+      const result = evaluateFormula(f.formula, { ...ctx, formulaResults }) as number
+      formulaResults[f.id] = result
+      total += result
     } catch {
       // Malformed formula — skip silently
     }

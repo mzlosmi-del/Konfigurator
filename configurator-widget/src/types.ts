@@ -62,6 +62,7 @@ export type FormulaNode =
   | { type: 'modifier'; char_id: string }
   | { type: 'input'; char_id: string }
   | { type: 'is_selected'; char_id: string; value_id: string }
+  | { type: 'formula_result'; formula_id: string }
   | { type: 'add' | 'subtract' | 'multiply' | 'divide'; left: FormulaNode; right: FormulaNode }
   | { type: 'gt' | 'gte' | 'lt' | 'lte' | 'eq'; left: FormulaNode; right: FormulaNode }
   | { type: 'and' | 'or'; left: FormulaNode; right: FormulaNode }
