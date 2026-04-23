@@ -41,20 +41,34 @@ export function ConfigureProductDialog({
   onApply,
 }: Props) {
   const [selection, setSelection] = useState<Record<string, string>>(initialSelection)
-  const prevDefaultsRef = useRef<Record<string, string>>({})
+  const prevDefaultsRef        = useRef<Record<string, string>>({})
+  const prevNumericDefaultsRef = useRef<Record<string, number>>({})
+
+  function extractNumericInputs(sel: Record<string, string>): Record<string, number> {
+    const ni: Record<string, number> = {}
+    for (const char of characteristics) {
+      if (char.display_type === 'number') ni[char.id] = Number(sel[char.id] ?? 0)
+    }
+    return ni
+  }
 
   // Reset to initial selection each time the dialog opens, applying any already-met defaults
   useEffect(() => {
     if (!open) return
-    const effect = evaluateRules(rules, initialSelection)
+    const ni     = extractNumericInputs(initialSelection)
+    const effect = evaluateRules(rules, initialSelection, ni)
     const withDef = applyDefaultValues(initialSelection, effect)
-    prevDefaultsRef.current = effect.defaultValues
-    setSelection(sanitizeSelection(withDef, effect))
+    // Apply numeric defaults into selection (stored as strings)
+    const withAll = { ...withDef }
+    for (const [id, val] of Object.entries(effect.defaultNumericValues)) withAll[id] = String(val)
+    prevDefaultsRef.current        = effect.defaultValues
+    prevNumericDefaultsRef.current = effect.defaultNumericValues
+    setSelection(sanitizeSelection(withAll, effect))
   }, [open])
 
   const ruleEffect = useMemo(
-    () => evaluateRules(rules, selection),
-    [rules, selection]
+    () => evaluateRules(rules, selection, extractNumericInputs(selection)),
+    [rules, selection, characteristics]
   )
 
   const configuredPrice = useMemo(() => {
@@ -85,17 +99,31 @@ export function ConfigureProductDialog({
 
   function handleSelect(charId: string, valueId: string) {
     const next     = { ...selection, [charId]: valueId }
-    const effect   = evaluateRules(rules, next)
+    const effect   = evaluateRules(rules, next, extractNumericInputs(next))
     const withDef  = applyDefaultValues(next, effect, new Set([charId]), prevDefaultsRef.current)
-    prevDefaultsRef.current = effect.defaultValues
-    setSelection(sanitizeSelection(withDef, effect))
+    // Apply newly-active numeric defaults into selection (as strings)
+    const withAll  = { ...withDef }
+    for (const [id, val] of Object.entries(effect.defaultNumericValues)) {
+      if (!(id in prevNumericDefaultsRef.current)) withAll[id] = String(val)
+    }
+    prevDefaultsRef.current        = effect.defaultValues
+    prevNumericDefaultsRef.current = effect.defaultNumericValues
+    setSelection(sanitizeSelection(withAll, effect))
   }
 
   function handleNumericInput(charId: string, raw: string) {
-    setSelection(prev => {
-      const next = { ...prev, [charId]: raw }
-      return next
-    })
+    const next   = { ...selection, [charId]: raw }
+    const effect = evaluateRules(rules, next, extractNumericInputs(next))
+    // Apply newly-active string defaults
+    const withDef = applyDefaultValues(next, effect, new Set([charId]), prevDefaultsRef.current)
+    // Apply newly-active numeric defaults (never override the field the user just typed)
+    const withAll = { ...withDef }
+    for (const [id, val] of Object.entries(effect.defaultNumericValues)) {
+      if (id !== charId && !(id in prevNumericDefaultsRef.current)) withAll[id] = String(val)
+    }
+    prevDefaultsRef.current        = effect.defaultValues
+    prevNumericDefaultsRef.current = effect.defaultNumericValues
+    setSelection(sanitizeSelection(withAll, effect))
   }
 
   return (

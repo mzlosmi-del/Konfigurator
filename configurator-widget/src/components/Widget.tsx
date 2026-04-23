@@ -25,7 +25,8 @@ export function Widget({ config }: Props) {
   const [numericInputs, setNumericInputs] = useState<NumericInputs>({})
   const [showForm, setShowForm] = useState(false)
   const [lang, setLangState] = useState<Lang>(getLang())
-  const prevDefaultsRef = useRef<Record<string, string>>({})
+  const prevDefaultsRef        = useRef<Record<string, string>>({})
+  const prevNumericDefaultsRef = useRef<Record<string, number>>({})
 
   useEffect(() => {
     const handler = (e: Event) => setLangState((e as CustomEvent<Lang>).detail)
@@ -47,11 +48,12 @@ export function Widget({ config }: Props) {
         }
 
         // Apply initial rules (set_value_default / locked)
-        const initialEffect      = evaluateRules(data.rules, initial, {})
-        const withDefaults       = applyDefaultValues(initial, initialEffect)
-        const sanitized          = sanitizeSelection(withDefaults, initialEffect)
-        const numericDefaults    = applyNumericDefaults({}, initialEffect)
-        prevDefaultsRef.current  = initialEffect.defaultValues
+        const initialEffect             = evaluateRules(data.rules, initial, {})
+        const withDefaults              = applyDefaultValues(initial, initialEffect)
+        const sanitized                 = sanitizeSelection(withDefaults, initialEffect)
+        const numericDefaults           = applyNumericDefaults({}, initialEffect)
+        prevDefaultsRef.current         = initialEffect.defaultValues
+        prevNumericDefaultsRef.current  = initialEffect.defaultNumericValues
         setSelection(sanitized)
         setNumericInputs(numericDefaults)
       })
@@ -63,15 +65,42 @@ export function Widget({ config }: Props) {
   function handleSelect(charId: string, valueId: string) {
     if (state.phase !== 'ready') return
     const next      = { ...selection, [charId]: valueId }
-    const effect    = evaluateRules(state.data.rules, next)
+    const effect    = evaluateRules(state.data.rules, next, numericInputs)
     const withDef   = applyDefaultValues(next, effect, new Set([charId]), prevDefaultsRef.current)
     const sanitized = sanitizeSelection(withDef, effect)
-    prevDefaultsRef.current = effect.defaultValues
+
+    // Apply newly-active numeric defaults triggered by this selection change
+    const newNumericEntries = Object.entries(effect.defaultNumericValues)
+      .filter(([id]) => !(id in prevNumericDefaultsRef.current))
+    if (newNumericEntries.length > 0) {
+      setNumericInputs(prev => ({ ...prev, ...Object.fromEntries(newNumericEntries) }))
+    }
+
+    prevDefaultsRef.current        = effect.defaultValues
+    prevNumericDefaultsRef.current = effect.defaultNumericValues
     setSelection(sanitized)
   }
 
   function handleNumericInput(charId: string, value: number) {
-    setNumericInputs(prev => ({ ...prev, [charId]: value }))
+    if (state.phase !== 'ready') return
+    const nextNumeric = { ...numericInputs, [charId]: value }
+    const effect      = evaluateRules(state.data.rules, selection, nextNumeric)
+
+    // Apply newly-active string defaults triggered by this numeric change
+    const withDef   = applyDefaultValues(selection, effect, new Set(), prevDefaultsRef.current)
+    const sanitized = sanitizeSelection(withDef, effect)
+    if (sanitized !== selection) setSelection(sanitized)
+
+    // Apply newly-active numeric defaults (never override the field the user just typed in)
+    const newNumericEntries = Object.entries(effect.defaultNumericValues)
+      .filter(([id]) => id !== charId && !(id in prevNumericDefaultsRef.current))
+    const finalNumeric = newNumericEntries.length > 0
+      ? { ...nextNumeric, ...Object.fromEntries(newNumericEntries) }
+      : nextNumeric
+
+    prevDefaultsRef.current        = effect.defaultValues
+    prevNumericDefaultsRef.current = effect.defaultNumericValues
+    setNumericInputs(finalNumeric)
   }
 
   // ── Derived state ───────────────────────────────────────────────────────────
