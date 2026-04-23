@@ -103,11 +103,12 @@ export function sanitizeSelection(selection: Selection, effect: RuleEffect): Sel
 export function applyDefaultValues(
   selection: Selection,
   effect: RuleEffect,
-  skip: Set<string> = new Set()
+  skip: Set<string> = new Set(),
+  prevDefaultValues: Record<string, string> = {}
 ): Selection {
   const next = { ...selection }
   for (const [charId, valueId] of Object.entries(effect.defaultValues)) {
-    if (!skip.has(charId)) next[charId] = valueId
+    if (!skip.has(charId) && !(charId in prevDefaultValues)) next[charId] = valueId
   }
   return next
 }

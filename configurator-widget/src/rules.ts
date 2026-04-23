@@ -135,18 +135,19 @@ export function sanitizeSelection(
 
 /**
  * Apply default values from rules to selection.
- * Always applies when condition is met, except for characteristics in `skip`
- * (the one the user is actively changing, so their click is not overridden).
- * Pass an empty skip set during initialisation to apply all defaults freely.
+ * Only applies defaults that are NEWLY active (not present in prevDefaultValues),
+ * so a user's manual override is preserved while the condition stays active.
+ * Pass prevDefaultValues={} during initialisation to apply all active defaults.
  */
 export function applyDefaultValues(
   selection: Selection,
   effect: RuleEffect,
-  skip: Set<string> = new Set()
+  skip: Set<string> = new Set(),
+  prevDefaultValues: Record<string, string> = {}
 ): Selection {
   const next = { ...selection }
   for (const [charId, valueId] of Object.entries(effect.defaultValues)) {
-    if (!skip.has(charId)) {
+    if (!skip.has(charId) && !(charId in prevDefaultValues)) {
       next[charId] = valueId
     }
   }

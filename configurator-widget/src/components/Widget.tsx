@@ -1,5 +1,5 @@
 import { h } from 'preact'
-import { useState, useEffect, useMemo } from 'preact/hooks'
+import { useState, useEffect, useMemo, useRef } from 'preact/hooks'
 import type { FullProductConfig, Selection, NumericInputs, WidgetConfig, ConfigLineItem } from '../types'
 import { loadProductConfig } from '../api'
 import { evaluateRules, calculatePrice, sanitizeSelection, applyDefaultValues, applyNumericDefaults } from '../rules'
@@ -25,6 +25,7 @@ export function Widget({ config }: Props) {
   const [numericInputs, setNumericInputs] = useState<NumericInputs>({})
   const [showForm, setShowForm] = useState(false)
   const [lang, setLangState] = useState<Lang>(getLang())
+  const prevDefaultsRef = useRef<Record<string, string>>({})
 
   useEffect(() => {
     const handler = (e: Event) => setLangState((e as CustomEvent<Lang>).detail)
@@ -50,6 +51,7 @@ export function Widget({ config }: Props) {
         const withDefaults       = applyDefaultValues(initial, initialEffect)
         const sanitized          = sanitizeSelection(withDefaults, initialEffect)
         const numericDefaults    = applyNumericDefaults({}, initialEffect)
+        prevDefaultsRef.current  = initialEffect.defaultValues
         setSelection(sanitized)
         setNumericInputs(numericDefaults)
       })
@@ -62,8 +64,9 @@ export function Widget({ config }: Props) {
     if (state.phase !== 'ready') return
     const next      = { ...selection, [charId]: valueId }
     const effect    = evaluateRules(state.data.rules, next)
-    const withDef   = applyDefaultValues(next, effect, new Set([charId]))
+    const withDef   = applyDefaultValues(next, effect, new Set([charId]), prevDefaultsRef.current)
     const sanitized = sanitizeSelection(withDef, effect)
+    prevDefaultsRef.current = effect.defaultValues
     setSelection(sanitized)
   }
 

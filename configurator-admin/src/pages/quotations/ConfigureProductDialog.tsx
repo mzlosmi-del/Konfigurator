@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Settings2 } from 'lucide-react'
 import type { CharacteristicWithValues } from '@/lib/products'
 import type { ConfigurationRule, PricingFormula } from '@/types/database'
@@ -41,12 +41,14 @@ export function ConfigureProductDialog({
   onApply,
 }: Props) {
   const [selection, setSelection] = useState<Record<string, string>>(initialSelection)
+  const prevDefaultsRef = useRef<Record<string, string>>({})
 
   // Reset to initial selection each time the dialog opens, applying any already-met defaults
   useEffect(() => {
     if (!open) return
     const effect = evaluateRules(rules, initialSelection)
     const withDef = applyDefaultValues(initialSelection, effect)
+    prevDefaultsRef.current = effect.defaultValues
     setSelection(sanitizeSelection(withDef, effect))
   }, [open])
 
@@ -84,7 +86,8 @@ export function ConfigureProductDialog({
   function handleSelect(charId: string, valueId: string) {
     const next     = { ...selection, [charId]: valueId }
     const effect   = evaluateRules(rules, next)
-    const withDef  = applyDefaultValues(next, effect, new Set([charId]))
+    const withDef  = applyDefaultValues(next, effect, new Set([charId]), prevDefaultsRef.current)
+    prevDefaultsRef.current = effect.defaultValues
     setSelection(sanitizeSelection(withDef, effect))
   }
 
