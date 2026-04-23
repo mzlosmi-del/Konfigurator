@@ -41,8 +41,9 @@ export function LoginPage() {
     })
     if (error) {
       setServerError(error.message)
+    } else {
+      navigate('/dashboard', { replace: true })
     }
-    // Navigation is handled by the useEffect above once session updates
   }
 
   return (

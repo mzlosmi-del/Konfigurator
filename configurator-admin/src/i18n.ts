@@ -294,6 +294,10 @@ const sr: Record<string, string> = {
 
   // Auth (missing)
   'Sign up failed. Please try again.':     'Registracija nije uspela. Pokušajte ponovo.',
+  'Check your email':                      'Proverite email',
+  'We sent a verification link to':        'Poslali smo link za verifikaciju na',
+  'Click the link to activate your account.': 'Kliknite na link da aktivirate nalog.',
+  'Back to sign in':                       'Nazad na prijavu',
 
   // Visualization (missing)
   'Enter a URL first':                     'Prvo unesite URL',

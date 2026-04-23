@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Boxes } from 'lucide-react'
+import { Boxes, MailCheck } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useAuthContext } from '@/components/auth/AuthContext'
 import { Button } from '@/components/ui/button'
@@ -27,6 +27,8 @@ export function RegisterPage() {
   const navigate = useNavigate()
   const { session } = useAuthContext()
   const [serverError, setServerError] = useState<string | null>(null)
+  const [emailSent, setEmailSent] = useState(false)
+  const [submittedEmail, setSubmittedEmail] = useState('')
 
   useEffect(() => {
     if (session) navigate('/dashboard', { replace: true })
@@ -69,19 +71,57 @@ export function RegisterPage() {
       )
       return
     }
-    // Navigation handled by useEffect once session updates
+
+    if (!data.session) {
+      // Email confirmation required
+      setSubmittedEmail(values.email)
+      setEmailSent(true)
+      return
+    }
+    // Session available immediately (confirmation disabled) — useEffect navigates
+  }
+
+  const logo = (
+    <div className="flex flex-col items-center gap-2">
+      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary">
+        <Boxes className="h-5 w-5 text-primary-foreground" />
+      </div>
+      <span className="text-lg font-semibold">{t('Configurator')}</span>
+    </div>
+  )
+
+  if (emailSent) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background p-4">
+        <div className="w-full max-w-sm space-y-6">
+          {logo}
+          <Card>
+            <CardHeader>
+              <div className="flex justify-center mb-2">
+                <MailCheck className="h-10 w-10 text-primary" />
+              </div>
+              <CardTitle className="text-center">{t('Check your email')}</CardTitle>
+              <CardDescription className="text-center">
+                {t('We sent a verification link to')}{' '}
+                <strong>{submittedEmail}</strong>.{' '}
+                {t('Click the link to activate your account.')}
+              </CardDescription>
+            </CardHeader>
+            <CardFooter className="justify-center">
+              <Link to="/login" className="text-sm text-primary hover:underline">
+                {t('Back to sign in')}
+              </Link>
+            </CardFooter>
+          </Card>
+        </div>
+      </div>
+    )
   }
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
       <div className="w-full max-w-sm space-y-6">
-        {/* Logo */}
-        <div className="flex flex-col items-center gap-2">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary">
-            <Boxes className="h-5 w-5 text-primary-foreground" />
-          </div>
-          <span className="text-lg font-semibold">{t('Configurator')}</span>
-        </div>
+        {logo}
 
         <Card>
           <CardHeader>
