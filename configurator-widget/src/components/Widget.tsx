@@ -39,15 +39,8 @@ export function Widget({ config }: Props) {
       .then(data => {
         setState({ phase: 'ready', data })
 
-        // Pre-select first value of each select/radio/swatch/toggle characteristic
-        const initial: Selection = {}
-        for (const char of data.characteristics) {
-          if (char.display_type !== 'number' && char.values.length > 0) {
-            initial[char.id] = char.values[0].id
-          }
-        }
-
         // Apply initial rules (set_value_default / locked)
+        const initial: Selection        = {}
         const initialEffect             = evaluateRules(data.rules, initial, {})
         const withDefaults              = applyDefaultValues(initial, initialEffect)
         const sanitized                 = sanitizeSelection(withDefaults, initialEffect)
