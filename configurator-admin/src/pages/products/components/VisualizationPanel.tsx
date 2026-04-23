@@ -152,8 +152,19 @@ export function VisualizationPanel({ productId }: Props) {
     setForm(f => ({ ...f, uploading: true }))
     try {
       const publicUrl = await uploadAssetFile(tenant.id, productId, form.file)
-      setForm(f => ({ ...f, url: publicUrl, uploading: false }))
-      toast({ title: t('File uploaded \u2014 click Add to save') })
+      const isDefault = form.characteristic_value_id === '' ? true : form.is_default
+      const created = await createAsset({
+        product_id: productId,
+        characteristic_value_id: form.characteristic_value_id || null,
+        asset_type: form.asset_type,
+        url: publicUrl,
+        is_default: isDefault,
+        sort_order: assets.length,
+      })
+      setAssets(prev => [...prev, created])
+      setForm(emptyForm())
+      setShowAddForm(false)
+      toast({ title: t('Asset uploaded and saved') })
     } catch (e) {
       setForm(f => ({ ...f, uploading: false }))
       toast({
@@ -353,7 +364,7 @@ export function VisualizationPanel({ productId }: Props) {
                   loading={form.uploading}
                   onClick={handleUpload}
                 >
-                  Upload to storage
+                  {t('Upload and save')}
                 </Button>
               )}
               {form.url && (

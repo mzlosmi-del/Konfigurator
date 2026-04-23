@@ -357,6 +357,8 @@ const sr: Record<string, string> = {
   'This will remove the asset. The image file itself (if hosted externally) will not be deleted.':
     'Ovo će ukloniti resurs. Sam fajl slike (ako je hostovan eksterno) neće biti obrisan.',
   'File uploaded \u2014 click Add to save': 'Fajl otpremljen \u2014 kliknite Dodaj za čuvanje',
+  'Asset uploaded and saved':              'Resurs otpremljen i sačuvan',
+  'Upload and save':                       'Otpremi i sačuvaj',
   'Upload failed':                         'Otpremanje nije uspelo',
   'Failed to add asset':                   'Dodavanje resursa nije uspelo',
   'Failed to delete asset':                'Brisanje resursa nije uspelo',

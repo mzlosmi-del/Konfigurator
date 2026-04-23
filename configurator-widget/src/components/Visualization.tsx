@@ -12,16 +12,14 @@ interface Props {
 export function Visualization({ assets, selection }: Props) {
   const url = resolveImage(assets, selection)
   const [loaded, setLoaded] = useState(false)
-  const [currentUrl, setCurrentUrl] = useState<string | null>(null)
+  const [failed, setFailed] = useState(false)
 
   useEffect(() => {
-    if (url !== currentUrl) {
-      setLoaded(false)
-      setCurrentUrl(url)
-    }
+    setLoaded(false)
+    setFailed(false)
   }, [url])
 
-  if (!url) {
+  if (!url || failed) {
     return (
       <div class="cw-visual">
         <div class="cw-visual-placeholder">{t('No image available')}</div>
@@ -36,6 +34,7 @@ export function Visualization({ assets, selection }: Props) {
         alt={t('Product visualization')}
         class={loaded ? '' : 'loading'}
         onLoad={() => setLoaded(true)}
+        onError={() => setFailed(true)}
       />
     </div>
   )
