@@ -29,9 +29,7 @@ export const WIDGET_STYLES = `
     width: 100%;
     height: 100%;
     object-fit: cover;
-    transition: opacity 0.25s ease;
   }
-  .cw-visual img.loading { opacity: 0; }
   .cw-visual-placeholder {
     width: 100%;
     height: 100%;

@@ -11,11 +11,9 @@ interface Props {
 
 export function Visualization({ assets, selection }: Props) {
   const url = resolveImage(assets, selection)
-  const [loaded, setLoaded] = useState(false)
   const [failed, setFailed] = useState(false)
 
   useEffect(() => {
-    setLoaded(false)
     setFailed(false)
   }, [url])
 
@@ -28,8 +26,6 @@ export function Visualization({ assets, selection }: Props) {
       <img
         src={url}
         alt={t('Product visualization')}
-        class={loaded ? '' : 'loading'}
-        onLoad={() => setLoaded(true)}
         onError={() => setFailed(true)}
       />
     </div>
