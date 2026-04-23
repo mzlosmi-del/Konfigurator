@@ -42,7 +42,7 @@ export function CharacteristicInput({
     const isNumericLocked = id in ruleEffect.lockedNumericValues
     const displayValue    = isNumericLocked
       ? ruleEffect.lockedNumericValues[id]
-      : (numericInputs[id] ?? 0)
+      : (numericInputs[id] ?? '')
     return (
       <div>
         <div class="cw-char-label">{characteristic.name}</div>
