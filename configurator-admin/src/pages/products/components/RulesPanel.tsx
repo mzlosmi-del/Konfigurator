@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Trash2 } from 'lucide-react'
 import { fetchRules, createRule, deleteRule } from '@/lib/rules'
-import { fetchCharacteristics, fetchValuesForCharacteristic } from '@/lib/products'
+import { fetchProductCharacteristicsWithValues } from '@/lib/products'
 import type { ConfigurationRule, RuleType, Characteristic, CharacteristicValue } from '@/types/database'
 import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
@@ -138,16 +138,19 @@ export function RulesPanel({ productId }: Props) {
   async function load() {
     setLoading(true)
     try {
-      const [rulesData, chars] = await Promise.all([
+      const [rulesData, charsWithValues] = await Promise.all([
         fetchRules(productId),
-        fetchCharacteristics(),
+        fetchProductCharacteristicsWithValues(productId),
       ])
       setRules(rulesData)
+      const chars: Characteristic[] = charsWithValues.map(c => {
+        const { characteristic_values: _cv, ...rest } = c
+        return rest as Characteristic
+      })
       setCharacteristics(chars)
-      const entries = await Promise.all(
-        chars.map(async c => [c.id, await fetchValuesForCharacteristic(c.id)] as const)
-      )
-      setValuesMap(Object.fromEntries(entries))
+      const vmap: ValuesMap = {}
+      for (const c of charsWithValues) vmap[c.id] = c.characteristic_values
+      setValuesMap(vmap)
     } catch {
       toast({ title: t('Failed to load rules'), variant: 'destructive' })
     } finally {

@@ -42,9 +42,12 @@ export function ConfigureProductDialog({
 }: Props) {
   const [selection, setSelection] = useState<Record<string, string>>(initialSelection)
 
-  // Reset to initial selection each time the dialog opens
+  // Reset to initial selection each time the dialog opens, applying any already-met defaults
   useEffect(() => {
-    if (open) setSelection(initialSelection)
+    if (!open) return
+    const effect = evaluateRules(rules, initialSelection)
+    const withDef = applyDefaultValues(initialSelection, effect)
+    setSelection(sanitizeSelection(withDef, effect))
   }, [open])
 
   const ruleEffect = useMemo(
