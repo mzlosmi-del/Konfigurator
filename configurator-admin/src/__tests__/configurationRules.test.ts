@@ -12,12 +12,14 @@ const valW  = 'val-w'
 
 const defaultRule: ConfigurationRule = {
   id:         'rule-1',
+  tenant_id:  'tenant-1',
   product_id: 'prod-1',
   rule_type:  'set_value_default',
   condition:  { characteristic_id: charA, value_id: valX },
   effect:     { characteristic_id: charB, value_id: valY },
   is_active:  true,
   created_at: '',
+  updated_at: '',
 }
 
 // Simulate the handleSelect + prevDefaultsRef logic from ConfigureProductDialog
