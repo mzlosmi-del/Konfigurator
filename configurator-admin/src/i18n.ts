@@ -574,6 +574,43 @@ const sr: Record<string, string> = {
   'Language':                              'Jezik',
   'English':                               'Engleski',
   'Serbian':                               'Srpski',
+
+  // Product form
+  'Number':                                'Broj',
+  'Unit of Measure':                       'Jedinica mere',
+  'e.g. pcs, m², kg, m':             'npr. kom, m², kg, m',
+  'Optional unique product identifier':    'Opcioni jedinstveni identifikator proizvoda',
+
+  // Characteristics panel
+  'characteristic':                        'karakteristika',
+
+  // Formula builder
+  'No other formulas available':           'Nema dostupnih formula',
+
+  // Rules panel
+  'on':                                    'na',
+
+  // Quotations
+  'All statuses':                          'Svi statusi',
+  'Clear':                                 'Poništi filter',
+  'Search by customer or reference…': 'Pretraži po kupcu ili referenci…',
+  'No quotations match the current filters.': 'Nema ponuda koje odgovaraju filterima.',
+  'quotation':                             'ponuda',
+  'quotations':                            'ponude',
+  'Quotations Report':                     'Izveštaj o ponudama',
+  'SKU / Code':                            'SKU / kod',
+  'Customer name':                         'Naziv kupca',
+
+  // Edit product page
+  'Product Texts':                         'Tekstovi proizvoda',
+
+  // Texts panel
+  'Named text blocks included in PDF quotations. Use these for product descriptions, specifications, or terms.':
+    'Imenovani blokovi teksta koji se uključuju u PDF ponude. Koristite ih za opise proizvoda, specifikacije ili uslove.',
+  'This text block will be permanently deleted.': 'Ovaj blok teksta će biti trajno obrisan.',
+
+  // Address (lowercase variant used in company profile)
+  'Street, city, country':                 'Ulica, grad, zemlja',
 }
 
 export const LANGS = ['en', 'sr'] as const
