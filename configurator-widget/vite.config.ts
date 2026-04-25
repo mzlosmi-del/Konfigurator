@@ -1,8 +1,14 @@
 import { defineConfig } from 'vite'
 import preact from '@preact/preset-vite'
+import { readFileSync } from 'fs'
+
+const { version } = JSON.parse(readFileSync('./package.json', 'utf-8'))
 
 export default defineConfig({
   plugins: [preact()],
+  define: {
+    __WIDGET_VERSION__: JSON.stringify(version),
+  },
   build: {
     lib: {
       entry: 'src/main.tsx',

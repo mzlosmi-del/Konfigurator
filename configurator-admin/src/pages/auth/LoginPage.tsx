@@ -97,6 +97,11 @@ export function LoginPage() {
                 {t('Sign in')}
               </Button>
               <p className="text-center text-sm text-muted-foreground">
+                <Link to="/forgot-password" className="text-primary hover:underline font-medium">
+                  {t('Forgot password?')}
+                </Link>
+              </p>
+              <p className="text-center text-sm text-muted-foreground">
                 {t("Don't have an account?")}{' '}
                 <Link to="/register" className="text-primary hover:underline font-medium">
                   {t('Create one')}

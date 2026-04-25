@@ -53,7 +53,10 @@ if (document.readyState === 'loading') {
   init()
 }
 
-// Also expose manual mount for SPAs that render after script load
-;(window as Window & { ConfiguratorWidget?: { mount: (el: HTMLElement) => void } }).ConfiguratorWidget = {
+declare const __WIDGET_VERSION__: string
+
+// Also expose manual mount and version for SPAs that render after script load
+;(window as Window & { ConfiguratorWidget?: { mount: (el: HTMLElement) => void; version: string } }).ConfiguratorWidget = {
   mount: mountWidget,
+  version: __WIDGET_VERSION__,
 }

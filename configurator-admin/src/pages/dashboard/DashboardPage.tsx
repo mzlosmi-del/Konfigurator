@@ -10,6 +10,7 @@ import { Spinner } from '@/components/ui/spinner'
 import { fetchProducts } from '@/lib/products'
 import { fetchInquiries } from '@/lib/inquiries'
 import type { Product, Inquiry, InquiryStatus } from '@/types/database'
+import { OnboardingChecklist } from '@/components/OnboardingChecklist'
 
 const statusVariant: Record<InquiryStatus, 'destructive' | 'warning' | 'success' | 'secondary'> = {
   new: 'destructive',
@@ -61,6 +62,10 @@ export function DashboardPage() {
           <div className="flex justify-center py-16"><Spinner /></div>
         ) : (
           <>
+            {tenant && (
+              <OnboardingChecklist products={products} tenantId={tenant.id} />
+            )}
+
             {/* Stat cards */}
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <StatCard
