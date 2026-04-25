@@ -1,4 +1,4 @@
-name: Deploy Widget
+name: Build Widget
 
 on:
   push:
@@ -9,7 +9,7 @@ on:
     tags: ['v*']
 
 jobs:
-  deploy:
+  build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -28,22 +28,6 @@ jobs:
         working-directory: configurator-widget
         run: npm run build
 
-      - name: Install Vercel CLI
-        run: npm install -g vercel@latest
-
-      - name: Deploy to Vercel
-        working-directory: configurator-widget
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_WIDGET_PROJECT_ID }}
-        run: |
-          if [ -z "$VERCEL_TOKEN" ]; then
-            echo "::warning::VERCEL_TOKEN secret not configured — skipping deploy"
-            exit 0
-          fi
-          vercel deploy --prod --yes --token "$VERCEL_TOKEN"
-
-      - name: Log pinned version
+      - name: Log release version
         if: startsWith(github.ref, 'refs/tags/v')
-        run: echo "Tagged release ${{ github.ref_name }} deployed"
+        run: echo "Building tagged release ${{ github.ref_name }}"
