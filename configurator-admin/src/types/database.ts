@@ -5,7 +5,7 @@
 export type Json = string | number | boolean | null | { [key: string]: Json } | Json[]
 
 export type ProductStatus = 'draft' | 'published' | 'archived'
-export type Plan = 'free' | 'starter' | 'pro'
+export type Plan = 'free' | 'starter' | 'growth' | 'scale'
 export type DisplayType = 'select' | 'radio' | 'swatch' | 'toggle' | 'number'
 export type AssetType = 'image' | 'render' | '3d_model'
 export type RuleType = 'hide_value' | 'disable_value' | 'price_override' | 'set_value_default' | 'set_value_locked'
@@ -341,6 +341,29 @@ export interface RuleEffect {
   value_id?: string          // target value for select-type characteristics
   price_modifier?: number    // price_override amount
   numeric_value?: number     // set_value_default / set_value_locked on numeric chars
+}
+
+// ── plan_limits ───────────────────────────────────────────────────────────────
+export interface PlanLimitsRow {
+  plan:                 Plan
+  products_max:         number
+  inquiries_per_month:  number
+  team_members_max:     number
+  three_d:              boolean
+  quotations:           boolean
+  webhooks:             boolean
+  remove_branding:      boolean
+  white_label:          boolean
+  ai_setup_per_month:   number
+  analytics:            'basic' | 'advanced'
+}
+
+// ── monthly_usage ─────────────────────────────────────────────────────────────
+export interface MonthlyUsageRow {
+  tenant_id:       string
+  period_month:    string
+  inquiries_count: number
+  ai_setup_count:  number
 }
 
 // Convenience row types

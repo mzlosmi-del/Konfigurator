@@ -2,12 +2,14 @@ import { createContext, useContext, type ReactNode } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 import type { Session, User } from '@supabase/supabase-js'
 import type { Profile, Tenant } from '@/types/database'
+import type { PlanLimits } from '@/lib/planLimits'
 
 interface AuthContextValue {
   session: Session | null
   user: User | null
   profile: Profile | null
   tenant: Tenant | null
+  planLimits: PlanLimits | null
   loading: boolean
   signOut: () => Promise<void>
 }

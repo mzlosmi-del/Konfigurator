@@ -2,12 +2,14 @@ import { useEffect, useState } from 'react'
 import type { Session, User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import type { Profile, Tenant } from '@/types/database'
+import { fetchPlanLimits, type PlanLimits } from '@/lib/planLimits'
 
 interface AuthState {
   session: Session | null
   user: User | null
   profile: Profile | null
   tenant: Tenant | null
+  planLimits: PlanLimits | null
   loading: boolean
 }
 
@@ -17,6 +19,7 @@ export function useAuth() {
     user: null,
     profile: null,
     tenant: null,
+    planLimits: null,
     loading: true,
   })
 
@@ -36,7 +39,7 @@ export function useAuth() {
         if (session) {
           loadProfileAndTenant(session)
         } else {
-          setState({ session: null, user: null, profile: null, tenant: null, loading: false })
+          setState({ session: null, user: null, profile: null, tenant: null, planLimits: null, loading: false })
         }
       }
     )
@@ -63,11 +66,14 @@ export function useAuth() {
       tenant = data as Tenant | null
     }
 
+    const planLimits = tenant ? await fetchPlanLimits(tenant.plan) : null
+
     setState({
       session,
       user: session.user,
       profile,
       tenant,
+      planLimits,
       loading: false,
     })
   }

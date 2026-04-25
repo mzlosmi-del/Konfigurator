@@ -10,8 +10,8 @@ import {
   deleteRejectionReason,
 } from '@/lib/quotations'
 import { fetchProducts } from '@/lib/products'
-import { atProductLimit, productLimit, planLabel } from '@/lib/planLimits'
-import type { QuotationRejectionReason } from '@/types/database'
+import { planLabel } from '@/lib/planLimits'
+import type { MonthlyUsageRow, QuotationRejectionReason } from '@/types/database'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -40,8 +40,47 @@ interface WebhookDelivery {
 
 const WEBHOOK_EVENTS = ['inquiry.created', 'quotation.status_changed'] as const
 
+// ── Small presentational helpers ──────────────────────────────────────────────
+
+function UsageRow({ label, used, max }: { label: string; used: number; max: number }) {
+  const unlimited = max < 0
+  const pct       = unlimited ? 0 : Math.min(100, Math.round((used / max) * 100))
+  const over      = !unlimited && used >= max
+  return (
+    <div className="space-y-1">
+      <div className="flex justify-between text-xs">
+        <span className="text-muted-foreground">{label}</span>
+        <span className={over ? 'text-destructive font-medium' : ''}>
+          {used}{unlimited ? '' : ` / ${max}`}
+          {over && <span className="ml-1">({t('limit reached')})</span>}
+        </span>
+      </div>
+      {!unlimited && (
+        <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+          <div
+            className={`h-full rounded-full transition-all ${over ? 'bg-destructive' : 'bg-primary'}`}
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+      )}
+    </div>
+  )
+}
+
+function FeatureRow({ label, enabled, note }: { label: string; enabled: boolean; note?: string }) {
+  return (
+    <div className="flex items-center gap-1.5 text-xs">
+      <span className={enabled ? 'text-primary' : 'text-muted-foreground/50'}>
+        {enabled ? '✓' : '✗'}
+      </span>
+      <span className={enabled ? '' : 'text-muted-foreground/60'}>{label}</span>
+      {note && <span className="ml-auto text-muted-foreground capitalize">{note}</span>}
+    </div>
+  )
+}
+
 export function SettingsPage() {
-  const { tenant, user } = useAuthContext()
+  const { tenant, user, planLimits } = useAuthContext()
   const { toasts, toast, dismiss } = useToast()
   const navigate     = useNavigate()
   const logoInputRef = useRef<HTMLInputElement>(null)
@@ -117,9 +156,27 @@ export function SettingsPage() {
   const [toDeleteR,  setToDeleteR]  = useState<QuotationRejectionReason | null>(null)
   const [deletingR,  setDeletingR]  = useState(false)
 
-  // ── Product count (for plan usage) ────────────────────────────────────────
-  const [productCount, setProductCount] = useState<number | null>(null)
-  useEffect(() => { fetchProducts().then(p => setProductCount(p.length)).catch(() => {}) }, [])
+  // ── Product count + monthly usage (for plan usage) ───────────────────────
+  const [productCount,  setProductCount]  = useState<number | null>(null)
+  const [monthlyUsage,  setMonthlyUsage]  = useState<MonthlyUsageRow | null>(null)
+
+  useEffect(() => {
+    fetchProducts().then(p => setProductCount(p.length)).catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    if (!tenant) return
+    const period = new Date()
+    period.setDate(1)
+    const periodStr = period.toISOString().slice(0, 10)
+    supabase
+      .from('monthly_usage')
+      .select('*')
+      .eq('tenant_id', tenant.id)
+      .eq('period_month', periodStr)
+      .maybeSingle()
+      .then(({ data }) => { if (data) setMonthlyUsage(data as MonthlyUsageRow) })
+  }, [tenant?.id])
 
   // ── Team ───────────────────────────────────────────────────────────────────
   const [members,       setMembers]       = useState<TeamMember[]>([])
@@ -325,10 +382,15 @@ export function SettingsPage() {
       <div className="p-6 max-w-xl space-y-4">
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">{t('Workspace')}</CardTitle>
-            <CardDescription>{t('Your tenant details')}</CardDescription>
+            <CardTitle className="text-base flex items-center justify-between">
+              {t('Workspace')}
+              <Badge variant="secondary" className="capitalize font-normal">
+                {planLabel(tenant?.plan ?? 'free')}
+              </Badge>
+            </CardTitle>
+            <CardDescription>{t('Your tenant details and plan usage')}</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-2 text-sm">
+          <CardContent className="space-y-3 text-sm">
             <div className="flex justify-between">
               <span className="text-muted-foreground">{t('Name')}</span>
               <span className="font-medium">{tenant?.name ?? '—'}</span>
@@ -337,22 +399,40 @@ export function SettingsPage() {
               <span className="text-muted-foreground">{t('Slug')}</span>
               <span className="font-mono text-xs">{tenant?.slug ?? '—'}</span>
             </div>
-            <div className="flex justify-between items-center">
-              <span className="text-muted-foreground">{t('Plan')}</span>
-              <Badge variant="secondary" className="capitalize">
-                {planLabel(tenant?.plan ?? 'free')}
-              </Badge>
-            </div>
-            {productCount !== null && tenant?.plan && (
-              <div className="flex justify-between items-center pt-1">
-                <span className="text-muted-foreground">{t('Products')}</span>
-                <span className={atProductLimit(tenant.plan, productCount) ? 'text-destructive font-medium' : ''}>
-                  {productCount}
-                  {productLimit(tenant.plan) >= 0 ? ` / ${productLimit(tenant.plan)}` : ''}
-                  {atProductLimit(tenant.plan, productCount) && (
-                    <span className="ml-1.5 text-xs">({t('limit reached')})</span>
-                  )}
-                </span>
+
+            {planLimits && (
+              <div className="space-y-2.5 border-t pt-3 mt-1">
+                {/* Products */}
+                {productCount !== null && (
+                  <UsageRow
+                    label={t('Products')}
+                    used={productCount}
+                    max={planLimits.products_max}
+                  />
+                )}
+
+                {/* Inquiries this month */}
+                <UsageRow
+                  label={t('Inquiries this month')}
+                  used={monthlyUsage?.inquiries_count ?? 0}
+                  max={planLimits.inquiries_per_month}
+                />
+
+                {/* Team seats */}
+                <UsageRow
+                  label={t('Team members')}
+                  used={members.length}
+                  max={planLimits.team_members_max}
+                />
+
+                {/* Feature flags */}
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1 pt-1">
+                  <FeatureRow label={t('3D models')}     enabled={planLimits.three_d} />
+                  <FeatureRow label={t('Quotations')}    enabled={planLimits.quotations} />
+                  <FeatureRow label={t('Webhooks')}      enabled={planLimits.webhooks} />
+                  <FeatureRow label={t('Remove branding')} enabled={planLimits.remove_branding} />
+                  <FeatureRow label={t('Analytics')}     enabled={true} note={planLimits.analytics} />
+                </div>
               </div>
             )}
           </CardContent>
