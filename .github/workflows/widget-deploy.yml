@@ -6,8 +6,6 @@ on:
     paths:
       - 'configurator-widget/**'
       - '.github/workflows/widget-deploy.yml'
-  # Also trigger on version tags for pinned releases
-  push-tags:
     tags: ['v*']
 
 jobs:
