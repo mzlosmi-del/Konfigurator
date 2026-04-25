@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Plus, Trash2, Star, StarOff, Upload, Link, ArrowUp, ArrowDown } from 'lucide-react'
 import {
   fetchAssetsForProduct,
@@ -21,6 +21,34 @@ import { Toaster } from '@/components/ui/toast'
 import { useAuthContext } from '@/components/auth/AuthContext'
 import { t } from '@/i18n'
 
+
+const MODEL_VIEWER_CDN = 'https://ajax.googleapis.com/ajax/libs/model-viewer/3.5.0/model-viewer.min.js'
+
+function loadModelViewer() {
+  if (customElements.get('model-viewer')) return
+  const s = document.createElement('script')
+  s.type = 'module'
+  s.src = MODEL_VIEWER_CDN
+  document.head.appendChild(s)
+}
+
+function ModelViewerThumb({ src }: { src: string }) {
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const container = containerRef.current
+    if (!container) return
+    const mv = document.createElement('model-viewer')
+    mv.setAttribute('src', src)
+    mv.setAttribute('auto-rotate', '')
+    mv.style.width = '100%'
+    mv.style.height = '100%'
+    container.appendChild(mv)
+    return () => { container.innerHTML = '' }
+  }, [src])
+
+  return <div ref={containerRef} className="w-full h-full" />
+}
 
 interface Props {
   productId: string
@@ -68,6 +96,10 @@ export function VisualizationPanel({ productId }: Props) {
   useEffect(() => {
     load()
   }, [productId])
+
+  useEffect(() => {
+    if (assets.some(a => a.asset_type === '3d_model')) loadModelViewer()
+  }, [assets])
 
   async function load() {
     setLoading(true)
@@ -224,15 +256,15 @@ export function VisualizationPanel({ productId }: Props) {
             >
               {/* Thumbnail */}
               <div className="h-12 w-16 shrink-0 rounded overflow-hidden border bg-muted flex items-center justify-center">
-                {(asset.asset_type === 'image' || asset.asset_type === 'render') ? (
+                {asset.asset_type === '3d_model' ? (
+                  <ModelViewerThumb src={asset.url} />
+                ) : (
                   <img
                     src={asset.url}
                     alt=""
                     className="h-full w-full object-cover"
                     onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
                   />
-                ) : (
-                  <span className="text-xs text-muted-foreground font-mono">3D</span>
                 )}
               </div>
 

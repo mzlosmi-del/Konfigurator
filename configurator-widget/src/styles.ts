@@ -30,6 +30,11 @@ export const WIDGET_STYLES = `
     height: 100%;
     object-fit: cover;
   }
+  .cw-visual model-viewer {
+    width: 100%;
+    height: 100%;
+    background: transparent;
+  }
   .cw-visual-placeholder {
     width: 100%;
     height: 100%;
