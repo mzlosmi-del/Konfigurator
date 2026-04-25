@@ -59,7 +59,12 @@ export async function createProduct(
     .insert(input as any)
     .select()
     .single()
-  if (error) throw new Error(error.message)
+  if (error) {
+    if (error.message.includes('plan_limit_exceeded')) {
+      throw new Error('You have reached the product limit for your plan. Upgrade to add more products.')
+    }
+    throw new Error(error.message)
+  }
   return data as Product
 }
 

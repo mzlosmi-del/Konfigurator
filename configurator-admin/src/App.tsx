@@ -6,6 +6,9 @@ import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
 import { AppShell } from '@/components/layout/AppShell'
 import { LoginPage } from '@/pages/auth/LoginPage'
 import { RegisterPage } from '@/pages/auth/RegisterPage'
+import { ForgotPasswordPage } from '@/pages/auth/ForgotPasswordPage'
+import { ResetPasswordPage } from '@/pages/auth/ResetPasswordPage'
+import { InvitePage } from '@/pages/auth/InvitePage'
 import { DashboardPage } from '@/pages/dashboard/DashboardPage'
 import { ProductsPage } from '@/pages/products/ProductsPage'
 import { NewProductPage } from '@/pages/products/NewProductPage'
@@ -38,6 +41,9 @@ export function App() {
           {/* Public routes */}
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
+          <Route path="/invite/:token" element={<InvitePage />} />
           <Route path="/preview/:productId" element={<PreviewPage />} />
 
           {/* Protected routes — require auth */}

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Check, Copy, ExternalLink, RefreshCw } from 'lucide-react'
 import { useAuthContext } from '@/components/auth/AuthContext'
 import type { Product } from '@/types/database'
+import { embedCopiedKey } from '@/components/OnboardingChecklist'
 import { t } from '@/i18n'
 
 interface Props {
@@ -44,6 +45,7 @@ export function EmbedPanel({ product }: Props) {
   async function handleCopy() {
     await navigator.clipboard.writeText(snippet)
     setCopied(true)
+    if (tenant) localStorage.setItem(embedCopiedKey(tenant.id), '1')
     setTimeout(() => setCopied(false), 2000)
   }
 
