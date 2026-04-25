@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Plus, Pencil, Trash2, Eye, EyeOff, Package } from 'lucide-react'
+import { useAuthContext } from '@/components/auth/AuthContext'
 import { fetchProducts, deleteProduct, updateProduct } from '@/lib/products'
+import { atProductLimit, productLimit, planLabel } from '@/lib/planLimits'
 import type { Product } from '@/types/database'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Button } from '@/components/ui/button'
@@ -21,12 +23,17 @@ const statusVariant: Record<Product['status'], 'success' | 'warning' | 'secondar
 
 export function ProductsPage() {
   const navigate = useNavigate()
+  const { tenant } = useAuthContext()
   const { toasts, toast, dismiss } = useToast()
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
   const [toDelete, setToDelete] = useState<Product | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [toggling, setToggling] = useState<string | null>(null)
+
+  const plan = tenant?.plan ?? 'free'
+  const atLimit = atProductLimit(plan, products.length)
+  const limit   = productLimit(plan)
 
   useEffect(() => { load() }, [])
 
@@ -76,9 +83,18 @@ export function ProductsPage() {
         title={t('Products')}
         description={t('Manage your configurable products.')}
         action={
-          <Button size="sm" onClick={() => navigate('/products/new')}>
-            <Plus className="h-4 w-4" /> {t('New product')}
-          </Button>
+          <div className="flex items-center gap-3">
+            {!loading && limit >= 0 && (
+              <span className={`text-sm ${atLimit ? 'text-destructive font-medium' : 'text-muted-foreground'}`}>
+                {products.length} / {limit} &middot; {planLabel(plan)}
+              </span>
+            )}
+            <div title={atLimit ? t('Upgrade your plan to add more products') : undefined}>
+              <Button size="sm" onClick={() => navigate('/products/new')} disabled={atLimit}>
+                <Plus className="h-4 w-4" /> {t('New product')}
+              </Button>
+            </div>
+          </div>
         }
       />
       <div className="p-6">
