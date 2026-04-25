@@ -28,23 +28,17 @@ jobs:
         working-directory: configurator-widget
         run: npm run build
 
-      - name: Deploy to Vercel (latest)
+      - name: Install Vercel CLI
+        run: npm install -g vercel@latest
+
+      - name: Deploy to Vercel
         working-directory: configurator-widget
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_WIDGET_PROJECT_ID }}
-        run: |
-          npm install -g vercel
-          vercel deploy --prod --token $VERCEL_TOKEN
+        run: vercel deploy --prod --yes --token "$VERCEL_TOKEN"
 
-      - name: Tag release artifact
+      - name: Log pinned version
         if: startsWith(github.ref, 'refs/tags/v')
-        env:
-          WIDGET_VERSION: ${{ github.ref_name }}
-        run: |
-          # The pinned-version URL (widget@v1.2.3.js) is served by Vercel
-          # via a path alias — add a vercel.json route in the widget project
-          # that maps /widget@${WIDGET_VERSION}.js → /widget.js
-          echo "Tagged release: $WIDGET_VERSION"
-          echo "Pinned URL will be: /widget@${WIDGET_VERSION}.js"
+        run: echo "Tagged release ${{ github.ref_name }} deployed"
