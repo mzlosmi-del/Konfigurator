@@ -105,6 +105,11 @@ export interface Database {
           sort_order: number
           sku: string | null
           unit_of_measure: string | null
+          is_template: boolean
+          template_category: string | null
+          public_slug: string | null
+          public_preview_enabled: boolean
+          read_only: boolean
           created_at: string
           updated_at: string
         }

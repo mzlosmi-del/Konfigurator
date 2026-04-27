@@ -1,5 +1,7 @@
-import { useState } from 'react'
-import { Check, Copy, ExternalLink, RefreshCw } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Check, Copy, ExternalLink, Link2, RefreshCw } from 'lucide-react'
+import QRCode from 'qrcode'
+import { supabase } from '@/lib/supabase'
 import { useAuthContext } from '@/components/auth/AuthContext'
 import type { Product } from '@/types/database'
 import { embedCopiedKey } from '@/components/OnboardingChecklist'
@@ -13,12 +15,27 @@ const WIDGET_CDN_URL    = import.meta.env.VITE_WIDGET_CDN_URL ?? '/widget.js'
 const SUPABASE_URL      = import.meta.env.VITE_SUPABASE_URL   ?? ''
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY ?? ''
 
+// Public preview page is served by the public-preview Edge Function
+const PUBLIC_PREVIEW_BASE = SUPABASE_URL.replace(/\/$/, '') + '/functions/v1/public-preview'
+
 export function EmbedPanel({ product }: Props) {
   const { tenant } = useAuthContext()
-  const [copied, setCopied]       = useState(false)
-  const [previewKey, setPreviewKey] = useState(0)
+  const [copied, setCopied]           = useState(false)
+  const [linkCopied, setLinkCopied]   = useState(false)
+  const [previewKey, setPreviewKey]   = useState(0)
+  const [previewEnabled, setPreviewEnabled] = useState(product.public_preview_enabled)
+  const [toggling, setToggling]       = useState(false)
+  const [qrDataUrl, setQrDataUrl]     = useState<string>('')
 
   const isPublished = product.status === 'published'
+  const publicSlug  = product.public_slug
+  const publicUrl   = publicSlug ? `${PUBLIC_PREVIEW_BASE}/${publicSlug}` : undefined
+
+  useEffect(() => {
+    if (!publicUrl) return
+    QRCode.toDataURL(publicUrl, { width: 160, margin: 1, color: { dark: '#111111', light: '#ffffff' } })
+      .then(setQrDataUrl)
+  }, [publicUrl])
 
   const previewSrc = (() => {
     const p = new URLSearchParams({
@@ -49,6 +66,24 @@ export function EmbedPanel({ product }: Props) {
     setTimeout(() => setCopied(false), 2000)
   }
 
+  async function handleCopyLink() {
+    if (!publicUrl) return
+    await navigator.clipboard.writeText(publicUrl)
+    setLinkCopied(true)
+    setTimeout(() => setLinkCopied(false), 2000)
+  }
+
+  async function handleTogglePreview() {
+    setToggling(true)
+    const next = !previewEnabled
+    const { error } = await supabase
+      .from('products')
+      .update({ public_preview_enabled: next } as unknown as never)
+      .eq('id', product.id)
+    if (!error) setPreviewEnabled(next)
+    setToggling(false)
+  }
+
   return (
     <div className="space-y-6">
       {!isPublished && (
@@ -56,6 +91,92 @@ export function EmbedPanel({ product }: Props) {
           {t('This product is not published. Publish it first so the widget can load it.')}
         </div>
       )}
+
+      {/* ── Share link ─────────────────────────────────────────────── */}
+      <div className="space-y-3">
+        <p className="text-sm font-medium">{t('Share link')}</p>
+        {isPublished && publicSlug ? (
+          <>
+            <p className="text-sm text-muted-foreground">
+              {t('Anyone with this link can preview your configurator without logging in.')}
+            </p>
+            <div className="flex items-center gap-2">
+              <div className="flex-1 rounded-md border bg-muted/40 px-3 py-2 font-mono text-xs truncate">
+                {publicUrl}
+              </div>
+              <button
+                onClick={handleCopyLink}
+                className="flex-none flex items-center gap-1.5 rounded-md border bg-background px-3 py-2 text-xs font-medium shadow-sm hover:bg-accent transition-colors"
+              >
+                {linkCopied
+                  ? <><Check className="h-3.5 w-3.5 text-emerald-600" />{t('Copied')}</>
+                  : <><Copy className="h-3.5 w-3.5" />{t('Copy')}</>}
+              </button>
+              <a
+                href={publicUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex-none flex items-center gap-1 rounded-md border bg-background px-3 py-2 text-xs font-medium shadow-sm hover:bg-accent transition-colors"
+                title={t('Open link')}
+              >
+                <ExternalLink className="h-3.5 w-3.5" />
+              </a>
+            </div>
+
+            {/* QR code */}
+            {qrDataUrl && (
+              <div className="flex items-start gap-4 pt-1">
+                <img src={qrDataUrl} alt="QR code" width={80} height={80} className="rounded border" />
+                <div className="text-xs text-muted-foreground space-y-2 pt-1">
+                  <p>{t('Scan to open the configurator on any device.')}</p>
+                  <a
+                    href={qrDataUrl}
+                    download={`qr-${product.id.slice(0, 8)}.png`}
+                    className="inline-flex items-center gap-1 text-primary hover:underline"
+                  >
+                    {t('Download QR')}
+                  </a>
+                </div>
+              </div>
+            )}
+
+            {/* Enable / disable toggle */}
+            <label className="flex items-center gap-3 cursor-pointer select-none">
+              <button
+                role="switch"
+                aria-checked={previewEnabled}
+                disabled={toggling}
+                onClick={handleTogglePreview}
+                className={[
+                  'relative inline-flex h-5 w-9 shrink-0 rounded-full border-2 border-transparent transition-colors',
+                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                  previewEnabled ? 'bg-primary' : 'bg-input',
+                  toggling ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer',
+                ].join(' ')}
+              >
+                <span
+                  className={[
+                    'pointer-events-none block h-4 w-4 rounded-full bg-background shadow-lg ring-0 transition-transform',
+                    previewEnabled ? 'translate-x-4' : 'translate-x-0',
+                  ].join(' ')}
+                />
+              </button>
+              <span className="text-sm">
+                {previewEnabled ? t('Link is active') : t('Link is disabled')}
+              </span>
+            </label>
+          </>
+        ) : isPublished ? (
+          <p className="text-sm text-muted-foreground">
+            <Link2 className="inline h-3.5 w-3.5 mr-1 opacity-60" />
+            {t('A shareable link will appear here once the product is saved after publishing.')}
+          </p>
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            {t('Publish this product to get a shareable preview link.')}
+          </p>
+        )}
+      </div>
 
       {/* ── Live preview ───────────────────────────────────────────── */}
       <div className="space-y-2">
