@@ -144,7 +144,54 @@ Deno.serve(async (req: Request) => {
     })
   }
 
-  // 6. Clone formulas — remap char_id and value_id references in the AST
+  // 6. Clone characteristic classes — remap characteristic IDs in memberships
+  const { data: productClasses } = await supabase
+    .from('product_classes')
+    .select('class_id, sort_order')
+    .eq('product_id', template_id)
+    .order('sort_order')
+
+  for (const pc of (productClasses ?? [])) {
+    const { data: cls } = await supabase
+      .from('characteristic_classes')
+      .select('name, sort_order')
+      .eq('id', pc.class_id)
+      .single()
+
+    if (!cls) continue
+
+    const { data: newClass } = await supabase
+      .from('characteristic_classes')
+      .insert({ tenant_id: tenantId, name: cls.name, sort_order: cls.sort_order })
+      .select().single()
+
+    if (!newClass) continue
+    const newClassId = (newClass as { id: string }).id
+
+    const { data: members } = await supabase
+      .from('characteristic_class_members')
+      .select('characteristic_id, sort_order')
+      .eq('class_id', pc.class_id)
+      .order('sort_order')
+
+    for (const m of (members ?? [])) {
+      const newCharId = charIdMap[m.characteristic_id]
+      if (!newCharId) continue
+      await supabase.from('characteristic_class_members').insert({
+        class_id:          newClassId,
+        characteristic_id: newCharId,
+        sort_order:        m.sort_order,
+      })
+    }
+
+    await supabase.from('product_classes').insert({
+      product_id: newProductId,
+      class_id:   newClassId,
+      sort_order: pc.sort_order,
+    })
+  }
+
+  // 8. Clone formulas — remap char_id and value_id references in the AST
   const { data: formulas } = await supabase
     .from('pricing_formulas')
     .select('*')
@@ -163,7 +210,7 @@ Deno.serve(async (req: Request) => {
     })
   }
 
-  // 7. Clone configuration rules — remap IDs
+  // 9. Clone configuration rules — remap IDs
   const { data: rules } = await supabase
     .from('configuration_rules')
     .select('*')

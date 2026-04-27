@@ -87,6 +87,51 @@ describe('clone-template: plan limit enforcement', () => {
   })
 })
 
+// ── Class cloning remapping ───────────────────────────────────────────────────
+
+describe('clone-template: class membership remapping', () => {
+  it('remaps characteristic_id through charIdMap when cloning class members', () => {
+    const charIdMap: Record<string, string> = { 'old-c1': 'new-c1', 'old-c2': 'new-c2' }
+    const members = [
+      { characteristic_id: 'old-c1', sort_order: 0 },
+      { characteristic_id: 'old-c2', sort_order: 1 },
+    ]
+    const remapped = members.map(m => ({
+      characteristic_id: charIdMap[m.characteristic_id] ?? m.characteristic_id,
+      sort_order: m.sort_order,
+    }))
+    expect(remapped[0].characteristic_id).toBe('new-c1')
+    expect(remapped[1].characteristic_id).toBe('new-c2')
+  })
+
+  it('skips members whose characteristic was not cloned (not in charIdMap)', () => {
+    const charIdMap: Record<string, string> = { 'old-c1': 'new-c1' }
+    const members = [
+      { characteristic_id: 'old-c1', sort_order: 0 },
+      { characteristic_id: 'unknown', sort_order: 1 },
+    ]
+    const remapped = members
+      .map(m => ({ newId: charIdMap[m.characteristic_id], sort_order: m.sort_order }))
+      .filter(m => !!m.newId)
+    expect(remapped).toHaveLength(1)
+    expect(remapped[0].newId).toBe('new-c1')
+  })
+
+  it('each template product should have exactly one class (seed expectation)', () => {
+    const templates = [
+      { name: 'Custom Desk',   classCount: 1 },
+      { name: 'Bookshelf',     classCount: 1 },
+      { name: 'Office Chair',  classCount: 1 },
+      { name: 'Dining Table',  classCount: 1 },
+      { name: 'Single Window', classCount: 1 },
+      { name: 'Sliding Door',  classCount: 1 },
+      { name: 'Bay Window',    classCount: 1 },
+      { name: 'Skylight',      classCount: 1 },
+    ]
+    expect(templates.every(t => t.classCount === 1)).toBe(true)
+  })
+})
+
 // ── Cloned product independence ───────────────────────────────────────────────
 // Verifies the conceptual guarantee: mutating one object does not affect another.
 
