@@ -75,8 +75,8 @@ vi.mock('@/lib/supabase', () => {
       from: (_table: string) => ({
         insert: (v: unknown) => {
           // Detect product insert — propagate mocked error
-          if (_insertError) return insertMock(v)
-          return { select: () => ({ single: async () => ({ data: { id: 'prod-1', ...v }, error: null }) }) }
+          if (_insertError) return insertMock()
+          return { select: () => ({ single: async () => ({ data: { id: 'prod-1', ...(v as object) }, error: null }) }) }
         },
         select: () => ({ order: () => ({ order: () => ({ data: [], error: null }) }) }),
       }),
