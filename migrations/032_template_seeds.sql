@@ -30,9 +30,8 @@ DECLARE
   v_desk_size_s uuid; v_desk_size_m uuid; v_desk_size_l uuid;
   v_desk_mat_oak uuid; v_desk_mat_wal uuid; v_desk_mat_mdf uuid;
   v_desk_leg_met uuid; v_desk_leg_woo uuid;
-  v_win_glass_dbl uuid; v_win_glass_tri uuid;
+  v_win_glass_tri uuid;
   v_win_open_fix uuid;
-  v_sky_open_vent uuid;
 
 BEGIN
 
@@ -220,7 +219,7 @@ BEGIN
     (c_win_open, sys_tid, 'Tilt-turn', 45,  2);
   INSERT INTO public.characteristic_values (characteristic_id, tenant_id, label, price_modifier, sort_order) VALUES
     (c_win_glass, sys_tid, 'Single glazing',  0, 0),
-    (c_win_glass, sys_tid, 'Double glazing', 60, 1) RETURNING id INTO v_win_glass_dbl;
+    (c_win_glass, sys_tid, 'Double glazing', 60, 1);
   INSERT INTO public.characteristic_values (characteristic_id, tenant_id, label, price_modifier, sort_order) VALUES
     (c_win_glass, sys_tid, 'Triple glazing', 120, 2) RETURNING id INTO v_win_glass_tri;
 
@@ -338,7 +337,7 @@ BEGIN
     (c_sky_size, sys_tid, '120×120 cm', 180, 2);
   INSERT INTO public.characteristic_values (characteristic_id, tenant_id, label, price_modifier, sort_order) VALUES
     (c_sky_open, sys_tid, 'Fixed',   0, 0),
-    (c_sky_open, sys_tid, 'Venting', 90, 1) RETURNING id INTO v_sky_open_vent;
+    (c_sky_open, sys_tid, 'Venting', 90, 1);
 
   INSERT INTO public.product_characteristics (product_id, characteristic_id, is_required, sort_order) VALUES
     (p_skylight, c_sky_size, true, 0), (p_skylight, c_sky_open, true, 1);
