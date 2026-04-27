@@ -23,7 +23,7 @@ export async function loadProductConfig(config: WidgetConfig): Promise<FullProdu
   // 1. Product
   const { data: product, error: productError } = await sb
     .from('products')
-    .select('id, name, description, base_price, currency')
+    .select('id, name, description, base_price, currency, ar_enabled, form_config')
     .eq('id', config.productId)
     .eq('status', 'published')
     .single()

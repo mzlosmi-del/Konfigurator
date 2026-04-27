@@ -89,6 +89,9 @@ export function ProductsPage() {
                 {products.length} / {maxProducts} &middot; {planLabel(tenant?.plan ?? 'free')}
               </span>
             )}
+            <Button size="sm" variant="outline" onClick={() => navigate('/products/import')} disabled={overLimit}>
+              {t('Import CSV')}
+            </Button>
             <div title={overLimit ? t('Upgrade your plan to add more products') : undefined}>
               <Button size="sm" onClick={() => navigate('/products/new')} disabled={overLimit}>
                 <Plus className="h-4 w-4" /> {t('New product')}

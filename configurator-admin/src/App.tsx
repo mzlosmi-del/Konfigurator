@@ -13,6 +13,7 @@ import { DashboardPage } from '@/pages/dashboard/DashboardPage'
 import { ProductsPage } from '@/pages/products/ProductsPage'
 import { NewProductPage } from '@/pages/products/NewProductPage'
 import { EditProductPage } from '@/pages/products/EditProductPage'
+import { ProductsImportPage } from '@/pages/products/ProductsImportPage'
 import { InquiriesPage } from '@/pages/inquiries/InquiriesPage'
 import { InquiryDetailPage } from '@/pages/inquiries/InquiryDetailPage'
 import { SettingsPage } from '@/pages/settings/SettingsPage'
@@ -56,6 +57,7 @@ export function App() {
               <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/products" element={<ProductsPage />} />
               <Route path="/products/new" element={<NewProductPage />} />
+              <Route path="/products/import" element={<ProductsImportPage />} />
               <Route path="/products/:id/edit" element={<EditProductPage />} />
               <Route path="/library" element={<LibraryPage />} />
               <Route path="/inquiries" element={<InquiriesPage />} />

@@ -10,6 +10,7 @@ interface Props {
   assets: VisualizationAsset[]
   selection: Selection
   numericInputs?: NumericInputs
+  arEnabled?: boolean
 }
 
 function loadModelViewer() {
@@ -98,11 +99,13 @@ function ModelViewer3D({
   rules,
   selection,
   numericInputs,
+  arEnabled,
 }: {
   url: string
   rules: MeshRule[]
   selection: Selection
   numericInputs: NumericInputs
+  arEnabled: boolean
 }) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mvRef = useRef<HTMLElement | null>(null)
@@ -120,7 +123,10 @@ function ModelViewer3D({
     mv.setAttribute('camera-controls', '')
     mv.setAttribute('auto-rotate', '')
     mv.setAttribute('shadow-intensity', '1')
-    mv.setAttribute('ar', '')
+    if (arEnabled) {
+      mv.setAttribute('ar', '')
+      mv.setAttribute('ar-modes', 'webxr scene-viewer quick-look')
+    }
     mv.style.width = '100%'
     mv.style.height = '100%'
 
@@ -143,7 +149,7 @@ function ModelViewer3D({
   return <div ref={containerRef} style="width:100%;height:100%" />
 }
 
-export function Visualization({ assets, selection, numericInputs = {} }: Props) {
+export function Visualization({ assets, selection, numericInputs = {}, arEnabled = true }: Props) {
   const url3d    = resolve3DAsset(assets, selection)
   const urlImg   = resolveImage(assets, selection)
   const [failed, setFailed] = useState(false)
@@ -168,6 +174,7 @@ export function Visualization({ assets, selection, numericInputs = {} }: Props) 
             rules={meshRules}
             selection={selection}
             numericInputs={numericInputs}
+            arEnabled={arEnabled}
           />
         : <img src={urlImg!} alt={t('Product visualization')} onError={() => setFailed(true)} />
       }

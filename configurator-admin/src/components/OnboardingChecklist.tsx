@@ -31,33 +31,41 @@ export function OnboardingChecklist({ products, tenantId }: Props) {
     () => localStorage.getItem(dismissedKey(tenantId)) === '1'
   )
 
-  const embedCopied = localStorage.getItem(embedCopiedKey(tenantId)) === '1'
+  const embedCopied  = localStorage.getItem(embedCopiedKey(tenantId)) === '1'
   const hasProduct   = products.length > 0
   const hasPublished = products.some(p => p.status === 'published')
+  const firstProductId = products[0]?.id
 
   const steps: Step[] = [
     {
-      label: t('Create your account'),
-      description: t('Your workspace is ready.'),
-      done: true,
-    },
-    {
       label: t('Create your first product'),
-      description: t('Add a configurable product with options and pricing.'),
+      description: t('Start from a template or build from scratch with options and pricing.'),
       done: hasProduct,
       href: '/products/new',
     },
     {
-      label: t('Publish the product'),
-      description: t('Make it live so the widget can load it.'),
-      done: hasPublished,
-      href: '/products',
+      label: t('Configure the inquiry form'),
+      description: t('Add GDPR consent and optional fields on the Form tab of your product.'),
+      done: hasProduct && embedCopied,
+      href: firstProductId ? `/products/${firstProductId}/edit?tab=form` : '/products',
     },
     {
-      label: t('Copy the embed code'),
-      description: t('Paste the snippet into your website.'),
-      done: embedCopied,
-      href: hasProduct ? `/products/${products[0]?.id}/edit` : '/products',
+      label: t('Publish and embed'),
+      description: t('Publish your product and paste the embed code on your website.'),
+      done: hasPublished && embedCopied,
+      href: firstProductId ? `/products/${firstProductId}/edit?tab=embed` : '/products',
+    },
+    {
+      label: t('Receive your first inquiry'),
+      description: t('A customer fills out your configurator and submits a quote request.'),
+      done: false,
+      href: '/inquiries',
+    },
+    {
+      label: t('Invite a team member'),
+      description: t('Add colleagues so they can manage products and inquiries.'),
+      done: false,
+      href: '/settings',
     },
   ]
 

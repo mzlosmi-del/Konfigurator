@@ -110,6 +110,8 @@ export interface Database {
           public_slug: string | null
           public_preview_enabled: boolean
           read_only: boolean
+          ar_enabled: boolean
+          form_config: Json
           created_at: string
           updated_at: string
         }

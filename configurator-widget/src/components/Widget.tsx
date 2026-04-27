@@ -10,8 +10,9 @@ import { CharacteristicInput } from './CharacteristicInput'
 import { InquiryForm } from './InquiryForm'
 
 interface Props {
-  config: WidgetConfig
-  track:  (type: string, payload?: Record<string, unknown>) => void
+  config:          WidgetConfig
+  track:           (type: string, payload?: Record<string, unknown>) => void
+  removeBranding?: boolean
 }
 
 type State =
@@ -20,7 +21,7 @@ type State =
   | { phase: 'ready'; data: FullProductConfig }
   | { phase: 'success' }
 
-export function Widget({ config, track }: Props) {
+export function Widget({ config, track, removeBranding = false }: Props) {
   const [state, setState] = useState<State>({ phase: 'loading' })
   const [selection, setSelection] = useState<Selection>({})
   const [numericInputs, setNumericInputs] = useState<NumericInputs>({})
@@ -193,12 +194,14 @@ export function Widget({ config, track }: Props) {
           <h3>{t('Inquiry sent!')}</h3>
           <p>{t("Thank you. We'll get back to you as soon as possible.")}</p>
         </div>
-        <div class="cw-branding">
-          <LangSwitcher />
-          <a href="https://konfigurator.app" target="_blank" rel="noopener">
-            {t('Powered by Konfigurator')}
-          </a>
-        </div>
+        {!removeBranding && (
+          <div class="cw-branding">
+            <LangSwitcher />
+            <a href="https://konfigurator.app" target="_blank" rel="noopener">
+              {t('Powered by Konfigurator')}
+            </a>
+          </div>
+        )}
       </div>
     )
   }
@@ -208,7 +211,7 @@ export function Widget({ config, track }: Props) {
   return (
     <div class="cw-root" key={lang}>
       {/* Product image */}
-      <Visualization assets={assets} selection={selection} numericInputs={numericInputs} />
+      <Visualization assets={assets} selection={selection} numericInputs={numericInputs} arEnabled={product.ar_enabled} />
 
       <div class="cw-body">
         {/* Product info */}
@@ -263,6 +266,7 @@ export function Widget({ config, track }: Props) {
             lineItems={lineItems}
             totalPrice={totalPrice}
             currency={product.currency}
+            formConfig={product.form_config}
             onSuccess={() => {
               track('inquiry_submitted', { price: totalPrice, currency: product.currency })
               setState({ phase: 'success' })
@@ -271,12 +275,14 @@ export function Widget({ config, track }: Props) {
         )}
       </div>
 
-      <div class="cw-branding">
-        <LangSwitcher />
-        <a href="https://konfigurator.app" target="_blank" rel="noopener">
-          {t('Powered by Konfigurator')}
-        </a>
-      </div>
+      {!removeBranding && (
+        <div class="cw-branding">
+          <LangSwitcher />
+          <a href="https://konfigurator.app" target="_blank" rel="noopener">
+            {t('Powered by Konfigurator')}
+          </a>
+        </div>
+      )}
     </div>
   )
 }

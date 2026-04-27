@@ -54,6 +54,8 @@ function ModelViewerThumb({ src }: { src: string }) {
 
 interface Props {
   productId: string
+  arEnabled?: boolean
+  onArToggle?: (v: boolean) => Promise<void>
 }
 
 const ASSET_TYPE_LABELS: Record<AssetType, string> = {
@@ -82,8 +84,8 @@ const emptyForm = (): AddFormState => ({
   uploading: false,
 })
 
-export function VisualizationPanel({ productId }: Props) {
-  const { tenant } = useAuthContext()
+export function VisualizationPanel({ productId, arEnabled = true, onArToggle }: Props) {
+  const { tenant, planLimits } = useAuthContext()
   const { toasts, toast, dismiss } = useToast()
 
   const [loading, setLoading] = useState(true)
@@ -95,6 +97,7 @@ export function VisualizationPanel({ productId }: Props) {
   const [toDelete, setToDelete] = useState<VisualizationAsset | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [meshEditorAssetId, setMeshEditorAssetId] = useState<string | null>(null)
+  const [arToggling, setArToggling] = useState(false)
   // Mesh names parsed client-side from the selected GLB file before upload
   const [pendingMeshNames, setPendingMeshNames] = useState<string[]>([])
 
@@ -521,6 +524,37 @@ export function VisualizationPanel({ productId }: Props) {
           <Plus className="h-4 w-4" />
           {t('Add visualization asset')}
         </button>
+      )}
+
+      {/* AR toggle — shown only when the plan includes 3D and there are 3D assets */}
+      {planLimits?.three_d && assets.some(a => a.asset_type === '3d_model') && onArToggle && (
+        <div className="pt-2 border-t">
+          <label className="flex items-center gap-3 cursor-pointer select-none">
+            <button
+              role="switch"
+              aria-checked={arEnabled}
+              disabled={arToggling}
+              onClick={async () => {
+                setArToggling(true)
+                try { await onArToggle(!arEnabled) } finally { setArToggling(false) }
+              }}
+              className={[
+                'relative inline-flex h-5 w-9 shrink-0 rounded-full border-2 border-transparent transition-colors',
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                arEnabled ? 'bg-primary' : 'bg-input',
+                arToggling ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer',
+              ].join(' ')}
+            >
+              <span className={[
+                'pointer-events-none block h-4 w-4 rounded-full bg-background shadow-lg ring-0 transition-transform',
+                arEnabled ? 'translate-x-4' : 'translate-x-0',
+              ].join(' ')} />
+            </button>
+            <span className="text-sm">
+              {t('Enable AR (augmented reality) button on 3D model')}
+            </span>
+          </label>
+        </div>
       )}
 
       <ConfirmDialog

@@ -14,6 +14,7 @@ function mountWidget(el: HTMLElement) {
   const supabaseAnonKey = el.getAttribute('data-supabase-anon-key') ?? ''
   const productId       = el.getAttribute('data-product-id')       ?? ''
   const tenantId        = el.getAttribute('data-tenant-id')        ?? ''
+  const removeBranding  = el.getAttribute('data-remove-branding') === 'true'
 
   if (!supabaseUrl || !supabaseAnonKey || !productId || !tenantId) {
     console.warn('[Configurator Widget] Missing required data attributes:', {
@@ -38,7 +39,7 @@ function mountWidget(el: HTMLElement) {
   const mountPoint = document.createElement('div')
   shadow.appendChild(mountPoint)
 
-  render(h(Widget, { config, track }), mountPoint)
+  render(h(Widget, { config, track, removeBranding }), mountPoint)
 
   // View event fires once per mount
   track('view')

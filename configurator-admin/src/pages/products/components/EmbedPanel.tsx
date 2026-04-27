@@ -19,13 +19,15 @@ const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY ?? ''
 const PUBLIC_PREVIEW_BASE = window.location.origin + '/p'
 
 export function EmbedPanel({ product }: Props) {
-  const { tenant } = useAuthContext()
-  const [copied, setCopied]           = useState(false)
-  const [linkCopied, setLinkCopied]   = useState(false)
-  const [previewKey, setPreviewKey]   = useState(0)
+  const { tenant, planLimits } = useAuthContext()
+  const [copied, setCopied]               = useState(false)
+  const [linkCopied, setLinkCopied]       = useState(false)
+  const [previewKey, setPreviewKey]       = useState(0)
   const [previewEnabled, setPreviewEnabled] = useState(product.public_preview_enabled)
-  const [toggling, setToggling]       = useState(false)
-  const [qrDataUrl, setQrDataUrl]     = useState<string>('')
+  const [toggling, setToggling]           = useState(false)
+  const [removeBranding, setRemoveBranding] = useState(false)
+  const [brandingToggling, setBrandingToggling] = useState(false)
+  const [qrDataUrl, setQrDataUrl]         = useState<string>('')
 
   const isPublished = product.status === 'published'
   const publicSlug  = product.public_slug
@@ -55,9 +57,16 @@ export function EmbedPanel({ product }: Props) {
     `  data-supabase-anon-key="${SUPABASE_ANON_KEY}"`,
     `  data-product-id="${product.id}"`,
     `  data-tenant-id="${tenant?.id ?? ''}"`,
+    ...(removeBranding ? ['  data-remove-branding="true"'] : []),
     '></div>',
     `<script src="${WIDGET_CDN_URL}" async></script>`,
   ].join('\n')
+
+  async function handleToggleBranding() {
+    setBrandingToggling(true)
+    setRemoveBranding(v => !v)
+    setBrandingToggling(false)
+  }
 
   async function handleCopy() {
     await navigator.clipboard.writeText(snippet)
@@ -242,6 +251,36 @@ export function EmbedPanel({ product }: Props) {
               : <><Copy className="h-3 w-3" /> {t('Copy')}</>}
           </button>
         </div>
+      </div>
+
+      {/* ── Branding ──────────────────────────────────────────────── */}
+      <div className="space-y-2">
+        <p className="text-sm font-medium">{t('Branding')}</p>
+        {planLimits?.remove_branding ? (
+          <label className="flex items-center gap-3 cursor-pointer select-none">
+            <button
+              role="switch"
+              aria-checked={removeBranding}
+              disabled={brandingToggling}
+              onClick={handleToggleBranding}
+              className={[
+                'relative inline-flex h-5 w-9 shrink-0 rounded-full border-2 border-transparent transition-colors cursor-pointer',
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                removeBranding ? 'bg-primary' : 'bg-input',
+              ].join(' ')}
+            >
+              <span className={[
+                'pointer-events-none block h-4 w-4 rounded-full bg-background shadow-lg ring-0 transition-transform',
+                removeBranding ? 'translate-x-4' : 'translate-x-0',
+              ].join(' ')} />
+            </button>
+            <span className="text-sm">{t('Remove "Powered by Konfigurator" badge')}</span>
+          </label>
+        ) : (
+          <p className="text-xs text-muted-foreground">
+            {t('The "Powered by Konfigurator" badge is shown on all widgets. Upgrade to Growth or Scale to remove it.')}
+          </p>
+        )}
       </div>
 
       {/* ── Deploy instructions ────────────────────────────────────── */}

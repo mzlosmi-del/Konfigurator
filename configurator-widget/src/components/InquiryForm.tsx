@@ -1,6 +1,6 @@
 import { h } from 'preact'
 import { useState } from 'preact/hooks'
-import type { WidgetConfig, ConfigLineItem } from '../types'
+import type { WidgetConfig, ConfigLineItem, FormConfig } from '../types'
 import { submitInquiry } from '../api'
 import { t } from '../i18n'
 
@@ -11,22 +11,27 @@ interface Props {
   lineItems: ConfigLineItem[]
   totalPrice: number
   currency: string
+  formConfig?: FormConfig
   onSuccess: () => void
 }
 
 interface FormState {
   name: string
   email: string
+  phone: string
+  company: string
   message: string
+  gdprConsent: boolean
 }
 
 interface FormErrors {
   name?: string
   email?: string
+  gdpr?: string
 }
 
-export function InquiryForm({ config, productId, tenantId, lineItems, totalPrice, currency, onSuccess }: Props) {
-  const [form, setForm] = useState<FormState>({ name: '', email: '', message: '' })
+export function InquiryForm({ config, productId, tenantId, lineItems, totalPrice, currency, formConfig = {}, onSuccess }: Props) {
+  const [form, setForm] = useState<FormState>({ name: '', email: '', phone: '', company: '', message: '', gdprConsent: false })
   const [errors, setErrors] = useState<FormErrors>({})
   const [submitting, setSubmitting] = useState(false)
   const [serverError, setServerError] = useState<string | null>(null)
@@ -36,6 +41,7 @@ export function InquiryForm({ config, productId, tenantId, lineItems, totalPrice
     if (!form.name.trim()) errs.name = t('Name is required')
     if (!form.email.trim()) errs.email = t('Email is required')
     else if (!/^[^@]+@[^@]+\.[^@]+$/.test(form.email)) errs.email = t('Enter a valid email')
+    if (formConfig.gdpr_enabled && !form.gdprConsent) errs.gdpr = t('You must accept to continue')
     setErrors(errs)
     return Object.keys(errs).length === 0
   }
@@ -53,7 +59,11 @@ export function InquiryForm({ config, productId, tenantId, lineItems, totalPrice
         product_id: productId,
         customer_name: form.name.trim(),
         customer_email: form.email.trim(),
-        message: form.message.trim(),
+        message: [
+          form.phone.trim() ? `Phone: ${form.phone.trim()}` : '',
+          form.company.trim() ? `Company: ${form.company.trim()}` : '',
+          form.message.trim(),
+        ].filter(Boolean).join('\n') || null,
         configuration: lineItems,
         total_price: totalPrice,
         currency,
@@ -67,6 +77,8 @@ export function InquiryForm({ config, productId, tenantId, lineItems, totalPrice
       setSubmitting(false)
     }
   }
+
+  const gdprText = formConfig.gdpr_text || t('I agree to the processing of my personal data.')
 
   return (
     <div class="cw-inquiry-form">
@@ -104,6 +116,32 @@ export function InquiryForm({ config, productId, tenantId, lineItems, totalPrice
             {errors.email && <span class="cw-field-error">{errors.email}</span>}
           </div>
 
+          {formConfig.show_phone && (
+            <div class="cw-field">
+              <label>{t('Phone number')}</label>
+              <input
+                type="tel"
+                placeholder="+385 91 234 5678"
+                value={form.phone}
+                onInput={(e) => setForm(f => ({ ...f, phone: (e.target as HTMLInputElement).value }))}
+                autocomplete="tel"
+              />
+            </div>
+          )}
+
+          {formConfig.show_company && (
+            <div class="cw-field">
+              <label>{t('Company name')}</label>
+              <input
+                type="text"
+                placeholder={t('Acme d.o.o.')}
+                value={form.company}
+                onInput={(e) => setForm(f => ({ ...f, company: (e.target as HTMLInputElement).value }))}
+                autocomplete="organization"
+              />
+            </div>
+          )}
+
           <div class="cw-field">
             <label>{t('Message (optional)')}</label>
             <textarea
@@ -113,6 +151,28 @@ export function InquiryForm({ config, productId, tenantId, lineItems, totalPrice
               onInput={(e) => setForm(f => ({ ...f, message: (e.target as HTMLTextAreaElement).value }))}
             />
           </div>
+
+          {formConfig.gdpr_enabled && (
+            <div class="cw-field">
+              <label style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={form.gdprConsent}
+                  style={{ marginTop: '2px', flexShrink: 0 }}
+                  onChange={(e) => setForm(f => ({ ...f, gdprConsent: (e.target as HTMLInputElement).checked }))}
+                />
+                <span style={{ fontSize: '12px', lineHeight: '1.4' }}>
+                  {gdprText}
+                  {formConfig.gdpr_link && (
+                    <> <a href={formConfig.gdpr_link} target="_blank" rel="noopener" style={{ color: '#2563eb' }}>
+                      {formConfig.gdpr_link_text || t('Privacy policy')}
+                    </a></>
+                  )}
+                </span>
+              </label>
+              {errors.gdpr && <span class="cw-field-error">{errors.gdpr}</span>}
+            </div>
+          )}
 
           <button
             type="submit"

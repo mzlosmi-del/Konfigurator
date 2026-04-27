@@ -70,7 +70,7 @@ export async function createProduct(
 
 export async function updateProduct(
   id: string,
-  input: Partial<Pick<Product, 'name' | 'description' | 'base_price' | 'currency' | 'status' | 'sku' | 'unit_of_measure'>>
+  input: Partial<Pick<Product, 'name' | 'description' | 'base_price' | 'currency' | 'status' | 'sku' | 'unit_of_measure' | 'ar_enabled' | 'form_config' | 'public_preview_enabled'>>
 ): Promise<Product> {
   const { data, error } = await supabase
     .from('products')
