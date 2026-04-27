@@ -37,13 +37,15 @@ export function createAnalytics(opts: {
     if (queue.length === 0) return
     const events = queue.splice(0)
     const body   = JSON.stringify({ product_id: opts.productId, tenant_id: opts.tenantId, events })
-    // sendBeacon survives page unload; falls back to fetch for regular flushes
-    if (typeof navigator !== 'undefined' && navigator.sendBeacon) {
-      navigator.sendBeacon(endpoint, new Blob([body], { type: 'application/json' }))
-    } else {
-      fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body, keepalive: true })
-        .catch(() => {})
-    }
+    // keepalive: true survives page unload; credentials: 'omit' is required so
+    // the browser doesn't send cookies — wildcard CORS rejects credentialed requests
+    fetch(endpoint, {
+      method:      'POST',
+      headers:     { 'Content-Type': 'application/json' },
+      body,
+      keepalive:   true,
+      credentials: 'omit',
+    }).catch(() => {})
   }
 
   function track(type: EventType, payload: Record<string, unknown> = {}) {
