@@ -28,6 +28,25 @@ export interface Characteristic {
   values: CharacteristicValue[]
 }
 
+export type MeshVisibilityRule = {
+  type: 'visibility'
+  mesh_name: string
+  value_id: string
+}
+
+export type MeshDimensionRule = {
+  type: 'dimension'
+  node_name: string
+  characteristic_id: string
+  axis: 'x' | 'y' | 'z'
+  value_min: number
+  value_max: number
+  scale_min: number
+  scale_max: number
+}
+
+export type MeshRule = MeshVisibilityRule | MeshDimensionRule
+
 export interface VisualizationAsset {
   id: string
   characteristic_value_id: string | null
@@ -35,6 +54,7 @@ export interface VisualizationAsset {
   url: string
   is_default: boolean
   sort_order: number
+  mesh_rules: MeshRule[]
 }
 
 export interface ConfigurationRule {

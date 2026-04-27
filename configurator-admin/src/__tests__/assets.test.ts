@@ -17,6 +17,7 @@ function makeAsset(
     asset_type: 'image',
     is_default: false,
     sort_order: 0,
+    mesh_rules: [],
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
     ...overrides,

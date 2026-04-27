@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Plus, Trash2, Star, StarOff, Upload, Link, ArrowUp, ArrowDown } from 'lucide-react'
+import { Plus, Trash2, Star, StarOff, Upload, Link, ArrowUp, ArrowDown, Network } from 'lucide-react'
 import {
   fetchAssetsForProduct,
   createAsset,
@@ -20,6 +20,7 @@ import { useToast } from '@/hooks/useToast'
 import { Toaster } from '@/components/ui/toast'
 import { useAuthContext } from '@/components/auth/AuthContext'
 import { t } from '@/i18n'
+import { MeshRulesEditor, type MeshRule } from './MeshRulesEditor'
 
 
 const MODEL_VIEWER_CDN = 'https://ajax.googleapis.com/ajax/libs/model-viewer/3.5.0/model-viewer.min.js'
@@ -92,6 +93,7 @@ export function VisualizationPanel({ productId }: Props) {
   const [saving, setSaving] = useState(false)
   const [toDelete, setToDelete] = useState<VisualizationAsset | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const [meshEditorAssetId, setMeshEditorAssetId] = useState<string | null>(null)
 
   useEffect(() => {
     load()
@@ -231,9 +233,25 @@ export function VisualizationPanel({ productId }: Props) {
     }
   }
 
+  async function handleSaveMeshRules(assetId: string, rules: MeshRule[]) {
+    try {
+      const updated = await updateAsset(assetId, { mesh_rules: rules as unknown as import('@/types/database').Json })
+      setAssets(prev => prev.map(a => a.id === assetId ? updated : a))
+      toast({ title: t('Mesh rules saved') })
+      setMeshEditorAssetId(null)
+    } catch {
+      toast({ title: t('Failed to save mesh rules'), variant: 'destructive' })
+    }
+  }
+
   function valueLabel(cvId: string | null): string {
     if (!cvId) return t('Default')
     return allValues.find(v => v.id === cvId)?.label ?? cvId.slice(0, 8)
+  }
+
+  function meshRulesCount(asset: VisualizationAsset): number {
+    if (!Array.isArray(asset.mesh_rules)) return 0
+    return (asset.mesh_rules as MeshRule[]).length
   }
 
   if (loading) {
@@ -250,76 +268,101 @@ export function VisualizationPanel({ productId }: Props) {
       ) : (
         <div className="space-y-2">
           {assets.map((asset, idx) => (
-            <div
-              key={asset.id}
-              className="flex items-center gap-3 rounded-lg border bg-card px-3 py-2.5 text-sm"
-            >
-              {/* Thumbnail */}
-              <div className="h-12 w-16 shrink-0 rounded overflow-hidden border bg-muted flex items-center justify-center">
-                {asset.asset_type === '3d_model' ? (
-                  <ModelViewerThumb src={asset.url} />
-                ) : (
-                  <img
-                    src={asset.url}
-                    alt=""
-                    className="h-full w-full object-cover"
-                    onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
-                  />
-                )}
-              </div>
-
-              {/* Info */}
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <Badge variant="secondary" className="text-xs capitalize">
-                    {t(ASSET_TYPE_LABELS[asset.asset_type])}
-                  </Badge>
-                  <span className="text-xs text-muted-foreground truncate">
-                    {valueLabel(asset.characteristic_value_id)}
-                  </span>
-                  {asset.is_default && (
-                    <Badge variant="success" className="text-xs">{t('Default')}</Badge>
+            <div key={asset.id}>
+              <div className="flex items-center gap-3 rounded-lg border bg-card px-3 py-2.5 text-sm">
+                {/* Thumbnail */}
+                <div className="h-12 w-16 shrink-0 rounded overflow-hidden border bg-muted flex items-center justify-center">
+                  {asset.asset_type === '3d_model' ? (
+                    <ModelViewerThumb src={asset.url} />
+                  ) : (
+                    <img
+                      src={asset.url}
+                      alt=""
+                      className="h-full w-full object-cover"
+                      onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
+                    />
                   )}
                 </div>
-                <p className="text-xs text-muted-foreground truncate mt-0.5 font-mono">
-                  {asset.url}
-                </p>
+
+                {/* Info */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Badge variant="secondary" className="text-xs capitalize">
+                      {t(ASSET_TYPE_LABELS[asset.asset_type])}
+                    </Badge>
+                    <span className="text-xs text-muted-foreground truncate">
+                      {valueLabel(asset.characteristic_value_id)}
+                    </span>
+                    {asset.is_default && (
+                      <Badge variant="success" className="text-xs">{t('Default')}</Badge>
+                    )}
+                    {asset.asset_type === '3d_model' && meshRulesCount(asset) > 0 && (
+                      <Badge variant="secondary" className="text-xs">
+                        {meshRulesCount(asset)} {t('mesh rules')}
+                      </Badge>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground truncate mt-0.5 font-mono">
+                    {asset.url}
+                  </p>
+                </div>
+
+                {/* Actions */}
+                <div className="flex items-center gap-0.5 shrink-0">
+                  {asset.asset_type === '3d_model' && (
+                    <Button
+                      variant="ghost" size="icon" className="h-7 w-7"
+                      title={t('Configure mesh rules')}
+                      onClick={() => setMeshEditorAssetId(meshEditorAssetId === asset.id ? null : asset.id)}
+                    >
+                      <Network className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
+                  <Button
+                    variant="ghost" size="icon" className="h-7 w-7"
+                    title={asset.is_default ? t('Unset default') : t('Set as default')}
+                    onClick={() => handleToggleDefault(asset)}
+                  >
+                    {asset.is_default
+                      ? <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+                      : <StarOff className="h-3.5 w-3.5 text-muted-foreground" />}
+                  </Button>
+                  <Button
+                    variant="ghost" size="icon" className="h-7 w-7"
+                    title={t('Move up')} disabled={idx === 0}
+                    onClick={() => handleMove(asset, 'up')}
+                  >
+                    <ArrowUp className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    variant="ghost" size="icon" className="h-7 w-7"
+                    title={t('Move down')} disabled={idx === assets.length - 1}
+                    onClick={() => handleMove(asset, 'down')}
+                  >
+                    <ArrowDown className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    variant="ghost" size="icon"
+                    className="h-7 w-7 text-destructive hover:text-destructive"
+                    title={t('Delete')}
+                    onClick={() => setToDelete(asset)}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
               </div>
 
-              {/* Actions */}
-              <div className="flex items-center gap-0.5 shrink-0">
-                <Button
-                  variant="ghost" size="icon" className="h-7 w-7"
-                  title={asset.is_default ? t('Unset default') : t('Set as default')}
-                  onClick={() => handleToggleDefault(asset)}
-                >
-                  {asset.is_default
-                    ? <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
-                    : <StarOff className="h-3.5 w-3.5 text-muted-foreground" />}
-                </Button>
-                <Button
-                  variant="ghost" size="icon" className="h-7 w-7"
-                  title={t('Move up')} disabled={idx === 0}
-                  onClick={() => handleMove(asset, 'up')}
-                >
-                  <ArrowUp className="h-3.5 w-3.5" />
-                </Button>
-                <Button
-                  variant="ghost" size="icon" className="h-7 w-7"
-                  title={t('Move down')} disabled={idx === assets.length - 1}
-                  onClick={() => handleMove(asset, 'down')}
-                >
-                  <ArrowDown className="h-3.5 w-3.5" />
-                </Button>
-                <Button
-                  variant="ghost" size="icon"
-                  className="h-7 w-7 text-destructive hover:text-destructive"
-                  title={t('Delete')}
-                  onClick={() => setToDelete(asset)}
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </Button>
-              </div>
+              {/* Inline mesh rules editor */}
+              {asset.asset_type === '3d_model' && meshEditorAssetId === asset.id && (
+                <MeshRulesEditor
+                  assetId={asset.id}
+                  assetUrl={asset.url}
+                  initialRules={(Array.isArray(asset.mesh_rules) ? asset.mesh_rules : []) as MeshRule[]}
+                  characteristics={chars}
+                  onSave={rules => handleSaveMeshRules(asset.id, rules)}
+                  onClose={() => setMeshEditorAssetId(null)}
+                />
+              )}
             </div>
           ))}
         </div>

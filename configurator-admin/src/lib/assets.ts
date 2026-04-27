@@ -38,7 +38,7 @@ export async function createAsset(
 export async function updateAsset(
   id: string,
   input: Partial<
-    Pick<VisualizationAsset, 'characteristic_value_id' | 'asset_type' | 'url' | 'is_default' | 'sort_order'>
+    Pick<VisualizationAsset, 'characteristic_value_id' | 'asset_type' | 'url' | 'is_default' | 'sort_order' | 'mesh_rules'>
   >
 ): Promise<VisualizationAsset> {
   const { data, error } = await supabase

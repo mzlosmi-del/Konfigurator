@@ -86,7 +86,7 @@ export async function loadProductConfig(config: WidgetConfig): Promise<FullProdu
           .order('sort_order', { ascending: true })
       : Promise.resolve({ data: [], error: null }),
     sb.from('visualization_assets')
-      .select('id, characteristic_value_id, asset_type, url, is_default, sort_order')
+      .select('id, characteristic_value_id, asset_type, url, is_default, sort_order, mesh_rules')
       .eq('product_id', config.productId)
       .order('sort_order', { ascending: true }),
     sb.from('configuration_rules')
