@@ -60,8 +60,14 @@ export async function createProduct(
     .select()
     .single()
   if (error) {
-    if (error.message.includes('plan_limit_exceeded')) {
-      throw new Error('You have reached the product limit for your plan. Upgrade to add more products.')
+    // DB trigger raises JSON: {"code":"PLAN_LIMIT_EXCEEDED","dimension":"products",...}
+    if (error.message.includes('PLAN_LIMIT_EXCEEDED') || error.message.includes('plan_limit_exceeded')) {
+      let detail = ''
+      try {
+        const parsed = JSON.parse(error.message) as { plan?: string; limit?: number }
+        if (parsed.plan) detail = ` (${parsed.plan} plan: ${parsed.limit} max)`
+      } catch { /* not JSON */ }
+      throw new Error(`Product limit reached${detail}. Upgrade your plan to add more products.`)
     }
     throw new Error(error.message)
   }

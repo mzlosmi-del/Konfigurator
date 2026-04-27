@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { PDFDocument, rgb, StandardFonts } from 'npm:pdf-lib@1.17.1'
+import { loadPlanLimits, makePlanError, gateForbidden } from '../_shared/planGate.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin':  '*',
@@ -64,6 +65,19 @@ Deno.serve(async (req: Request) => {
   const supabaseUrl    = Deno.env.get('SUPABASE_URL')!
   const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 
+  // Require authentication — callers must pass a valid user JWT
+  const authHeader = req.headers.get('Authorization')
+  if (!authHeader?.startsWith('Bearer ')) {
+    return new Response('Unauthorized', { status: 401, headers: corsHeaders })
+  }
+  const userClient = createClient(supabaseUrl, Deno.env.get('SUPABASE_ANON_KEY')!, {
+    global: { headers: { Authorization: authHeader } },
+  })
+  const { data: { user }, error: authErr } = await userClient.auth.getUser()
+  if (authErr || !user) {
+    return new Response('Unauthorized', { status: 401, headers: corsHeaders })
+  }
+
   const sb = createClient(supabaseUrl, serviceRoleKey)
 
   let quotation_id: string
@@ -93,6 +107,13 @@ Deno.serve(async (req: Request) => {
       .eq('id', quotation.tenant_id)
       .single()
     const tenantName = (tenantData as TenantRow | null)?.name ?? 'Your store'
+
+    // ── Plan gate: quotations feature ──────────────────────────────────────
+    const limits = await loadPlanLimits(sb, quotation.tenant_id)
+    if (!limits) return new Response('Tenant not found', { status: 404, headers: corsHeaders })
+    if (!limits.quotations) {
+      return gateForbidden(makePlanError('quotations', limits.plan), corsHeaders)
+    }
 
     const pdfBytes = await buildQuotationPdf({ tenantName, quotation })
 

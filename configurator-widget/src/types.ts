@@ -5,12 +5,23 @@ export interface WidgetConfig {
   tenantId: string
 }
 
+export interface FormConfig {
+  show_phone?: boolean
+  show_company?: boolean
+  gdpr_enabled?: boolean
+  gdpr_text?: string
+  gdpr_link?: string
+  gdpr_link_text?: string
+}
+
 export interface ProductData {
   id: string
   name: string
   description: string | null
   base_price: number
   currency: string
+  ar_enabled: boolean
+  form_config: FormConfig
 }
 
 export interface CharacteristicValue {
@@ -102,6 +113,7 @@ export interface FullProductConfig {
   assets: VisualizationAsset[]
   rules: ConfigurationRule[]
   formulas: PricingFormula[]
+  removeBranding: boolean
 }
 
 // Selected state: charId → valueId (for select/radio/swatch/toggle types)

@@ -10,6 +10,7 @@ interface Props {
   assets: VisualizationAsset[]
   selection: Selection
   numericInputs?: NumericInputs
+  arEnabled?: boolean
 }
 
 function loadModelViewer() {
@@ -20,14 +21,36 @@ function loadModelViewer() {
   document.head.appendChild(s)
 }
 
+type ThreeScene = { isScene: true; traverse: (cb: (node: unknown) => void) => void }
+
+function findScene(mv: HTMLElement): ThreeScene | null {
+  // Try the named getter first (works on unminified / some CDN builds)
+  const direct = (mv as unknown as { scene?: ThreeScene }).scene
+  if (direct?.traverse) return direct
+  // ModelScene extends THREE.Scene which sets isScene = true on the instance.
+  // On the minified CDN build the getter is renamed, but the instance symbol
+  // property added by model-viewer is still enumerable via getOwnPropertySymbols.
+  for (const sym of Object.getOwnPropertySymbols(mv)) {
+    try {
+      const v = (mv as unknown as Record<symbol, unknown>)[sym]
+      if (
+        v !== null && typeof v === 'object' &&
+        (v as ThreeScene).isScene === true &&
+        typeof (v as ThreeScene).traverse === 'function'
+      ) return v as ThreeScene
+    } catch { /* symbol getter may throw */ }
+  }
+  return null
+}
+
 function applyMeshRules(
   mv: HTMLElement,
   rules: MeshRule[],
   selection: Selection,
   numericInputs: NumericInputs,
 ) {
-  const scene = (mv as { scene?: { traverse?: (cb: (node: unknown) => void) => void } }).scene
-  if (!scene?.traverse) return
+  const scene = findScene(mv)
+  if (!scene) return
 
   const selectedValueIds = new Set(Object.values(selection))
 
@@ -76,11 +99,13 @@ function ModelViewer3D({
   rules,
   selection,
   numericInputs,
+  arEnabled,
 }: {
   url: string
   rules: MeshRule[]
   selection: Selection
   numericInputs: NumericInputs
+  arEnabled: boolean
 }) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mvRef = useRef<HTMLElement | null>(null)
@@ -98,7 +123,10 @@ function ModelViewer3D({
     mv.setAttribute('camera-controls', '')
     mv.setAttribute('auto-rotate', '')
     mv.setAttribute('shadow-intensity', '1')
-    mv.setAttribute('ar', '')
+    if (arEnabled) {
+      mv.setAttribute('ar', '')
+      mv.setAttribute('ar-modes', 'webxr scene-viewer quick-look')
+    }
     mv.style.width = '100%'
     mv.style.height = '100%'
 
@@ -121,7 +149,7 @@ function ModelViewer3D({
   return <div ref={containerRef} style="width:100%;height:100%" />
 }
 
-export function Visualization({ assets, selection, numericInputs = {} }: Props) {
+export function Visualization({ assets, selection, numericInputs = {}, arEnabled = true }: Props) {
   const url3d    = resolve3DAsset(assets, selection)
   const urlImg   = resolveImage(assets, selection)
   const [failed, setFailed] = useState(false)
@@ -146,6 +174,7 @@ export function Visualization({ assets, selection, numericInputs = {} }: Props) 
             rules={meshRules}
             selection={selection}
             numericInputs={numericInputs}
+            arEnabled={arEnabled}
           />
         : <img src={urlImg!} alt={t('Product visualization')} onError={() => setFailed(true)} />
       }
