@@ -48,7 +48,19 @@ export function createAnalytics(opts: {
     }).catch(() => {})
   }
 
+  // Debounce characteristic_changed so rapid clicks produce one event per burst
+  let charDebounceTimer: ReturnType<typeof setTimeout> | null = null
+
   function track(type: EventType, payload: Record<string, unknown> = {}) {
+    if (type === 'characteristic_changed') {
+      if (charDebounceTimer !== null) clearTimeout(charDebounceTimer)
+      charDebounceTimer = setTimeout(() => {
+        charDebounceTimer = null
+        queue.push({ session_id: sessionId, event_type: type, payload })
+        if (queue.length >= 5) flush()
+      }, 400)
+      return
+    }
     queue.push({ session_id: sessionId, event_type: type, payload })
     if (queue.length >= 5) flush()
   }

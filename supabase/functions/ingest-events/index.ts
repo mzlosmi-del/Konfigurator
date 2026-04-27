@@ -6,7 +6,7 @@ const CORS = {
 }
 
 const VALID_TYPES = new Set(['view', 'characteristic_changed', 'inquiry_started', 'inquiry_submitted'])
-const RATE_LIMIT  = 10   // max requests per session per minute
+const RATE_LIMIT  = 200  // max events per session per minute
 
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: CORS })
