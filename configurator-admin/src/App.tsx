@@ -25,6 +25,7 @@ import { QuotationDetailPage } from '@/pages/quotations/QuotationDetailPage'
 import { TextsPage } from '@/pages/texts/TextsPage'
 import { AnalyticsPage } from '@/pages/analytics/AnalyticsPage'
 import { EmbedDocsPage } from '@/pages/embed-docs/EmbedDocsPage'
+import { PublicPreviewPage } from '@/pages/public/PublicPreviewPage'
 
 export function App() {
   const [lang, setLangState] = useState<Lang>(getLang())
@@ -47,6 +48,7 @@ export function App() {
           <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/invite/:token" element={<InvitePage />} />
           <Route path="/preview/:productId" element={<PreviewPage />} />
+          <Route path="/p/:slug" element={<PublicPreviewPage />} />
 
           {/* Protected routes — require auth */}
           <Route element={<ProtectedRoute />}>

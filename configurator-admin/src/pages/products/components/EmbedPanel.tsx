@@ -15,8 +15,8 @@ const WIDGET_CDN_URL    = import.meta.env.VITE_WIDGET_CDN_URL ?? '/widget.js'
 const SUPABASE_URL      = import.meta.env.VITE_SUPABASE_URL   ?? ''
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY ?? ''
 
-// Public preview page is served by the public-preview Edge Function
-const PUBLIC_PREVIEW_BASE = SUPABASE_URL.replace(/\/$/, '') + '/functions/v1/public-preview'
+// Public preview page is hosted on Vercel — avoids Supabase gateway CSP/content-type restrictions
+const PUBLIC_PREVIEW_BASE = window.location.origin + '/p'
 
 export function EmbedPanel({ product }: Props) {
   const { tenant } = useAuthContext()
