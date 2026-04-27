@@ -23,7 +23,10 @@ export async function parseGlbMeshNames(source: File | string): Promise<string[]
   if (jsonChunkType !== 0x4E4F534A) throw new Error('GLB JSON chunk not found')
 
   const jsonBytes = new Uint8Array(buffer, 20, jsonChunkLength)
-  const gltf = JSON.parse(new TextDecoder().decode(jsonBytes))
+  // The GLTF spec says pad with spaces, but many generators (including ours) pad
+  // with null bytes (\x00).  JSON.parse chokes on trailing nulls, so strip them.
+  const jsonText = new TextDecoder().decode(jsonBytes).replace(/\0+$/, '')
+  const gltf = JSON.parse(jsonText)
 
   const names = new Set<string>()
 
