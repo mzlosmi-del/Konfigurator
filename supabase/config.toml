@@ -1,8 +1,0 @@
-[functions.public-preview]
-verify_jwt = false
-
-[functions.embed]
-verify_jwt = false
-
-[functions.ingest-events]
-verify_jwt = false
