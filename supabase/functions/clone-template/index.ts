@@ -230,6 +230,25 @@ Deno.serve(async (req: Request) => {
   // Note: visualization_assets are intentionally NOT copied from template —
   // the new product starts without images (user adds their own via admin).
 
+  // 10. Clone product texts
+  const { data: texts } = await supabase
+    .from('product_texts')
+    .select('label, content, text_type, language, sort_order')
+    .eq('product_id', template_id)
+    .order('sort_order')
+
+  for (const txt of (texts ?? [])) {
+    await supabase.from('product_texts').insert({
+      tenant_id:  tenantId,
+      product_id: newProductId,
+      label:      txt.label,
+      content:    txt.content,
+      text_type:  txt.text_type,
+      language:   txt.language,
+      sort_order: txt.sort_order,
+    })
+  }
+
   return new Response(JSON.stringify({ product_id: newProductId }), {
     headers: { ...CORS, 'Content-Type': 'application/json' },
   })
