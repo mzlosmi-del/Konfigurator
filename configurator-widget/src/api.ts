@@ -126,12 +126,17 @@ export async function loadProductConfig(config: WidgetConfig): Promise<FullProdu
     .filter(id => charById[id])
     .map(id => ({ ...charById[id], values: valuesByCharId[id] ?? [] }))
 
+  // Server-authoritative branding flag — not operator-controllable via data attributes
+  const { data: brandingData } = await sb.rpc('get_widget_branding', { p_product_id: config.productId })
+  const removeBranding = brandingData === true
+
   return {
     product: product as ProductData,
     characteristics,
     assets:    (assetsData    ?? []) as VisualizationAsset[],
     rules:     (rulesData     ?? []) as ConfigurationRule[],
     formulas:  (formulasData  ?? []) as PricingFormula[],
+    removeBranding,
   }
 }
 

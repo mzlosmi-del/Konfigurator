@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { loadPlanLimits, makePlanError, gateForbidden } from '../_shared/planGate.ts'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -58,6 +59,21 @@ Deno.serve(async (req: Request) => {
   }
 
   const tenantId = callerProfile.tenant_id
+
+  // ── Plan gate: team_members_max ────────────────────────────────────────
+  const limits = await loadPlanLimits(sb, tenantId)
+  if (limits && limits.team_members_max >= 0) {
+    const { count } = await sb
+      .from('profiles')
+      .select('id', { count: 'exact', head: true })
+      .eq('tenant_id', tenantId)
+    if ((count ?? 0) >= limits.team_members_max) {
+      return gateForbidden(
+        makePlanError('team_members', limits.plan, count ?? 0, limits.team_members_max),
+        CORS,
+      )
+    }
+  }
 
   // Check if email already a member
   const { data: existing } = await sb

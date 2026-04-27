@@ -10,9 +10,8 @@ import { CharacteristicInput } from './CharacteristicInput'
 import { InquiryForm } from './InquiryForm'
 
 interface Props {
-  config:          WidgetConfig
-  track:           (type: string, payload?: Record<string, unknown>) => void
-  removeBranding?: boolean
+  config: WidgetConfig
+  track:  (type: string, payload?: Record<string, unknown>) => void
 }
 
 type State =
@@ -21,7 +20,7 @@ type State =
   | { phase: 'ready'; data: FullProductConfig }
   | { phase: 'success' }
 
-export function Widget({ config, track, removeBranding = false }: Props) {
+export function Widget({ config, track }: Props) {
   const [state, setState] = useState<State>({ phase: 'loading' })
   const [selection, setSelection] = useState<Selection>({})
   const [numericInputs, setNumericInputs] = useState<NumericInputs>({})
@@ -194,7 +193,7 @@ export function Widget({ config, track, removeBranding = false }: Props) {
           <h3>{t('Inquiry sent!')}</h3>
           <p>{t("Thank you. We'll get back to you as soon as possible.")}</p>
         </div>
-        {!removeBranding && (
+        {!state.data.removeBranding && (
           <div class="cw-branding">
             <LangSwitcher />
             <a href="https://konfigurator.app" target="_blank" rel="noopener">
@@ -206,7 +205,7 @@ export function Widget({ config, track, removeBranding = false }: Props) {
     )
   }
 
-  const { product, characteristics, assets } = state.data
+  const { product, characteristics, assets, removeBranding } = state.data
 
   return (
     <div class="cw-root" key={lang}>

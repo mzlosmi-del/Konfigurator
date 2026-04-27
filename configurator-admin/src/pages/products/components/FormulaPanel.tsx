@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Plus, Trash2, ChevronDown, ChevronRight, ToggleLeft, ToggleRight } from 'lucide-react'
 import { fetchFormulas, createFormula, updateFormula, deleteFormula } from '@/lib/formulas'
-import { fetchCharacteristics, fetchValuesForCharacteristic } from '@/lib/products'
+import { fetchProductCharacteristicsWithValues } from '@/lib/products'
 import type { PricingFormula, FormulaNode, Characteristic, CharacteristicValue } from '@/types/database'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -40,17 +40,13 @@ export function FormulaPanel({ productId }: Props) {
   async function load() {
     setLoading(true)
     try {
-      const [formulasData, chars] = await Promise.all([
+      const [formulasData, charsWithValues] = await Promise.all([
         fetchFormulas(productId),
-        fetchCharacteristics(),
+        fetchProductCharacteristicsWithValues(productId),
       ])
       setFormulas(formulasData)
-      setCharacteristics(chars)
-
-      const entries = await Promise.all(
-        chars.map(async c => [c.id, await fetchValuesForCharacteristic(c.id)] as const)
-      )
-      setValuesMap(Object.fromEntries(entries))
+      setCharacteristics(charsWithValues)
+      setValuesMap(Object.fromEntries(charsWithValues.map(c => [c.id, c.characteristic_values])))
     } catch {
       toast({ title: t('Failed to load formulas'), variant: 'destructive' })
     } finally {

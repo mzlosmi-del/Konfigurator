@@ -113,6 +113,7 @@ export interface FullProductConfig {
   assets: VisualizationAsset[]
   rules: ConfigurationRule[]
   formulas: PricingFormula[]
+  removeBranding: boolean
 }
 
 // Selected state: charId → valueId (for select/radio/swatch/toggle types)

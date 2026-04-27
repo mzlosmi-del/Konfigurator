@@ -735,32 +735,45 @@ export function SettingsPage() {
             )}
 
             {/* Invite form */}
-            <div className="space-y-2 pt-1 border-t">
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground pt-2">{t('Invite member')}</p>
-              <div className="flex gap-2">
-                <Input
-                  type="email"
-                  placeholder={t('colleague@company.com')}
-                  value={inviteEmail}
-                  onChange={e => setInviteEmail(e.target.value)}
-                  className="flex-1 h-8 text-sm"
-                  onKeyDown={e => { if (e.key === 'Enter') handleSendInvite() }}
-                />
-                <Select
-                  value={inviteRole}
-                  onChange={e => setInviteRole(e.target.value)}
-                  className="h-8 text-sm w-28"
-                >
-                  <option value="admin">{t('Admin')}</option>
-                  <option value="member">{t('Member')}</option>
-                  <option value="viewer">{t('Viewer')}</option>
-                </Select>
-              </div>
-              <Button size="sm" onClick={handleSendInvite} loading={sendingInvite} disabled={!inviteEmail.trim()}>
-                <UserPlus className="h-3.5 w-3.5 mr-1.5" />
-                {t('Send invitation')}
-              </Button>
-            </div>
+            {(() => {
+              const atTeamLimit = planLimits && planLimits.team_members_max >= 0 && members.length >= planLimits.team_members_max
+              return (
+                <div className="space-y-2 pt-1 border-t">
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground pt-2">{t('Invite member')}</p>
+                  {atTeamLimit ? (
+                    <p className="text-xs text-muted-foreground rounded-md border bg-muted/40 px-3 py-2">
+                      {t('Team member limit reached for your plan. Upgrade to add more members.')}
+                    </p>
+                  ) : (
+                    <>
+                      <div className="flex gap-2">
+                        <Input
+                          type="email"
+                          placeholder={t('colleague@company.com')}
+                          value={inviteEmail}
+                          onChange={e => setInviteEmail(e.target.value)}
+                          className="flex-1 h-8 text-sm"
+                          onKeyDown={e => { if (e.key === 'Enter') handleSendInvite() }}
+                        />
+                        <Select
+                          value={inviteRole}
+                          onChange={e => setInviteRole(e.target.value)}
+                          className="h-8 text-sm w-28"
+                        >
+                          <option value="admin">{t('Admin')}</option>
+                          <option value="member">{t('Member')}</option>
+                          <option value="viewer">{t('Viewer')}</option>
+                        </Select>
+                      </div>
+                      <Button size="sm" onClick={handleSendInvite} loading={sendingInvite} disabled={!inviteEmail.trim()}>
+                        <UserPlus className="h-3.5 w-3.5 mr-1.5" />
+                        {t('Send invitation')}
+                      </Button>
+                    </>
+                  )}
+                </div>
+              )
+            })()}
           </CardContent>
         </Card>
 
@@ -774,6 +787,12 @@ export function SettingsPage() {
             <CardDescription>{t('Receive HTTP POST events when inquiries or quotations change.')}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            {planLimits && !planLimits.webhooks && (
+              <div className="rounded-md border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+                {t('Webhooks are available on the Growth plan and above.')}
+                <button className="ml-1 underline text-primary" onClick={() => setSettingsTab('billing')}>{t('Upgrade')}</button>
+              </div>
+            )}
             {/* Existing endpoints */}
             {webhooks.length > 0 && (
               <div className="space-y-2">
@@ -834,32 +853,34 @@ export function SettingsPage() {
             )}
 
             {/* Add endpoint form */}
-            <div className="space-y-2 border-t pt-3">
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{t('Add endpoint')}</p>
-              <Input
-                placeholder="https://example.com/webhook"
-                value={whUrl}
-                onChange={e => setWhUrl(e.target.value)}
-                className="h-8 text-sm font-mono"
-              />
-              <div className="flex flex-wrap gap-3">
-                {WEBHOOK_EVENTS.map(ev => (
-                  <label key={ev} className="flex items-center gap-1.5 text-xs cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={whEvents.includes(ev)}
-                      onChange={e => setWhEvents(prev => e.target.checked ? [...prev, ev] : prev.filter(x => x !== ev))}
-                      className="h-3 w-3"
-                    />
-                    <span className="font-mono">{ev}</span>
-                  </label>
-                ))}
+            {planLimits?.webhooks && (
+              <div className="space-y-2 border-t pt-3">
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{t('Add endpoint')}</p>
+                <Input
+                  placeholder="https://example.com/webhook"
+                  value={whUrl}
+                  onChange={e => setWhUrl(e.target.value)}
+                  className="h-8 text-sm font-mono"
+                />
+                <div className="flex flex-wrap gap-3">
+                  {WEBHOOK_EVENTS.map(ev => (
+                    <label key={ev} className="flex items-center gap-1.5 text-xs cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={whEvents.includes(ev)}
+                        onChange={e => setWhEvents(prev => e.target.checked ? [...prev, ev] : prev.filter(x => x !== ev))}
+                        className="h-3 w-3"
+                      />
+                      <span className="font-mono">{ev}</span>
+                    </label>
+                  ))}
+                </div>
+                <Button size="sm" onClick={handleAddWebhook} loading={addingWh} disabled={!whUrl.trim()}>
+                  <Plus className="h-3.5 w-3.5 mr-1.5" />
+                  {t('Add endpoint')}
+                </Button>
               </div>
-              <Button size="sm" onClick={handleAddWebhook} loading={addingWh} disabled={!whUrl.trim()}>
-                <Plus className="h-3.5 w-3.5 mr-1.5" />
-                {t('Add endpoint')}
-              </Button>
-            </div>
+            )}
           </CardContent>
         </Card>
 
@@ -944,17 +965,17 @@ export function SettingsPage() {
             {/* Plan cards */}
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               {([
-                { plan: 'starter', label: 'Starter', monthly: '29', annual: '290', features: ['25 products', '250 inquiries/mo', '3 team members', '3D models', 'Quotations'] },
-                { plan: 'growth',  label: 'Growth',  monthly: '79', annual: '790', features: ['Unlimited products', '2000 inquiries/mo', '10 team members', 'Webhooks', 'Advanced analytics', 'Remove branding'] },
-                { plan: 'scale',   label: 'Scale',   monthly: '199', annual: '1990', features: ['Everything unlimited', 'White-label', 'AI product setup ∞', 'Priority support'] },
+                { plan: 'starter', label: 'Starter', monthly: '49', annual: '490', features: ['25 products', '250 inquiries/mo', '3 team members', '3D models', 'Quotations'] },
+                { plan: 'growth',  label: 'Growth',  monthly: '149', annual: '1490', features: ['Unlimited products', '2000 inquiries/mo', '10 team members', 'Webhooks', 'Advanced analytics', 'Remove branding'] },
+                { plan: 'scale',   label: 'Scale',   monthly: '399', annual: '3990', features: ['Everything unlimited', 'White-label', 'AI product setup ∞', 'Priority support'] },
               ] as const).map(({ plan, label, monthly, annual, features }) => {
                 const isCurrent = tenant?.plan === plan
                 return (
                   <Card key={plan} className={isCurrent ? 'border-primary' : ''}>
                     <CardHeader className="pb-2">
                       <CardTitle className="text-sm font-semibold">{label}</CardTitle>
-                      <div className="text-2xl font-bold">${monthly}<span className="text-sm font-normal text-muted-foreground">/mo</span></div>
-                      <div className="text-xs text-muted-foreground">${annual}/yr (save 2 months)</div>
+                      <div className="text-2xl font-bold">€{monthly}<span className="text-sm font-normal text-muted-foreground">/mo</span></div>
+                      <div className="text-xs text-muted-foreground">€{annual}/yr (save 2 months)</div>
                     </CardHeader>
                     <CardContent className="space-y-3">
                       <ul className="space-y-1">
