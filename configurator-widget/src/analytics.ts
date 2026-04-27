@@ -1,0 +1,64 @@
+export type EventType =
+  | 'view'
+  | 'characteristic_changed'
+  | 'inquiry_started'
+  | 'inquiry_submitted'
+
+interface QueuedEvent {
+  session_id: string
+  event_type: EventType
+  payload:    Record<string, unknown>
+}
+
+export function createAnalytics(opts: {
+  supabaseUrl: string
+  productId:   string
+  tenantId:    string
+}) {
+  // Honour Do Not Track
+  if (typeof navigator !== 'undefined' && navigator.doNotTrack === '1') {
+    return { track: (_t: EventType) => {} }
+  }
+
+  // Stable session ID (survives page navigation, cleared on tab close)
+  const sessionId = (() => {
+    const KEY = 'cw_sid'
+    try {
+      let sid = sessionStorage.getItem(KEY)
+      if (!sid) { sid = crypto.randomUUID(); sessionStorage.setItem(KEY, sid) }
+      return sid
+    } catch { return crypto.randomUUID() }
+  })()
+
+  const endpoint = `${opts.supabaseUrl.replace(/\/$/, '')}/functions/v1/ingest-events`
+  const queue: QueuedEvent[] = []
+
+  function flush() {
+    if (queue.length === 0) return
+    const events = queue.splice(0)
+    const body   = JSON.stringify({ product_id: opts.productId, tenant_id: opts.tenantId, events })
+    // sendBeacon survives page unload; falls back to fetch for regular flushes
+    if (typeof navigator !== 'undefined' && navigator.sendBeacon) {
+      navigator.sendBeacon(endpoint, new Blob([body], { type: 'application/json' }))
+    } else {
+      fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body, keepalive: true })
+        .catch(() => {})
+    }
+  }
+
+  function track(type: EventType, payload: Record<string, unknown> = {}) {
+    queue.push({ session_id: sessionId, event_type: type, payload })
+    if (queue.length >= 5) flush()
+  }
+
+  if (typeof document !== 'undefined') {
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') flush()
+    })
+  }
+  if (typeof window !== 'undefined') {
+    window.addEventListener('beforeunload', flush)
+  }
+
+  return { track }
+}

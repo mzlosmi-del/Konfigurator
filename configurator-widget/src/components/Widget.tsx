@@ -11,6 +11,7 @@ import { InquiryForm } from './InquiryForm'
 
 interface Props {
   config: WidgetConfig
+  track:  (type: string, payload?: Record<string, unknown>) => void
 }
 
 type State =
@@ -19,7 +20,7 @@ type State =
   | { phase: 'ready'; data: FullProductConfig }
   | { phase: 'success' }
 
-export function Widget({ config }: Props) {
+export function Widget({ config, track }: Props) {
   const [state, setState] = useState<State>({ phase: 'loading' })
   const [selection, setSelection] = useState<Selection>({})
   const [numericInputs, setNumericInputs] = useState<NumericInputs>({})
@@ -57,6 +58,7 @@ export function Widget({ config }: Props) {
 
   function handleSelect(charId: string, valueId: string) {
     if (state.phase !== 'ready') return
+    track('characteristic_changed', { char_id: charId, value_id: valueId })
     const next      = { ...selection, [charId]: valueId }
     const effect    = evaluateRules(state.data.rules, next, numericInputs)
     const withDef   = applyDefaultValues(next, effect, new Set([charId]), prevDefaultsRef.current)
@@ -245,7 +247,7 @@ export function Widget({ config }: Props) {
         {!showForm && (
           <button
             class="cw-form-toggle"
-            onClick={() => setShowForm(true)}
+            onClick={() => { track('inquiry_started', { price: totalPrice }); setShowForm(true) }}
             disabled={!allSelected}
           >
             {allSelected ? t('Request a quote') : t('Select all options to continue')}
@@ -261,7 +263,10 @@ export function Widget({ config }: Props) {
             lineItems={lineItems}
             totalPrice={totalPrice}
             currency={product.currency}
-            onSuccess={() => setState({ phase: 'success' })}
+            onSuccess={() => {
+              track('inquiry_submitted', { price: totalPrice, currency: product.currency })
+              setState({ phase: 'success' })
+            }}
           />
         )}
       </div>
