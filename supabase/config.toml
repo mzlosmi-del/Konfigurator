@@ -1,7 +1,7 @@
 [project]
 # Replace with your actual Supabase project ref
 # Found in: Supabase Dashboard → Project Settings → General → Reference ID
-id = "YOUR_PROJECT_REF"
+id = "laqgfdqorqksfbqkbwkl"
 
 [functions.public-preview]
 verify_jwt = false
