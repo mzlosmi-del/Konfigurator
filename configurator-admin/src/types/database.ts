@@ -197,6 +197,7 @@ export interface Database {
           url: string
           is_default: boolean
           sort_order: number
+          mesh_rules: Json
           created_at: string
           updated_at: string
         }
