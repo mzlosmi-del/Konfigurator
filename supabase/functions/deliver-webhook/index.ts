@@ -6,6 +6,9 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
  * primary action succeeds — not a DB trigger.
  *
  * Body: { event: string, tenant_id: string, payload: object }
+ *
+ * For inquiry.created events the outgoing payload is enriched with v2 flat
+ * Zapier-friendly fields while keeping all v1 fields unchanged.
  */
 
 const CORS = {
@@ -35,6 +38,40 @@ async function hmacSha256(secret: string, body: string): Promise<string> {
   return Array.from(new Uint8Array(sig)).map(b => b.toString(16).padStart(2, '0')).join('')
 }
 
+// Enrich inquiry.created payload with flat v2 fields without breaking v1 shape
+async function enrichInquiryPayload(
+  payload: Record<string, unknown>,
+  sb: ReturnType<typeof createClient>,
+): Promise<Record<string, unknown>> {
+  const productId = payload.product_id as string | undefined
+
+  let publicSlug: string | null = null
+  if (productId) {
+    const { data } = await sb
+      .from('products')
+      .select('public_slug')
+      .eq('id', productId)
+      .single()
+    publicSlug = (data as { public_slug: string | null } | null)?.public_slug ?? null
+  }
+
+  return {
+    // ── v1 fields preserved as-is ──────────────────────────────────────────
+    ...payload,
+
+    // ── v2 flat Zapier-friendly additions ──────────────────────────────────
+    public_slug:  publicSlug,
+    utm_source:   (payload.utm_source  as string | null) ?? null,
+    utm_medium:   (payload.utm_medium  as string | null) ?? null,
+    referrer:     (payload.referrer    as string | null) ?? null,
+
+    // v2 envelope — mirrors nested data for future consumer versioning
+    v2: {
+      configuration: payload.configuration ?? [],
+    },
+  }
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: CORS })
@@ -55,6 +92,11 @@ Deno.serve(async (req: Request) => {
   const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
   const sb = createClient(supabaseUrl, serviceRoleKey)
 
+  // Enrich payload for inquiry events before delivery
+  const outPayload = body.event === 'inquiry.created'
+    ? await enrichInquiryPayload(body.payload, sb)
+    : body.payload
+
   // Fetch enabled endpoints subscribed to this event
   const { data: endpoints } = await sb
     .from('webhook_endpoints')
@@ -72,7 +114,7 @@ Deno.serve(async (req: Request) => {
     ep => ep.events.length === 0 || ep.events.includes(body.event)
   )
 
-  const payloadJson = JSON.stringify(body.payload)
+  const payloadJson = JSON.stringify(outPayload)
   let delivered = 0
 
   await Promise.allSettled(relevant.map(async (ep) => {
@@ -84,7 +126,7 @@ Deno.serve(async (req: Request) => {
       id:          deliveryId,
       endpoint_id: ep.id,
       event:       body.event,
-      payload:     body.payload,
+      payload:     outPayload,
       status:      'pending',
       attempts:    1,
       last_attempt_at: new Date().toISOString(),

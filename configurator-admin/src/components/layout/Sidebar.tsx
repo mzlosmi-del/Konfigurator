@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { NavLink } from 'react-router-dom'
-import { LayoutDashboard, Package, Inbox, Settings, LogOut, Boxes, Layers, FileText, AlignLeft, BarChart2 } from 'lucide-react'
+import { LayoutDashboard, Package, Inbox, Settings, LogOut, Boxes, Layers, FileText, AlignLeft, BarChart2, Code2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuthContext } from '@/components/auth/AuthContext'
 import { Separator } from '@/components/ui/separator'
@@ -25,6 +25,7 @@ export function Sidebar() {
     { to: '/inquiries',  icon: Inbox,            label: 'Inquiries',   badge: newCount },
     { to: '/quotations', icon: FileText,        label: 'Quotations',  badge: 0 },
     { to: '/analytics',  icon: BarChart2,       label: 'Analytics',   badge: 0 },
+    { to: '/embed-docs', icon: Code2,           label: 'Embed',       badge: 0 },
     { to: '/settings',   icon: Settings,        label: 'Settings',    badge: 0 },
   ]
 

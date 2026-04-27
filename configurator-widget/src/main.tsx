@@ -60,3 +60,12 @@ declare const __WIDGET_VERSION__: string
   mount: mountWidget,
   version: __WIDGET_VERSION__,
 }
+
+// ── Web Component ──────────────────────────────────────────────────────────────
+// Allows usage as: <konfigurator-widget data-product-id="…" data-tenant-id="…" …>
+if (typeof customElements !== 'undefined' && !customElements.get('konfigurator-widget')) {
+  class KonfiguratorWidget extends HTMLElement {
+    connectedCallback() { mountWidget(this) }
+  }
+  customElements.define('konfigurator-widget', KonfiguratorWidget)
+}

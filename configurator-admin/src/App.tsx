@@ -24,6 +24,7 @@ import { QuotationFormPage } from '@/pages/quotations/QuotationFormPage'
 import { QuotationDetailPage } from '@/pages/quotations/QuotationDetailPage'
 import { TextsPage } from '@/pages/texts/TextsPage'
 import { AnalyticsPage } from '@/pages/analytics/AnalyticsPage'
+import { EmbedDocsPage } from '@/pages/embed-docs/EmbedDocsPage'
 
 export function App() {
   const [lang, setLangState] = useState<Lang>(getLang())
@@ -64,6 +65,7 @@ export function App() {
               <Route path="/quotations/:id/edit" element={<QuotationFormPage />} />
               <Route path="/texts" element={<TextsPage />} />
               <Route path="/analytics" element={<AnalyticsPage />} />
+              <Route path="/embed-docs" element={<EmbedDocsPage />} />
               <Route path="/settings" element={<SettingsPage />} />
             </Route>
           </Route>
