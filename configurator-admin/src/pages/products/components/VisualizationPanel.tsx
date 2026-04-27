@@ -9,6 +9,7 @@ import {
   uploadAssetFile,
 } from '@/lib/assets'
 import { fetchProductCharacteristicsWithValues, type CharacteristicWithValues } from '@/lib/products'
+import { parseMeshNames } from '@/lib/glbParser'
 import type { VisualizationAsset, AssetType } from '@/types/database'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -94,6 +95,8 @@ export function VisualizationPanel({ productId }: Props) {
   const [toDelete, setToDelete] = useState<VisualizationAsset | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [meshEditorAssetId, setMeshEditorAssetId] = useState<string | null>(null)
+  // Mesh names parsed client-side from the selected GLB file before upload
+  const [pendingMeshNames, setPendingMeshNames] = useState<string[]>([])
 
   useEffect(() => {
     load()
@@ -179,6 +182,10 @@ export function VisualizationPanel({ productId }: Props) {
       setForm(emptyForm())
       setShowAddForm(false)
       toast({ title: t('Asset uploaded and saved') })
+      // Auto-open mesh rules editor for newly uploaded 3D models
+      if (created.asset_type === '3d_model') {
+        setMeshEditorAssetId(created.id)
+      }
     } catch (e) {
       setForm(f => ({ ...f, uploading: false }))
       toast({
@@ -358,9 +365,10 @@ export function VisualizationPanel({ productId }: Props) {
                   assetId={asset.id}
                   assetUrl={asset.url}
                   initialRules={(Array.isArray(asset.mesh_rules) ? asset.mesh_rules : []) as MeshRule[]}
+                  initialMeshNames={pendingMeshNames}
                   characteristics={chars}
                   onSave={rules => handleSaveMeshRules(asset.id, rules)}
-                  onClose={() => setMeshEditorAssetId(null)}
+                  onClose={() => { setMeshEditorAssetId(null); setPendingMeshNames([]) }}
                 />
               )}
             </div>
@@ -411,7 +419,23 @@ export function VisualizationPanel({ productId }: Props) {
                 type="file"
                 accept="image/*,.glb,.gltf"
                 className="text-sm"
-                onChange={e => setForm(f => ({ ...f, file: e.target.files?.[0] ?? null }))}
+                onChange={e => {
+                  const file = e.target.files?.[0] ?? null
+                  const is3d = !!file && /\.(glb|gltf)$/i.test(file.name)
+                  setForm(f => ({
+                    ...f,
+                    file,
+                    asset_type: is3d ? '3d_model' : f.asset_type,
+                  }))
+                  if (is3d && file) {
+                    setPendingMeshNames([])
+                    parseMeshNames(file)
+                      .then(names => setPendingMeshNames(names))
+                      .catch(() => {})
+                  } else {
+                    setPendingMeshNames([])
+                  }
+                }}
               />
               {form.file && (
                 <Button
