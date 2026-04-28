@@ -34,7 +34,7 @@ import type {
 } from '@/types/database'
 import type { CharacteristicWithValues } from '@/lib/products'
 import { ConfigureProductDialog } from './ConfigureProductDialog'
-import { PdfLayoutDialog, type PdfSection } from './PdfLayoutDialog'
+import { PdfLayoutDialog, type PdfSection, type ProductTextGroup } from './PdfLayoutDialog'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Button } from '@/components/ui/button'
@@ -417,9 +417,14 @@ export function QuotationFormPage() {
     const { savedId, savedQuotation, tenantProfile } = pendingPdfData
     setGeneratingPdf(true)
     try {
+      const enabledPtIds = new Set(
+        sections.filter(s => s.productTextId && s.visible).map(s => s.productTextId!)
+      )
+      const hasPtSections = sections.some(s => s.productTextId !== undefined)
       const pdfProductTexts: Record<string, ProductText[]> = {}
       for (const [pid, texts] of Object.entries(productTextsCache)) {
-        pdfProductTexts[pid] = texts
+        const kept = hasPtSections ? texts.filter(pt => enabledPtIds.has(pt.id)) : texts
+        if (kept.length) pdfProductTexts[pid] = kept
       }
       const bytes = await buildQuotationPdfBytes(tenantProfile, savedQuotation, pdfProductTexts, globalTexts, sections, lang)
       setLayoutDialogOpen(false)
@@ -651,6 +656,18 @@ export function QuotationFormPage() {
           if (!open && pendingPdfData) navigate(`/quotations/${pendingPdfData.savedId}`)
         }}
         globalTexts={globalTexts}
+        productTexts={lineItems
+          .filter(li => li.product_id && productTextsCache[li.product_id]?.length)
+          .reduce<ProductTextGroup[]>((acc, li) => {
+            if (acc.some(g => g.productId === li.product_id)) return acc
+            const prod = products.find(p => p.id === li.product_id)
+            acc.push({
+              productId:   li.product_id,
+              productName: prod?.name ?? li.product_id,
+              texts:       productTextsCache[li.product_id],
+            })
+            return acc
+          }, [])}
         quotationHasNotes={!!notes.trim()}
         onConfirm={handleLayoutConfirm}
         loading={generatingPdf}

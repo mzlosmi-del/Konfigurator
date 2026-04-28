@@ -5,9 +5,11 @@ import {
   fetchQuotation, updateQuotation, uploadQuotationPdf,
   fetchRejectionReasons, calcSubtotal, calcTotal,
 } from '@/lib/quotations'
+import { fetchProductTexts, fetchGlobalTexts } from '@/lib/products'
 import { buildQuotationPdfBytes, openPdfBlob, type TenantProfile } from '@/lib/quotationPdf'
 import { useAuthContext } from '@/components/auth/AuthContext'
-import type { Quotation, QuotationStatus, QuotationLineItem, QuotationAdjustment, QuotationRejectionReason } from '@/types/database'
+import type { Quotation, QuotationStatus, QuotationLineItem, QuotationAdjustment, QuotationRejectionReason, ProductText } from '@/types/database'
+import { PdfLayoutDialog, type PdfSection, type ProductTextGroup } from './PdfLayoutDialog'
 import { STATUS_OPTIONS, STATUS_LABELS, statusVariant } from './quotationStatusConfig'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Button } from '@/components/ui/button'
@@ -38,10 +40,14 @@ export function QuotationDetailPage() {
   const [quotation,      setQuotation]      = useState<Quotation | null>(null)
   const [loading,        setLoading]        = useState(true)
   const [updatingStatus, setUpdatingStatus] = useState(false)
-  const [generatingPdf,  setGeneratingPdf]  = useState(false)
-  const [savingPdf,      setSavingPdf]      = useState(false)
-  const [pendingBytes,   setPendingBytes]   = useState<Uint8Array | null>(null)
-  const [confirmSave,    setConfirmSave]    = useState(false)
+  const [generatingPdf,    setGeneratingPdf]    = useState(false)
+  const [savingPdf,        setSavingPdf]        = useState(false)
+  const [pendingBytes,     setPendingBytes]     = useState<Uint8Array | null>(null)
+  const [confirmSave,      setConfirmSave]      = useState(false)
+  const [layoutOpen,       setLayoutOpen]       = useState(false)
+  const [pdfProductTexts,  setPdfProductTexts]  = useState<Record<string, ProductText[]>>({})
+  const [pdfGlobalTexts,   setPdfGlobalTexts]   = useState<ProductText[]>([])
+  const [productTextGroups, setProductTextGroups] = useState<ProductTextGroup[]>([])
 
   // Rejection dialog state
   const [rejectionReasons,    setRejectionReasons]    = useState<QuotationRejectionReason[]>([])
@@ -114,7 +120,50 @@ export function QuotationDetailPage() {
     if (!quotation) return
     setGeneratingPdf(true)
     try {
-      const bytes = await buildQuotationPdfBytes(buildTenantProfile(), quotation)
+      const lineItems = (Array.isArray(quotation.line_items) ? quotation.line_items : []) as unknown as QuotationLineItem[]
+      const uniqueProductIds = [...new Set(lineItems.map(li => li.product_id).filter(Boolean))]
+
+      const [textsResults, globalTexts] = await Promise.all([
+        Promise.all(uniqueProductIds.map(pid => fetchProductTexts(pid).then(texts => ({ pid, texts })))),
+        fetchGlobalTexts(),
+      ])
+
+      const textsMap: Record<string, ProductText[]> = {}
+      const groups: ProductTextGroup[] = []
+      for (const { pid, texts } of textsResults) {
+        if (texts.length) {
+          textsMap[pid] = texts
+          const li = lineItems.find(l => l.product_id === pid)
+          groups.push({ productId: pid, productName: li?.product_name ?? pid, texts })
+        }
+      }
+
+      setPdfProductTexts(textsMap)
+      setPdfGlobalTexts(globalTexts)
+      setProductTextGroups(groups)
+      setLayoutOpen(true)
+    } catch (err) {
+      toast({ title: t('Failed to load product data'), description: String(err), variant: 'destructive' })
+    } finally {
+      setGeneratingPdf(false)
+    }
+  }
+
+  async function handleLayoutConfirm(sections: PdfSection[], lang: 'en' | 'sr') {
+    if (!quotation) return
+    setGeneratingPdf(true)
+    try {
+      const enabledPtIds = new Set(
+        sections.filter(s => s.productTextId && s.visible).map(s => s.productTextId!)
+      )
+      const hasPtSections = sections.some(s => s.productTextId !== undefined)
+      const filtered: Record<string, ProductText[]> = {}
+      for (const [pid, texts] of Object.entries(pdfProductTexts)) {
+        const kept = hasPtSections ? texts.filter(pt => enabledPtIds.has(pt.id)) : texts
+        if (kept.length) filtered[pid] = kept
+      }
+      const bytes = await buildQuotationPdfBytes(buildTenantProfile(), quotation, filtered, pdfGlobalTexts, sections, lang)
+      setLayoutOpen(false)
       openPdfBlob(bytes)
       setPendingBytes(bytes)
       setConfirmSave(true)
@@ -437,6 +486,17 @@ export function QuotationDetailPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* ── PDF layout / text selection ───────────────────────────────────── */}
+      <PdfLayoutDialog
+        open={layoutOpen}
+        onOpenChange={setLayoutOpen}
+        globalTexts={pdfGlobalTexts}
+        productTexts={productTextGroups}
+        quotationHasNotes={!!quotation?.notes?.trim()}
+        onConfirm={handleLayoutConfirm}
+        loading={generatingPdf}
+      />
 
       {/* ── Save PDF confirm ───────────────────────────────────────────────── */}
       <ConfirmDialog

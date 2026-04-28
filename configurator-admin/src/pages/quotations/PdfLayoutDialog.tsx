@@ -27,28 +27,58 @@ import { Button } from '@/components/ui/button'
 import { t } from '@/i18n'
 
 export interface PdfSection {
-  id:      string
-  label:   string
-  visible: boolean
-  locked?: boolean
-  textId?: string
+  id:            string
+  label:         string
+  visible:       boolean
+  locked?:       boolean
+  textId?:       string   // global text block ID
+  productTextId?: string  // product text entry ID
+  productId?:    string   // owning product (for productTextId sections)
+  group?:        string   // display group label shown below the section title
+}
+
+export interface ProductTextGroup {
+  productId:   string
+  productName: string
+  texts:       ProductText[]
 }
 
 interface Props {
-  open:          boolean
-  onOpenChange:  (open: boolean) => void
-  globalTexts:   ProductText[]
+  open:              boolean
+  onOpenChange:      (open: boolean) => void
+  globalTexts:       ProductText[]
+  productTexts?:     ProductTextGroup[]
   quotationHasNotes: boolean
-  onConfirm:     (sections: PdfSection[], lang: 'en' | 'sr') => void
-  loading:       boolean
+  onConfirm:         (sections: PdfSection[], lang: 'en' | 'sr') => void
+  loading:           boolean
 }
 
-function buildDefaultSections(globalTexts: ProductText[], hasNotes: boolean): PdfSection[] {
+function buildDefaultSections(
+  globalTexts: ProductText[],
+  hasNotes: boolean,
+  productTexts?: ProductTextGroup[],
+): PdfSection[] {
   const sections: PdfSection[] = [
     { id: 'line-items', label: 'Line Items & Summary', visible: true, locked: true },
-    { id: 'notes',      label: 'Notes',                visible: hasNotes },
-    { id: 'terms',      label: 'Terms & Conditions',   visible: true },
   ]
+
+  // One toggleable row per product text entry (rendered inline within each line item)
+  for (const { productId, productName, texts } of (productTexts ?? [])) {
+    for (const pt of texts) {
+      sections.push({
+        id:            `pt-${pt.id}`,
+        label:         pt.label,
+        visible:       true,
+        productTextId: pt.id,
+        productId,
+        group:         productName,
+      })
+    }
+  }
+
+  sections.push({ id: 'notes', label: 'Notes', visible: hasNotes })
+  sections.push({ id: 'terms', label: 'Terms & Conditions', visible: true })
+
   for (const txt of globalTexts) {
     sections.push({
       id:      `text-${txt.id}`,
@@ -82,9 +112,9 @@ function SortableItem({ section, onToggle }: SortableItemProps) {
       ref={setNodeRef}
       style={style}
       className={[
-        'flex items-center gap-3 border rounded-lg px-3 py-2.5',
-        section.locked  ? 'bg-muted/30'  : 'bg-background',
-        !section.visible ? 'opacity-50'  : '',
+        'flex items-center gap-3 border rounded-lg px-3 py-2',
+        section.locked   ? 'bg-muted/30'  : 'bg-background',
+        !section.visible ? 'opacity-50'   : '',
       ].join(' ')}
     >
       {section.locked ? (
@@ -101,10 +131,15 @@ function SortableItem({ section, onToggle }: SortableItemProps) {
         </button>
       )}
 
-      <span className="flex-1 text-sm font-medium">{t(section.label)}</span>
+      <div className="flex-1 min-w-0">
+        <span className="text-sm font-medium">{t(section.label)}</span>
+        {section.group && (
+          <p className="text-xs text-muted-foreground truncate">{section.group}</p>
+        )}
+      </div>
 
       {section.locked ? (
-        <span className="text-xs text-muted-foreground">{t('Always included')}</span>
+        <span className="text-xs text-muted-foreground shrink-0">{t('Always included')}</span>
       ) : (
         <button
           type="button"
@@ -122,16 +157,16 @@ function SortableItem({ section, onToggle }: SortableItemProps) {
   )
 }
 
-export function PdfLayoutDialog({ open, onOpenChange, globalTexts, quotationHasNotes, onConfirm, loading }: Props) {
+export function PdfLayoutDialog({ open, onOpenChange, globalTexts, productTexts, quotationHasNotes, onConfirm, loading }: Props) {
   const [sections, setSections] = useState<PdfSection[]>(() =>
-    buildDefaultSections(globalTexts, quotationHasNotes)
+    buildDefaultSections(globalTexts, quotationHasNotes, productTexts)
   )
   const [lang, setLang] = useState<'en' | 'sr'>('en')
 
   // Reset when dialog opens
   const [lastOpen, setLastOpen] = useState(false)
   if (open && !lastOpen) {
-    setSections(buildDefaultSections(globalTexts, quotationHasNotes))
+    setSections(buildDefaultSections(globalTexts, quotationHasNotes, productTexts))
     setLang('en')
     setLastOpen(true)
   }
