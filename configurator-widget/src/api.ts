@@ -127,8 +127,12 @@ export async function loadProductConfig(config: WidgetConfig): Promise<FullProdu
     .map(id => ({ ...charById[id], values: valuesByCharId[id] ?? [] }))
 
   // Server-authoritative branding flag — not operator-controllable via data attributes
-  const { data: brandingData } = await sb.rpc('get_widget_branding', { p_product_id: config.productId })
-  const removeBranding = brandingData === true
+  const { data: brandingData, error: brandingErr } = await sb.rpc('get_widget_branding', { p_product_id: config.productId })
+  if (brandingErr) {
+    // Function not yet deployed — apply migration 039_plan_sync.sql to fix this
+    console.warn('[konfigurator] get_widget_branding unavailable, branding badge will be shown:', brandingErr.message)
+  }
+  const removeBranding = !brandingErr && brandingData === true
 
   return {
     product: product as ProductData,
