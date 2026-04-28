@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Spinner } from '@/components/ui/spinner'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
-import { ProductForm, type ProductFormValues } from './components/ProductForm'
+import { ProductForm, buildI18nMap, type ProductFormValues } from './components/ProductForm'
 import { useToast } from '@/hooks/useToast'
 import { Toaster } from '@/components/ui/toast'
 import { t } from '@/i18n'
@@ -73,12 +73,14 @@ export function NewProductPage() {
   async function handleSubmit(values: ProductFormValues) {
     try {
       const product = await createProduct({
-        name:            values.name,
-        description:     values.description ?? null,
-        base_price:      values.base_price,
-        currency:        values.currency,
-        sku:             values.sku?.trim() || null,
-        unit_of_measure: values.unit_of_measure?.trim() || null,
+        name:             values.name,
+        name_i18n:        buildI18nMap(values.name_en, values.name_sr),
+        description:      values.description ?? null,
+        description_i18n: buildI18nMap(values.description_en, values.description_sr),
+        base_price:       values.base_price,
+        currency:         values.currency,
+        sku:              values.sku?.trim() || null,
+        unit_of_measure:  values.unit_of_measure?.trim() || null,
       })
       navigate(`/products/${product.id}/edit`, { replace: true })
     } catch (e) {

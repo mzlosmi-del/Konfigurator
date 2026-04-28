@@ -13,7 +13,11 @@ const CURRENCIES = ['EUR', 'USD', 'GBP', 'CHF', 'HRK', 'RSD']
 
 export type ProductFormValues = {
   name: string
+  name_en?: string
+  name_sr?: string
   description?: string
+  description_en?: string
+  description_sr?: string
   base_price: number
   currency: string
   sku?: string
@@ -35,7 +39,11 @@ export function ProductForm({
 }: ProductFormProps) {
   const schema = z.object({
     name:             z.string().min(1, t('Name is required')).max(300),
+    name_en:          z.string().max(300).optional().or(z.literal('')),
+    name_sr:          z.string().max(300).optional().or(z.literal('')),
     description:      z.string().optional(),
+    description_en:   z.string().optional(),
+    description_sr:   z.string().optional(),
     base_price:       z.coerce.number().min(0, t('Price must be 0 or more')),
     currency:         z.string().length(3),
     sku:              z.string().max(100).optional().or(z.literal('')),
@@ -65,6 +73,24 @@ export function ProductForm({
         />
       </FormField>
 
+      {/* Name translations */}
+      <div className="grid grid-cols-2 gap-3">
+        <FormField label={t('Name (EN)')} htmlFor="name_en" error={errors.name_en?.message}>
+          <Input
+            id="name_en"
+            placeholder={t('English name')}
+            {...register('name_en')}
+          />
+        </FormField>
+        <FormField label={t('Name (SR)')} htmlFor="name_sr" error={errors.name_sr?.message}>
+          <Input
+            id="name_sr"
+            placeholder={t('Serbian name')}
+            {...register('name_sr')}
+          />
+        </FormField>
+      </div>
+
       <FormField
         label={t('Description')}
         htmlFor="description"
@@ -78,6 +104,26 @@ export function ProductForm({
           {...register('description')}
         />
       </FormField>
+
+      {/* Description translations */}
+      <div className="grid grid-cols-2 gap-3">
+        <FormField label={t('Description (EN)')} htmlFor="description_en">
+          <Textarea
+            id="description_en"
+            placeholder={t('English description')}
+            rows={2}
+            {...register('description_en')}
+          />
+        </FormField>
+        <FormField label={t('Description (SR)')} htmlFor="description_sr">
+          <Textarea
+            id="description_sr"
+            placeholder={t('Serbian description')}
+            rows={2}
+            {...register('description_sr')}
+          />
+        </FormField>
+      </div>
 
       <div className="grid grid-cols-2 gap-4">
         <FormField
@@ -148,10 +194,24 @@ export function ProductForm({
   )
 }
 
+// Build a name_i18n / description_i18n map from form values, skipping empty strings
+export function buildI18nMap(en?: string, sr?: string): Record<string, string> {
+  const map: Record<string, string> = {}
+  if (en?.trim()) map['en'] = en.trim()
+  if (sr?.trim()) map['sr'] = sr.trim()
+  return map
+}
+
 export function productToFormValues(p: Product): ProductFormValues {
+  const ni = p.name_i18n as Record<string, string> | null ?? {}
+  const di = p.description_i18n as Record<string, string> | null ?? {}
   return {
     name:            p.name,
+    name_en:         ni['en'] ?? '',
+    name_sr:         ni['sr'] ?? '',
     description:     p.description ?? '',
+    description_en:  di['en'] ?? '',
+    description_sr:  di['sr'] ?? '',
     base_price:      p.base_price,
     currency:        p.currency,
     sku:             p.sku ?? '',

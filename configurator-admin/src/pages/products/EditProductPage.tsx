@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Spinner } from '@/components/ui/spinner'
-import { ProductForm, productToFormValues, type ProductFormValues } from './components/ProductForm'
+import { ProductForm, productToFormValues, buildI18nMap, type ProductFormValues } from './components/ProductForm'
 import { CharacteristicsPanel } from './components/CharacteristicsPanel'
 import { RulesPanel } from './components/RulesPanel'
 import { FormulaPanel } from './components/FormulaPanel'
@@ -60,12 +60,14 @@ export function EditProductPage() {
     if (!product) return
     try {
       const updated = await updateProduct(product.id, {
-        name:            values.name,
-        description:     values.description ?? null,
-        base_price:      values.base_price,
-        currency:        values.currency,
-        sku:             values.sku?.trim() || null,
-        unit_of_measure: values.unit_of_measure?.trim() || null,
+        name:             values.name,
+        name_i18n:        buildI18nMap(values.name_en, values.name_sr),
+        description:      values.description ?? null,
+        description_i18n: buildI18nMap(values.description_en, values.description_sr),
+        base_price:       values.base_price,
+        currency:         values.currency,
+        sku:              values.sku?.trim() || null,
+        unit_of_measure:  values.unit_of_measure?.trim() || null,
       })
       setProduct(updated as Product)
       toast({ title: t('Product saved') })

@@ -14,6 +14,7 @@ import {
   deleteCharacteristic,
   fetchClasses,
   createClass,
+  updateClass,
   deleteClass,
   fetchAllMemberships,
   addCharacteristicToClass,
@@ -42,10 +43,14 @@ interface DroppableClassProps {
   characteristics: Characteristic[]
   onRemoveMember: (classId: string, charId: string) => void
   onDeleteClass: (cls: CharacteristicClass) => void
+  onRenameClass: (id: string, name: string) => void
+  onRenameClassI18n: (id: string, lang: string, value: string) => void
 }
 
-function DroppableClass({ cls, memberIds, characteristics, onRemoveMember, onDeleteClass }: DroppableClassProps) {
+function DroppableClass({ cls, memberIds, characteristics, onRemoveMember, onDeleteClass, onRenameClass, onRenameClassI18n }: DroppableClassProps) {
   const { setNodeRef, isOver } = useDroppable({ id: cls.id })
+  const [editing, setEditing] = useState(false)
+  const i18n = (cls.name_i18n as Record<string, string> | null) ?? {}
 
   return (
     <div
@@ -59,7 +64,46 @@ function DroppableClass({ cls, memberIds, characteristics, onRemoveMember, onDel
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-1.5 min-w-0">
           <Tag className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-          <span className="text-sm font-medium truncate">{cls.name}</span>
+          {editing ? (
+            <div className="flex flex-col gap-1 min-w-0 flex-1">
+              <input
+                className="text-sm font-medium bg-transparent border-b border-primary outline-none w-full"
+                defaultValue={cls.name}
+                autoFocus
+                onBlur={e => { onRenameClass(cls.id, e.target.value); setEditing(false) }}
+                onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
+                placeholder={t('Name (default)')}
+              />
+              <div className="flex gap-1">
+                <input
+                  className="text-xs bg-transparent border-b border-muted-foreground/30 outline-none w-16"
+                  defaultValue={i18n['en'] ?? ''}
+                  onBlur={e => onRenameClassI18n(cls.id, 'en', e.target.value)}
+                  placeholder="EN"
+                />
+                <input
+                  className="text-xs bg-transparent border-b border-muted-foreground/30 outline-none w-16"
+                  defaultValue={i18n['sr'] ?? ''}
+                  onBlur={e => onRenameClassI18n(cls.id, 'sr', e.target.value)}
+                  placeholder="SR"
+                />
+              </div>
+            </div>
+          ) : (
+            <button
+              type="button"
+              className="text-sm font-medium truncate hover:text-primary transition-colors text-left"
+              onClick={() => setEditing(true)}
+              title={t('Click to rename and add translations')}
+            >
+              {cls.name}
+              {(i18n['en'] || i18n['sr']) && (
+                <span className="ml-1 text-xs text-muted-foreground font-normal">
+                  {[i18n['en'] && 'EN', i18n['sr'] && 'SR'].filter(Boolean).join('/')}
+                </span>
+              )}
+            </button>
+          )}
           <span className="text-xs text-muted-foreground shrink-0">
             ({memberIds.length})
           </span>
@@ -121,6 +165,7 @@ interface DraggableCharProps {
   expanded: boolean
   onToggleExpand: () => void
   onRename: (name: string) => void
+  onRenameI18n: (lang: string, value: string) => void
   onChangeType: (type: Characteristic['display_type']) => void
   onDelete: () => void
   tenantId: string
@@ -134,12 +179,14 @@ function DraggableChar({
   expanded,
   onToggleExpand,
   onRename,
+  onRenameI18n,
   onChangeType,
   onDelete,
   tenantId,
   onValuesChange,
 }: DraggableCharProps) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: char.id })
+  const i18n = (char.name_i18n as Record<string, string> | null) ?? {}
 
   return (
     <div
@@ -224,18 +271,48 @@ function DraggableChar({
         </Button>
       </div>
 
-      {/* Expanded: values editor */}
+      {/* Expanded section */}
       {expanded && (
-        <div className="px-4 pb-4 pt-2 border-t bg-muted/10">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
-            {t('Values')}
-          </p>
-          <CharacteristicValuesEditor
-            characteristicId={char.id}
-            tenantId={tenantId}
-            values={values}
-            onChange={onValuesChange}
-          />
+        <div className="px-4 pb-4 pt-2 border-t bg-muted/10 space-y-3">
+          {/* Name translations */}
+          <div>
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1.5">
+              {t('Name translations')}
+            </p>
+            <div className="flex gap-2">
+              <div className="flex-1">
+                <label className="text-xs text-muted-foreground mb-0.5 block">EN</label>
+                <input
+                  className="w-full text-sm bg-background border border-border rounded px-2 py-1 outline-none focus:ring-1 focus:ring-primary"
+                  defaultValue={i18n['en'] ?? ''}
+                  placeholder={t('English name')}
+                  onBlur={e => onRenameI18n('en', e.target.value)}
+                />
+              </div>
+              <div className="flex-1">
+                <label className="text-xs text-muted-foreground mb-0.5 block">SR</label>
+                <input
+                  className="w-full text-sm bg-background border border-border rounded px-2 py-1 outline-none focus:ring-1 focus:ring-primary"
+                  defaultValue={i18n['sr'] ?? ''}
+                  placeholder={t('Serbian name')}
+                  onBlur={e => onRenameI18n('sr', e.target.value)}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Values editor */}
+          <div>
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
+              {t('Values')}
+            </p>
+            <CharacteristicValuesEditor
+              characteristicId={char.id}
+              tenantId={tenantId}
+              values={values}
+              onChange={onValuesChange}
+            />
+          </div>
         </div>
       )}
     </div>
@@ -263,6 +340,8 @@ export function LibraryPage() {
 
   const [showNewClass, setShowNewClass]   = useState(false)
   const [newClassName, setNewClassName]   = useState('')
+  const [newClassNameEn, setNewClassNameEn] = useState('')
+  const [newClassNameSr, setNewClassNameSr] = useState('')
   const [creatingClass, setCreatingClass] = useState(false)
 
   const [toDelete, setToDelete]           = useState<Characteristic | null>(null)
@@ -366,6 +445,19 @@ export function LibraryPage() {
     }
   }
 
+  async function handleRenameCharI18n(char: Characteristic, lang: string, value: string) {
+    const existing = (char.name_i18n as Record<string, string> | null) ?? {}
+    const merged: Record<string, string> = { ...existing }
+    if (value.trim()) merged[lang] = value.trim()
+    else delete merged[lang]
+    try {
+      const updated = await updateCharacteristic(char.id, { name_i18n: merged })
+      setChars(prev => prev.map(c => c.id === char.id ? updated : c))
+    } catch {
+      toast({ title: t('Failed to save translation'), variant: 'destructive' })
+    }
+  }
+
   async function handleChangeType(char: Characteristic, display_type: Characteristic['display_type']) {
     try {
       const updated = await updateCharacteristic(char.id, { display_type })
@@ -400,15 +492,45 @@ export function LibraryPage() {
     if (!newClassName.trim()) return
     setCreatingClass(true)
     try {
-      const created = await createClass({ name: newClassName.trim() })
+      const i18n: Record<string, string> = {}
+      if (newClassNameEn.trim()) i18n['en'] = newClassNameEn.trim()
+      if (newClassNameSr.trim()) i18n['sr'] = newClassNameSr.trim()
+      const created = await createClass({ name: newClassName.trim(), name_i18n: i18n })
       setClasses(prev => [...prev, created])
       setMemberships(prev => ({ ...prev, [created.id]: [] }))
       setNewClassName('')
+      setNewClassNameEn('')
+      setNewClassNameSr('')
       setShowNewClass(false)
     } catch {
       toast({ title: t('Failed to create class'), variant: 'destructive' })
     } finally {
       setCreatingClass(false)
+    }
+  }
+
+  async function handleRenameClass(id: string, name: string) {
+    if (!name.trim()) return
+    try {
+      const updated = await updateClass(id, { name: name.trim() })
+      setClasses(prev => prev.map(c => c.id === id ? updated : c))
+    } catch {
+      toast({ title: t('Failed to rename class'), variant: 'destructive' })
+    }
+  }
+
+  async function handleRenameClassI18n(id: string, lang: string, value: string) {
+    const cls = classes.find(c => c.id === id)
+    if (!cls) return
+    const existing = (cls.name_i18n as Record<string, string> | null) ?? {}
+    const merged: Record<string, string> = { ...existing }
+    if (value.trim()) merged[lang] = value.trim()
+    else delete merged[lang]
+    try {
+      const updated = await updateClass(id, { name_i18n: merged })
+      setClasses(prev => prev.map(c => c.id === id ? updated : c))
+    } catch {
+      toast({ title: t('Failed to save translation'), variant: 'destructive' })
     }
   }
 
@@ -487,27 +609,45 @@ export function LibraryPage() {
                       characteristics={characteristics}
                       onRemoveMember={handleRemoveMember}
                       onDeleteClass={setToDeleteClass}
+                      onRenameClass={handleRenameClass}
+                      onRenameClassI18n={handleRenameClassI18n}
                     />
                   ))}
                 </div>
               )}
 
               {showNewClass && (
-                <div className="flex gap-2 items-center pt-1">
+                <div className="rounded-lg border p-3 space-y-2 bg-muted/10">
                   <Input
                     placeholder={t('Class name (e.g. Dimensions, Material)')}
                     value={newClassName}
                     onChange={e => setNewClassName(e.target.value)}
                     onKeyDown={e => { if (e.key === 'Enter') handleCreateClass() }}
                     autoFocus
-                    className="flex-1 text-sm"
+                    className="text-sm"
                   />
-                  <Button size="sm" onClick={handleCreateClass} loading={creatingClass} disabled={!newClassName.trim()}>
-                    {t('Create')}
-                  </Button>
-                  <Button size="sm" variant="ghost" onClick={() => { setShowNewClass(false); setNewClassName('') }}>
-                    {t('Cancel')}
-                  </Button>
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="Name (EN)"
+                      value={newClassNameEn}
+                      onChange={e => setNewClassNameEn(e.target.value)}
+                      className="flex-1 text-sm h-8"
+                    />
+                    <Input
+                      placeholder="Name (SR)"
+                      value={newClassNameSr}
+                      onChange={e => setNewClassNameSr(e.target.value)}
+                      className="flex-1 text-sm h-8"
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <Button size="sm" onClick={handleCreateClass} loading={creatingClass} disabled={!newClassName.trim()}>
+                      {t('Create')}
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => { setShowNewClass(false); setNewClassName(''); setNewClassNameEn(''); setNewClassNameSr('') }}>
+                      {t('Cancel')}
+                    </Button>
+                  </div>
                 </div>
               )}
             </CardContent>
@@ -583,6 +723,7 @@ export function LibraryPage() {
                     expanded={!!expanded[char.id]}
                     onToggleExpand={() => toggleExpand(char.id)}
                     onRename={name => handleRenameChar(char, name)}
+                    onRenameI18n={(lang, value) => handleRenameCharI18n(char, lang, value)}
                     onChangeType={type => handleChangeType(char, type)}
                     onDelete={() => setToDelete(char)}
                     tenantId={tenant?.id ?? ''}

@@ -105,6 +105,15 @@ export interface Database {
           sort_order: number
           sku: string | null
           unit_of_measure: string | null
+          is_template: boolean
+          template_category: string | null
+          public_slug: string | null
+          public_preview_enabled: boolean
+          read_only: boolean
+          ar_enabled: boolean
+          form_config: Json
+          name_i18n: Json
+          description_i18n: Json
           created_at: string
           updated_at: string
         }
@@ -132,6 +141,7 @@ export interface Database {
           id: string
           tenant_id: string
           name: string
+          name_i18n: Json
           sort_order: number
           created_at: string
           updated_at: string
@@ -153,6 +163,7 @@ export interface Database {
           id: string
           tenant_id: string
           name: string
+          name_i18n: Json
           display_type: DisplayType
           sort_order: number
           created_at: string
@@ -167,6 +178,7 @@ export interface Database {
           characteristic_id: string
           tenant_id: string
           label: string
+          label_i18n: Json
           price_modifier: number
           sort_order: number
           created_at: string

@@ -4,7 +4,7 @@ import type { FullProductConfig, Selection, NumericInputs, WidgetConfig, ConfigL
 import { loadProductConfig } from '../api'
 import { evaluateRules, calculatePrice, sanitizeSelection, applyDefaultValues, applyNumericDefaults } from '../rules'
 import { calculateFormulaTotal } from '../formulaEngine'
-import { t, getLang, setLang, LANGS, type Lang } from '../i18n'
+import { t, getLang, setLang, LANGS, pickTranslation, type Lang } from '../i18n'
 import { Visualization } from './Visualization'
 import { CharacteristicInput } from './CharacteristicInput'
 import { InquiryForm } from './InquiryForm'
@@ -214,9 +214,9 @@ export function Widget({ config, track }: Props) {
 
       <div class="cw-body">
         {/* Product info */}
-        <div class="cw-product-name">{product.name}</div>
+        <div class="cw-product-name">{pickTranslation(product.name_i18n, lang, product.name)}</div>
         {product.description && (
-          <div class="cw-product-desc">{product.description}</div>
+          <div class="cw-product-desc">{pickTranslation(product.description_i18n, lang, product.description)}</div>
         )}
 
         {/* Characteristics */}
@@ -231,6 +231,7 @@ export function Widget({ config, track }: Props) {
                 numericInputs={numericInputs}
                 onChange={handleSelect}
                 onNumericInput={handleNumericInput}
+                lang={lang}
               />
             ))}
           </div>
