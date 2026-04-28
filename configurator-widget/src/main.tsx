@@ -1,6 +1,7 @@
 import { h, render } from 'preact'
 import { Widget } from './components/Widget'
 import { WIDGET_STYLES } from './styles'
+import { themeToStyleBlock } from './themes'
 import { createAnalytics } from './analytics'
 import type { WidgetConfig } from './types'
 
@@ -30,6 +31,11 @@ function mountWidget(el: HTMLElement) {
 
   // Mount into Shadow DOM — fully isolated from host page styles
   const shadow = el.attachShadow({ mode: 'open' })
+
+  // Theme variables (injected first so they're available to WIDGET_STYLES)
+  const themeEl = document.createElement('style')
+  themeEl.textContent = themeToStyleBlock(el.getAttribute('data-style') ?? 'cloud')
+  shadow.appendChild(themeEl)
 
   const styleEl = document.createElement('style')
   styleEl.textContent = WIDGET_STYLES

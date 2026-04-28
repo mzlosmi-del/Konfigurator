@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { useAuthContext } from '@/components/auth/AuthContext'
 import type { Product } from '@/types/database'
 import { embedCopiedKey } from '@/components/OnboardingChecklist'
+import { THEME_IDS, THEME_META, type ThemeId } from '../../../../../configurator-widget/src/themes'
 import { t } from '@/i18n'
 
 interface Props {
@@ -28,6 +29,7 @@ export function EmbedPanel({ product }: Props) {
   const [removeBranding, setRemoveBranding] = useState(false)
   const [brandingToggling, setBrandingToggling] = useState(false)
   const [qrDataUrl, setQrDataUrl]         = useState<string>('')
+  const [selectedStyle, setSelectedStyle] = useState<ThemeId>('cloud')
 
   const isPublished = product.status === 'published'
   const publicSlug  = product.public_slug
@@ -45,6 +47,7 @@ export function EmbedPanel({ product }: Props) {
       anon_key:     SUPABASE_ANON_KEY,
       product_id:   product.id,
       tenant_id:    tenant?.id ?? '',
+      style:        selectedStyle,
     })
     return `/widget-preview.html?${p.toString()}`
   })()
@@ -57,6 +60,7 @@ export function EmbedPanel({ product }: Props) {
     `  data-supabase-anon-key="${SUPABASE_ANON_KEY}"`,
     `  data-product-id="${product.id}"`,
     `  data-tenant-id="${tenant?.id ?? ''}"`,
+    `  data-style="${selectedStyle}"`,
     ...(removeBranding ? ['  data-remove-branding="true"'] : []),
     '></div>',
     `<script src="${WIDGET_CDN_URL}" async></script>`,
@@ -230,6 +234,58 @@ export function EmbedPanel({ product }: Props) {
             <ExternalLink className="h-3 w-3" />
           </a>
         )}
+      </div>
+
+      {/* ── Widget style ───────────────────────────────────────────── */}
+      <div className="space-y-3">
+        <p className="text-sm font-medium">{t('Widget style')}</p>
+        <p className="text-sm text-muted-foreground">
+          {t('Choose a colour palette and font that matches your site.')}
+        </p>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          {THEME_IDS.map(id => {
+            const meta     = THEME_META[id]
+            const active   = id === selectedStyle
+            const [bg, primary, cta] = meta.colors
+            return (
+              <button
+                key={id}
+                type="button"
+                onClick={() => { setSelectedStyle(id); setPreviewKey(k => k + 1) }}
+                className={[
+                  'flex flex-col items-start gap-2 rounded-lg border p-3 text-left transition-all',
+                  active
+                    ? 'border-primary bg-primary/5 ring-1 ring-primary'
+                    : 'border-border bg-card hover:bg-accent',
+                ].join(' ')}
+              >
+                {/* Color swatches */}
+                <div className="flex gap-1">
+                  {[bg, primary, cta].map((c, i) => (
+                    <span
+                      key={i}
+                      className="h-4 w-4 rounded-full border border-black/10"
+                      style={{ background: c }}
+                    />
+                  ))}
+                </div>
+                {/* Font preview */}
+                <span
+                  className="text-sm font-medium leading-none"
+                  style={{ fontFamily: meta.font }}
+                >
+                  {t(meta.label)}
+                </span>
+                <span
+                  className="text-xs text-muted-foreground leading-none"
+                  style={{ fontFamily: meta.font }}
+                >
+                  Aa Bb Cc
+                </span>
+              </button>
+            )
+          })}
+        </div>
       </div>
 
       {/* ── Embed snippet ──────────────────────────────────────────── */}
