@@ -23,7 +23,7 @@ export async function loadProductConfig(config: WidgetConfig): Promise<FullProdu
   // 1. Product
   const { data: product, error: productError } = await sb
     .from('products')
-    .select('id, name, description, base_price, currency, ar_enabled, form_config')
+    .select('id, name, name_i18n, description, description_i18n, base_price, currency, ar_enabled, form_config')
     .eq('id', config.productId)
     .eq('status', 'published')
     .single()
@@ -77,11 +77,11 @@ export async function loadProductConfig(config: WidgetConfig): Promise<FullProdu
   // a default visualization asset with no configurable characteristics.
   const [charResult, valuesResult, assetsResult, rulesResult, formulasResult] = await Promise.all([
     characteristicIds.length > 0
-      ? sb.from('characteristics').select('id, name, display_type, sort_order').in('id', characteristicIds)
+      ? sb.from('characteristics').select('id, name, name_i18n, display_type, sort_order').in('id', characteristicIds)
       : Promise.resolve({ data: [], error: null }),
     characteristicIds.length > 0
       ? sb.from('characteristic_values')
-          .select('id, characteristic_id, label, price_modifier, sort_order')
+          .select('id, characteristic_id, label, label_i18n, price_modifier, sort_order')
           .in('characteristic_id', characteristicIds)
           .order('sort_order', { ascending: true })
       : Promise.resolve({ data: [], error: null }),

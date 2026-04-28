@@ -1,7 +1,7 @@
 // Serbian (Latin) translations for the widget
 const sr: Record<string, string> = {
   // Widget states
-  'Loading configurator\u2026':            'Učitavanje konfiguratora\u2026',
+  'Loading configurator…':            'Učitavanje konfiguratora…',
   'Product not found or not published':    'Proizvod nije pronađen ili nije objavljen',
   'Inquiry sent!':                         'Upit je poslat!',
   'Thank you. We\'ll get back to you as soon as possible.': 'Hvala. Javićemo vam se što pre moguće.',
@@ -16,11 +16,11 @@ const sr: Record<string, string> = {
   'Email address *':                       'E-mail adresa *',
   'ivan@example.com':                      'petar@primer.com',
   'Message (optional)':                    'Poruka (opciono)',
-  'Any additional details or questions\u2026': 'Dodatni detalji ili pitanja\u2026',
+  'Any additional details or questions…': 'Dodatni detalji ili pitanja…',
   'Name is required':                      'Ime je obavezno',
   'Email is required':                     'E-mail je obavezan',
   'Enter a valid email':                   'Unesite ispravnu e-mail adresu',
-  'Sending\u2026':                         'Slanje\u2026',
+  'Sending…':                         'Slanje…',
   'Send inquiry':                          'Pošalji upit',
   'Failed to submit. Please try again.':   'Slanje nije uspelo. Pokušajte ponovo.',
 
@@ -52,6 +52,15 @@ export function t(key: string): string {
 
 // For select placeholder: "Select {name}…"
 export function tSelect(name: string): string {
-  if (_lang === 'en') return `Select ${name}\u2026`
-  return `Izaberite ${name}\u2026`
+  if (_lang === 'en') return `Select ${name}…`
+  return `Izaberite ${name}…`
+}
+
+// Pick a translated string from a JSONB i18n map, falling back to the primary value.
+export function pickTranslation(
+  i18n: Record<string, string> | null | undefined,
+  lang: string,
+  fallback: string
+): string {
+  return i18n?.[lang] || fallback
 }

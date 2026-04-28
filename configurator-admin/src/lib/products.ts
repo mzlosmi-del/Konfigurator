@@ -52,7 +52,7 @@ export async function fetchProduct(id: string): Promise<Product> {
 
 export async function createProduct(
   input: Pick<Product, 'name' | 'description' | 'base_price' | 'currency'>
-    & { sku?: string | null; unit_of_measure?: string | null }
+    & { sku?: string | null; unit_of_measure?: string | null; name_i18n?: Record<string,string>; description_i18n?: Record<string,string> }
 ): Promise<Product> {
   const { data, error } = await supabase
     .from('products')
@@ -77,6 +77,7 @@ export async function createProduct(
 export async function updateProduct(
   id: string,
   input: Partial<Pick<Product, 'name' | 'description' | 'base_price' | 'currency' | 'status' | 'sku' | 'unit_of_measure' | 'ar_enabled' | 'form_config' | 'public_preview_enabled'>>
+    & { name_i18n?: Record<string,string>; description_i18n?: Record<string,string> }
 ): Promise<Product> {
   const { data, error } = await supabase
     .from('products')
@@ -105,7 +106,7 @@ export async function fetchClasses(): Promise<CharacteristicClass[]> {
   return (data ?? []) as CharacteristicClass[]
 }
 
-export async function createClass(input: Pick<CharacteristicClass, 'name'>): Promise<CharacteristicClass> {
+export async function createClass(input: Pick<CharacteristicClass, 'name'> & { name_i18n?: Record<string,string> }): Promise<CharacteristicClass> {
   const { data, error } = await supabase
     .from('characteristic_classes')
     .insert(input as any)
@@ -117,7 +118,7 @@ export async function createClass(input: Pick<CharacteristicClass, 'name'>): Pro
 
 export async function updateClass(
   id: string,
-  input: Partial<Pick<CharacteristicClass, 'name' | 'sort_order'>>
+  input: Partial<Pick<CharacteristicClass, 'name' | 'sort_order'>> & { name_i18n?: Record<string,string> }
 ): Promise<CharacteristicClass> {
   const { data, error } = await supabase
     .from('characteristic_classes')
@@ -238,7 +239,7 @@ export async function fetchCharacteristics(): Promise<Characteristic[]> {
 }
 
 export async function createCharacteristic(
-  input: Pick<Characteristic, 'name' | 'display_type'>
+  input: Pick<Characteristic, 'name' | 'display_type'> & { name_i18n?: Record<string,string> }
 ): Promise<Characteristic> {
   const { data, error } = await supabase
     .from('characteristics')
@@ -251,7 +252,7 @@ export async function createCharacteristic(
 
 export async function updateCharacteristic(
   id: string,
-  input: Partial<Pick<Characteristic, 'name' | 'display_type'>>
+  input: Partial<Pick<Characteristic, 'name' | 'display_type'>> & { name_i18n?: Record<string,string> }
 ): Promise<Characteristic> {
   const { data, error } = await supabase
     .from('characteristics')
@@ -284,7 +285,7 @@ export async function fetchValuesForCharacteristic(
 
 export async function createCharacteristicValue(
   input: Pick<CharacteristicValue, 'characteristic_id' | 'label' | 'price_modifier' | 'sort_order'>
-    & { tenant_id: string }
+    & { tenant_id: string; label_i18n?: Record<string,string> }
 ): Promise<CharacteristicValue> {
   const { data, error } = await supabase
     .from('characteristic_values')
@@ -297,7 +298,7 @@ export async function createCharacteristicValue(
 
 export async function updateCharacteristicValue(
   id: string,
-  input: Partial<Pick<CharacteristicValue, 'label' | 'price_modifier' | 'sort_order'>>
+  input: Partial<Pick<CharacteristicValue, 'label' | 'price_modifier' | 'sort_order'>> & { label_i18n?: Record<string,string> }
 ): Promise<CharacteristicValue> {
   const { data, error } = await supabase
     .from('characteristic_values')

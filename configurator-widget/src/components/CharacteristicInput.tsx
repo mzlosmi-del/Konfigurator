@@ -1,7 +1,7 @@
 import { h } from 'preact'
 import type { Characteristic, CharacteristicValue, NumericInputs } from '../types'
 import type { RuleEffect } from '../rules'
-import { t, tSelect } from '../i18n'
+import { t, tSelect, pickTranslation, type Lang } from '../i18n'
 
 interface Props {
   characteristic: Characteristic
@@ -10,6 +10,7 @@ interface Props {
   numericInputs: NumericInputs
   onChange: (charId: string, valueId: string) => void
   onNumericInput: (charId: string, value: number) => void
+  lang: Lang
 }
 
 function formatModifier(mod: number): string {
@@ -33,9 +34,12 @@ export function CharacteristicInput({
   numericInputs,
   onChange,
   onNumericInput,
+  lang,
 }: Props) {
   const { display_type, id } = characteristic
   const isLocked = id in ruleEffect.lockedValues
+
+  const charName = pickTranslation(characteristic.name_i18n, lang, characteristic.name)
 
   // ── Number input ────────────────────────────────────────────────────────────
   if (display_type === 'number') {
@@ -45,7 +49,7 @@ export function CharacteristicInput({
       : (numericInputs[id] ?? '')
     return (
       <div>
-        <div class="cw-char-label">{characteristic.name}</div>
+        <div class="cw-char-label">{charName}</div>
         <input
           type="number"
           class={`cw-number-input${(isLocked || isNumericLocked) ? ' locked' : ''}`}
@@ -68,11 +72,14 @@ export function CharacteristicInput({
   if (isLocked) {
     const lockedValueId = ruleEffect.lockedValues[id]
     const lockedValue   = characteristic.values.find(v => v.id === lockedValueId)
+    const lockedLabel   = lockedValue
+      ? pickTranslation(lockedValue.label_i18n, lang, lockedValue.label)
+      : '—'
     return (
       <div>
-        <div class="cw-char-label">{characteristic.name}</div>
+        <div class="cw-char-label">{charName}</div>
         <div class="cw-locked-value">
-          <span class="cw-locked-label">{lockedValue?.label ?? '—'}</span>
+          <span class="cw-locked-label">{lockedLabel}</span>
           <span class="cw-locked-badge">{t('Auto-set')}</span>
         </div>
       </div>
@@ -83,7 +90,7 @@ export function CharacteristicInput({
   if (display_type === 'select') {
     return (
       <div>
-        <div class="cw-char-label">{characteristic.name}</div>
+        <div class="cw-char-label">{charName}</div>
         <select
           class="cw-select"
           value={selectedValueId ?? ''}
@@ -92,14 +99,14 @@ export function CharacteristicInput({
             if (val) onChange(id, val)
           }}
         >
-          <option value="">{tSelect(characteristic.name)}</option>
+          <option value="">{tSelect(charName)}</option>
           {visible.map(v => (
             <option
               key={v.id}
               value={v.id}
               disabled={ruleEffect.disabledValues.has(v.id)}
             >
-              {v.label}
+              {pickTranslation(v.label_i18n, lang, v.label)}
               {v.price_modifier !== 0 ? ` (${formatModifier(v.price_modifier)})` : ''}
             </option>
           ))}
@@ -112,7 +119,7 @@ export function CharacteristicInput({
   if (display_type === 'radio') {
     return (
       <div>
-        <div class="cw-char-label">{characteristic.name}</div>
+        <div class="cw-char-label">{charName}</div>
         <div class="cw-radio-group">
           {visible.map(v => {
             const disabled = ruleEffect.disabledValues.has(v.id)
@@ -125,7 +132,7 @@ export function CharacteristicInput({
                 disabled={disabled}
                 type="button"
               >
-                {v.label}
+                {pickTranslation(v.label_i18n, lang, v.label)}
                 {v.price_modifier !== 0 && (
                   <span class={modifierClass(v.price_modifier)}>
                     {formatModifier(v.price_modifier)}
@@ -141,13 +148,17 @@ export function CharacteristicInput({
 
   // ── Swatch ──────────────────────────────────────────────────────────────────
   if (display_type === 'swatch') {
+    const selectedValue = visible.find(v => v.id === selectedValueId)
+    const selectedLabel = selectedValue
+      ? pickTranslation(selectedValue.label_i18n, lang, selectedValue.label)
+      : undefined
     return (
       <div>
         <div class="cw-char-label">
-          {characteristic.name}
-          {selectedValueId && (
+          {charName}
+          {selectedLabel && (
             <span style={{ fontWeight: 400, marginLeft: 6, textTransform: 'none', letterSpacing: 0 }}>
-              — {visible.find(v => v.id === selectedValueId)?.label}
+              — {selectedLabel}
             </span>
           )}
         </div>
@@ -155,13 +166,14 @@ export function CharacteristicInput({
           {visible.map(v => {
             const disabled = ruleEffect.disabledValues.has(v.id)
             const selected = selectedValueId === v.id
-            const initials = v.label.slice(0, 2).toUpperCase()
+            const label    = pickTranslation(v.label_i18n, lang, v.label)
+            const initials = label.slice(0, 2).toUpperCase()
             return (
               <button
                 key={v.id}
                 class={`cw-swatch${selected ? ' selected' : ''}${disabled ? ' disabled' : ''}`}
                 onClick={() => !disabled && onChange(id, v.id)}
-                title={v.label}
+                title={label}
                 type="button"
               >
                 {initials}
@@ -177,7 +189,7 @@ export function CharacteristicInput({
   if (display_type === 'toggle') {
     return (
       <div>
-        <div class="cw-char-label">{characteristic.name}</div>
+        <div class="cw-char-label">{charName}</div>
         <div class="cw-toggle-group">
           {visible.map(v => {
             const disabled = ruleEffect.disabledValues.has(v.id)
@@ -190,7 +202,7 @@ export function CharacteristicInput({
                 disabled={disabled}
                 type="button"
               >
-                {v.label}
+                {pickTranslation(v.label_i18n, lang, v.label)}
               </button>
             )
           })}

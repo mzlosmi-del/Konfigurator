@@ -17,7 +17,9 @@ export interface FormConfig {
 export interface ProductData {
   id: string
   name: string
+  name_i18n?: Record<string, string>
   description: string | null
+  description_i18n?: Record<string, string>
   base_price: number
   currency: string
   ar_enabled: boolean
@@ -27,6 +29,7 @@ export interface ProductData {
 export interface CharacteristicValue {
   id: string
   label: string
+  label_i18n?: Record<string, string>
   price_modifier: number
   sort_order: number
 }
@@ -34,6 +37,7 @@ export interface CharacteristicValue {
 export interface Characteristic {
   id: string
   name: string
+  name_i18n?: Record<string, string>
   display_type: 'select' | 'radio' | 'swatch' | 'toggle' | 'number'
   sort_order: number
   values: CharacteristicValue[]
