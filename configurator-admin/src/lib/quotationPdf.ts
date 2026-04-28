@@ -29,21 +29,23 @@ const C = {
   rowRule:     rgb(0.920, 0.920, 0.920),
 }
 
-function wrapText(text: string, font: PDFFont, size: number, maxWidth: number): string[] {
-  const words = text.split(' ')
-  const lines: string[] = []
-  let line = ''
-  for (const word of words) {
-    const test = line ? `${line} ${word}` : word
-    if (font.widthOfTextAtSize(test, size) > maxWidth) {
-      if (line) lines.push(line)
-      line = word
-    } else {
-      line = test
+function wrapText(rawText: string, font: PDFFont, size: number, maxWidth: number): string[] {
+  const result: string[] = []
+  for (const paragraph of rawText.split(/\r?\n/)) {
+    const words = paragraph.split(' ')
+    let line = ''
+    for (const word of words) {
+      const test = line ? `${line} ${word}` : word
+      if (font.widthOfTextAtSize(test, size) > maxWidth) {
+        if (line) result.push(line)
+        line = word
+      } else {
+        line = test
+      }
     }
+    result.push(line)   // always push, even empty (preserves blank lines between paragraphs)
   }
-  if (line) lines.push(line)
-  return lines.length ? lines : ['']
+  return result.length ? result : ['']
 }
 
 // ── PDF label translations ────────────────────────────────────────────────────
@@ -144,6 +146,7 @@ export async function buildQuotationPdfBytes(
 
   // ── Drawing helpers ────────────────────────────────────────────────────────
   function text(str: string, x: number, yPos: number, size: number, font: PDFFont, color = C.black) {
+    str = str.replace(/[\x00-\x09\x0b-\x1f\x7f]/g, ' ')  // strip control chars WinAnsi can't encode
     if (!str) return
     page.drawText(str, { x, y: yPos, size, font, color })
   }
