@@ -1,6 +1,6 @@
-export type ThemeId = 'cloud' | 'forest' | 'slate' | 'sand'
+export type ThemeId = 'cloud' | 'forest' | 'slate' | 'sand' | 'noir'
 
-export const THEME_IDS: ThemeId[] = ['cloud', 'forest', 'slate', 'sand']
+export const THEME_IDS: ThemeId[] = ['cloud', 'forest', 'slate', 'sand', 'noir']
 
 export interface ThemeMeta {
   label:   string
@@ -28,6 +28,11 @@ export const THEME_META: Record<ThemeId, ThemeMeta> = {
     label:  'Sand',
     font:   "Palatino, Georgia, serif",
     colors: ['#fffbf7', '#b45309', '#78350f'],
+  },
+  noir: {
+    label:  'Noir',
+    font:   "'Helvetica Neue', Arial, sans-serif",
+    colors: ['#0a0a0a', '#6b7280', '#3f3f46'],
   },
 }
 
@@ -158,6 +163,37 @@ export const THEME_VARS: Record<ThemeId, Record<string, string>> = {
     '--cw-radius':           '4px',
     '--cw-radius-sm':        '2px',
     '--cw-radius-btn':       '4px',
+  },
+
+  noir: {
+    '--cw-font':             "'Helvetica Neue',Arial,sans-serif",
+    '--cw-bg':               '#0a0a0a',
+    '--cw-surface':          '#141414',
+    '--cw-surface-alt':      '#1f1f1f',
+    '--cw-border':           '#2a2a2a',
+    '--cw-border-input':     '#3a3a3a',
+    '--cw-text':             '#f5f5f5',
+    '--cw-text-muted':       '#a1a1aa',
+    '--cw-text-label':       '#d4d4d8',
+    '--cw-text-heading':     '#ffffff',
+    '--cw-text-placeholder': '#52525b',
+    '--cw-primary':          '#6b7280',
+    '--cw-primary-hover':    '#9ca3af',
+    '--cw-primary-surface':  '#1f1f1f',
+    '--cw-primary-text':     '#f5f5f5',
+    '--cw-primary-glow':     '#374151',
+    '--cw-cta-bg':           '#1e1e1e',
+    '--cw-cta-hover':        '#2d2d2d',
+    '--cw-submit-bg':        '#3f3f46',
+    '--cw-submit-hover':     '#52525b',
+    '--cw-success-bg':       '#14532d',
+    '--cw-spinner':          '#9ca3af',
+    '--cw-branding':         '#3f3f46',
+    '--cw-lang-active-bg':   '#f5f5f5',
+    '--cw-lang-active-text': '#0a0a0a',
+    '--cw-radius':           '12px',
+    '--cw-radius-sm':        '6px',
+    '--cw-radius-btn':       '8px',
   },
 }
 
