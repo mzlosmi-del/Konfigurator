@@ -32,14 +32,14 @@ function mountWidget(el: HTMLElement) {
   // Mount into Shadow DOM — fully isolated from host page styles
   const shadow = el.attachShadow({ mode: 'open' })
 
-  // Theme variables (injected first so they're available to WIDGET_STYLES)
-  const themeEl = document.createElement('style')
-  themeEl.textContent = themeToStyleBlock(el.getAttribute('data-style') ?? 'cloud')
-  shadow.appendChild(themeEl)
-
+  // Main styles first (defines :host Cloud defaults), theme override second (wins the cascade)
   const styleEl = document.createElement('style')
   styleEl.textContent = WIDGET_STYLES
   shadow.appendChild(styleEl)
+
+  const themeEl = document.createElement('style')
+  themeEl.textContent = themeToStyleBlock(el.getAttribute('data-style') ?? 'cloud')
+  shadow.appendChild(themeEl)
 
   const mountPoint = document.createElement('div')
   shadow.appendChild(mountPoint)
