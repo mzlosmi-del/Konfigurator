@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { NavLink } from 'react-router-dom'
-import { LayoutDashboard, Package, Inbox, Settings, LogOut, Boxes, Layers, FileText, AlignLeft, BarChart2, Code2 } from 'lucide-react'
+import { LayoutDashboard, Package, Inbox, Settings, LogOut, Layers, FileText, AlignLeft, BarChart2, Code2 } from 'lucide-react'
+import { Logo } from '@/components/ui/Logo'
 import { cn } from '@/lib/utils'
 import { useAuthContext } from '@/components/auth/AuthContext'
 import { Separator } from '@/components/ui/separator'
@@ -8,7 +9,7 @@ import { useInquiryCounts } from '@/hooks/useInquiryCounts'
 import { t, getLang, setLang, LANGS, type Lang } from '@/i18n'
 
 export function Sidebar() {
-  const { tenant, signOut } = useAuthContext()
+  const { signOut } = useAuthContext()
   const { newCount } = useInquiryCounts()
   const [lang, setLangState] = useState<Lang>(getLang())
 
@@ -32,13 +33,8 @@ export function Sidebar() {
   return (
     <aside className="flex h-screen w-56 shrink-0 flex-col border-r bg-card">
       {/* Logo / brand */}
-      <div className="flex h-14 items-center gap-2.5 px-4 border-b">
-        <div className="flex h-7 w-7 items-center justify-center rounded-md bg-primary">
-          <Boxes className="h-4 w-4 text-primary-foreground" />
-        </div>
-        <span className="font-semibold text-sm truncate">
-          {tenant?.name ?? t('Configurator')}
-        </span>
+      <div className="flex h-14 items-center px-4 border-b">
+        <Logo lockup="horizontal" size={28} />
       </div>
 
       {/* Nav */}

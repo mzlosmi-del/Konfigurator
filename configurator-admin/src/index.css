@@ -4,30 +4,40 @@
 
 @layer base {
   :root {
+    /* ── Configureout brand tokens ── */
+    --turq-50:  #e6fbf8;
+    --turq-200: #7de4d3;
+    --turq-300: #38d3bb;
+    --turq-500: #0fa392;
+    --turq-700: #0a665b;
+    --ink:      #0c1414;
+    --paper:    #f7f5f1;
+
     --background: 0 0% 98%;
     --foreground: 220 15% 10%;
 
     --card: 0 0% 100%;
     --card-foreground: 220 15% 10%;
 
-    --primary: 220 70% 45%;
+    /* primary → turq-500 (#0fa392 ≈ HSL 173 83% 35%) */
+    --primary:            173 83% 35%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 220 14% 94%;
-    --secondary-foreground: 220 15% 20%;
+    --secondary: 173 20% 94%;
+    --secondary-foreground: 173 50% 15%;
 
-    --muted: 220 14% 94%;
+    --muted: 173 10% 94%;
     --muted-foreground: 220 10% 50%;
 
-    --accent: 220 14% 90%;
-    --accent-foreground: 220 15% 15%;
+    --accent: 173 20% 90%;
+    --accent-foreground: 173 50% 15%;
 
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
 
     --border: 220 13% 88%;
     --input: 220 13% 88%;
-    --ring: 220 70% 45%;
+    --ring: 173 83% 35%;
 
     --radius: 0.5rem;
   }

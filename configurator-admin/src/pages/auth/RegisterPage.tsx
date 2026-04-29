@@ -3,7 +3,8 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Boxes, MailCheck } from 'lucide-react'
+import { MailCheck } from 'lucide-react'
+import { Logo } from '@/components/ui/Logo'
 import { supabase } from '@/lib/supabase'
 import { useAuthContext } from '@/components/auth/AuthContext'
 import { Button } from '@/components/ui/button'
@@ -82,11 +83,8 @@ export function RegisterPage() {
   }
 
   const logo = (
-    <div className="flex flex-col items-center gap-2">
-      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary">
-        <Boxes className="h-5 w-5 text-primary-foreground" />
-      </div>
-      <span className="text-lg font-semibold">{t('Configurator')}</span>
+    <div className="flex flex-col items-center">
+      <Logo lockup="vertical" size={96} />
     </div>
   )
 
