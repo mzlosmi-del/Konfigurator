@@ -102,17 +102,6 @@ export function SettingsPage() {
   const [savingProfile,  setSavingProfile]  = useState(false)
   const [uploadingLogo,  setUploadingLogo]  = useState(false)
 
-  // Re-sync form fields whenever tenant is refreshed in the auth context
-  useEffect(() => {
-    if (!tenant) return
-    setCompanyAddress(tenant.company_address ?? '')
-    setCompanyPhone(tenant.company_phone     ?? '')
-    setCompanyEmail(tenant.company_email     ?? '')
-    setCompanyWebsite(tenant.company_website ?? '')
-    setContactPerson(tenant.contact_person   ?? '')
-    setLogoUrl(tenant.logo_url               ?? '')
-  }, [tenant])
-
   async function handleSaveNotifyEmail() {
     if (!tenant) return
     setSaving(true)
