@@ -403,18 +403,22 @@ export function SettingsPage() {
     if (!tenant) return
     setSavingProfile(true)
     try {
-      const { error } = await supabase.from('tenants').update({
-        company_address: companyAddress.trim() || null,
-        company_phone:   companyPhone.trim()   || null,
-        company_email:   companyEmail.trim()   || null,
-        company_website: companyWebsite.trim() || null,
-        contact_person:  contactPerson.trim()  || null,
-      } as unknown as never).eq('id', tenant.id)
-      if (error) throw error
+      const { data: rows, error } = await (supabase.from('tenants') as any)
+        .update({
+          company_address: companyAddress.trim() || null,
+          company_phone:   companyPhone.trim()   || null,
+          company_email:   companyEmail.trim()   || null,
+          company_website: companyWebsite.trim() || null,
+          contact_person:  contactPerson.trim()  || null,
+        })
+        .eq('id', tenant.id)
+        .select('id, company_address, contact_person')
+      if (error) throw new Error(`DB error ${error.code}: ${error.message}`)
+      if (!rows?.length) throw new Error('0 rows updated — RLS may be blocking or columns missing')
       await refreshTenant()
       toast({ title: t('Company profile saved') })
     } catch (e) {
-      toast({ title: t('Failed to save'), description: e instanceof Error ? e.message : undefined, variant: 'destructive' })
+      toast({ title: t('Failed to save'), description: e instanceof Error ? e.message : 'Unknown error', variant: 'destructive' })
     } finally {
       setSavingProfile(false)
     }
