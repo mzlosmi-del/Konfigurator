@@ -57,7 +57,11 @@ Deno.serve(async (req: Request) => {
 
   if (maxProducts >= 0) {
     const { count } = await supabase
-      .from('products').select('id', { count: 'exact', head: true }).eq('tenant_id', tenantId)
+      .from('products')
+      .select('id', { count: 'exact', head: true })
+      .eq('tenant_id', tenantId)
+      .eq('is_template', false)
+      .eq('status', 'published')
     if ((count ?? 0) >= maxProducts) {
       return new Response(JSON.stringify({ error: 'plan_limit_exceeded: upgrade to clone more templates' }), {
         status: 403, headers: { ...CORS, 'Content-Type': 'application/json' },
