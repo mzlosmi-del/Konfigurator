@@ -288,7 +288,17 @@ export function NewProductPage() {
 
           {/* ── From description (AI) ───────────────────────────────────────── */}
           <TabsContent value="ai" className="mt-4 max-w-xl">
-            {!aiAllowed ? (
+            {/* Coming soon — remove this card and change false→true below to activate */}
+            <Card>
+              <CardContent className="pt-8 pb-8 text-center space-y-3">
+                <Sparkles className="h-8 w-8 mx-auto text-muted-foreground" />
+                <p className="text-sm font-medium">{t('AI product setup')}</p>
+                <p className="text-sm text-muted-foreground">
+                  {t('Coming soon. This feature is under development.')}
+                </p>
+              </CardContent>
+            </Card>
+            {false && !aiAllowed ? (
               <Card>
                 <CardContent className="pt-6 text-center space-y-3">
                   <Sparkles className="h-8 w-8 mx-auto text-muted-foreground" />
