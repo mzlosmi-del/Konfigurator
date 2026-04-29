@@ -180,14 +180,18 @@ export async function buildQuotationPdfBytes(
   let logoEmbedded = false
   if (tenant.logo_url) {
     try {
-      const buf = await fetch(tenant.logo_url).then(r => r.arrayBuffer())
-      const isPNG = tenant.logo_url.toLowerCase().includes('.png')
-      const img   = isPNG ? await pdfDoc.embedPng(buf) : await pdfDoc.embedJpg(buf)
-      const dims  = img.scaleToFit(logoBoxW, logoBoxH)
-      const imgX  = logoBoxX + (logoBoxW - dims.width) / 2
-      const imgY  = logoBoxY + (logoBoxH - dims.height) / 2
-      page.drawImage(img, { x: imgX, y: imgY, width: dims.width, height: dims.height })
-      logoEmbedded = true
+      const res = await fetch(tenant.logo_url)
+      if (res.ok) {
+        const contentType = res.headers.get('content-type') ?? ''
+        const buf = await res.arrayBuffer()
+        const isPNG = contentType.includes('png') || tenant.logo_url.toLowerCase().includes('.png')
+        const img   = isPNG ? await pdfDoc.embedPng(buf) : await pdfDoc.embedJpg(buf)
+        const dims  = img.scaleToFit(logoBoxW, logoBoxH)
+        const imgX  = logoBoxX + (logoBoxW - dims.width) / 2
+        const imgY  = logoBoxY + (logoBoxH - dims.height) / 2
+        page.drawImage(img, { x: imgX, y: imgY, width: dims.width, height: dims.height })
+        logoEmbedded = true
+      }
     } catch {
       // fall through to placeholder
     }

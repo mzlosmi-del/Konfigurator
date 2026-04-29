@@ -8,6 +8,7 @@ import {
 import { fetchProductTexts, fetchGlobalTexts } from '@/lib/products'
 import { buildQuotationPdfBytes, openPdfBlob, type TenantProfile } from '@/lib/quotationPdf'
 import { useAuthContext } from '@/components/auth/AuthContext'
+import { supabase } from '@/lib/supabase'
 import type { Quotation, QuotationStatus, QuotationLineItem, QuotationAdjustment, QuotationRejectionReason, ProductText } from '@/types/database'
 import { PdfLayoutDialog, type PdfSection, type ProductTextGroup } from './PdfLayoutDialog'
 import { STATUS_OPTIONS, STATUS_LABELS, statusVariant } from './quotationStatusConfig'
@@ -65,16 +66,16 @@ export function QuotationDetailPage() {
       .finally(() => setLoading(false))
   }, [id])
 
-  function buildTenantProfile(): TenantProfile {
-    return {
-      name:            tenant?.name            ?? 'Your store',
-      logo_url:        (tenant as any)?.logo_url,
-      company_address: (tenant as any)?.company_address,
-      company_phone:   (tenant as any)?.company_phone,
-      company_email:   (tenant as any)?.company_email,
-      company_website: (tenant as any)?.company_website,
-      contact_person:  (tenant as any)?.contact_person,
+  async function buildTenantProfile(): Promise<TenantProfile> {
+    if (tenant?.id) {
+      const { data } = await supabase
+        .from('tenants')
+        .select('name, logo_url, company_address, company_phone, company_email, company_website, contact_person')
+        .eq('id', tenant.id)
+        .single()
+      if (data) return data as TenantProfile
     }
+    return { name: tenant?.name ?? 'Your store' }
   }
 
   async function handleStatusChange(status: QuotationStatus) {
@@ -162,7 +163,7 @@ export function QuotationDetailPage() {
         const kept = hasPtSections ? texts.filter(pt => enabledPtIds.has(pt.id)) : texts
         if (kept.length) filtered[pid] = kept
       }
-      const bytes = await buildQuotationPdfBytes(buildTenantProfile(), quotation, filtered, pdfGlobalTexts, sections, lang)
+      const bytes = await buildQuotationPdfBytes(await buildTenantProfile(), quotation, filtered, pdfGlobalTexts, sections, lang)
       setLayoutOpen(false)
       openPdfBlob(bytes)
       setPendingBytes(bytes)
