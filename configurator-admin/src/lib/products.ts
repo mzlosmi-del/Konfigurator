@@ -34,10 +34,22 @@ export async function fetchProducts(): Promise<Product[]> {
   const { data, error } = await supabase
     .from('products')
     .select('*')
+    .eq('is_template', false)
     .order('sort_order', { ascending: true })
     .order('created_at', { ascending: false })
   if (error) throw new Error(error.message)
   return (data ?? []) as Product[]
+}
+
+export async function fetchPublishedProductCount(tenantId: string): Promise<number> {
+  const { count, error } = await supabase
+    .from('products')
+    .select('id', { count: 'exact', head: true })
+    .eq('tenant_id', tenantId)
+    .eq('is_template', false)
+    .eq('status', 'published')
+  if (error) throw new Error(error.message)
+  return count ?? 0
 }
 
 export async function fetchProduct(id: string): Promise<Product> {

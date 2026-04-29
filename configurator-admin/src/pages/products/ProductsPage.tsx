@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Plus, Pencil, Trash2, Eye, EyeOff, Package } from 'lucide-react'
 import { useAuthContext } from '@/components/auth/AuthContext'
-import { fetchProducts, deleteProduct, updateProduct } from '@/lib/products'
+import { fetchProducts, fetchPublishedProductCount, deleteProduct, updateProduct } from '@/lib/products'
 import { atLimit, isUnlimited, planLabel } from '@/lib/planLimits'
 import type { Product } from '@/types/database'
 import { PageHeader } from '@/components/layout/PageHeader'
@@ -26,21 +26,28 @@ export function ProductsPage() {
   const { tenant, planLimits } = useAuthContext()
   const { toasts, toast, dismiss } = useToast()
   const [products, setProducts] = useState<Product[]>([])
+  const [publishedCount, setPublishedCount] = useState(0)
   const [loading, setLoading] = useState(true)
   const [toDelete, setToDelete] = useState<Product | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [toggling, setToggling] = useState<string | null>(null)
 
   const maxProducts  = planLimits?.products_max ?? -1
-  const overLimit    = atLimit(maxProducts, products.length)
+  const overLimit    = atLimit(maxProducts, publishedCount)
   const unlimited    = isUnlimited(maxProducts)
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load() }, [tenant?.id])
 
   async function load() {
+    if (!tenant?.id) return
     setLoading(true)
     try {
-      setProducts(await fetchProducts())
+      const [list, count] = await Promise.all([
+        fetchProducts(),
+        fetchPublishedProductCount(tenant.id),
+      ])
+      setProducts(list)
+      setPublishedCount(count)
     } catch {
       toast({ title: t('Failed to load products'), variant: 'destructive' })
     } finally {
@@ -53,7 +60,9 @@ export function ProductsPage() {
     setDeleting(true)
     try {
       await deleteProduct(toDelete.id)
+      const wasPublished = toDelete.status === 'published'
       setProducts(p => p.filter(x => x.id !== toDelete.id))
+      if (wasPublished) setPublishedCount(c => Math.max(0, c - 1))
       toast({ title: t('Product deleted') })
       setToDelete(null)
     } catch {
@@ -69,6 +78,7 @@ export function ProductsPage() {
     try {
       const updated = await updateProduct(product.id, { status: next })
       setProducts(p => p.map(x => (x.id === (updated as Product).id ? (updated as Product) : x)))
+      setPublishedCount(c => next === 'published' ? c + 1 : Math.max(0, c - 1))
       toast({ title: next === 'published' ? t('Product published') : t('Product unpublished') })
     } catch {
       toast({ title: t('Update failed'), variant: 'destructive' })
@@ -86,7 +96,7 @@ export function ProductsPage() {
           <div className="flex items-center gap-3">
             {!loading && !unlimited && (
               <span className={`text-sm ${overLimit ? 'text-destructive font-medium' : 'text-muted-foreground'}`}>
-                {products.length} / {maxProducts} &middot; {planLabel(tenant?.plan ?? 'free')}
+                {publishedCount} / {maxProducts} &middot; {planLabel(tenant?.plan ?? 'free')}
               </span>
             )}
             <div title={overLimit ? t('Upgrade your plan to add more products') : undefined}>

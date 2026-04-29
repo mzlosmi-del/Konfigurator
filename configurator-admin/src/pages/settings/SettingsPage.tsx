@@ -9,7 +9,7 @@ import {
   updateRejectionReason,
   deleteRejectionReason,
 } from '@/lib/quotations'
-import { fetchProducts } from '@/lib/products'
+import { fetchPublishedProductCount } from '@/lib/products'
 import { planLabel } from '@/lib/planLimits'
 import type { MonthlyUsageRow, QuotationRejectionReason } from '@/types/database'
 import { PageHeader } from '@/components/layout/PageHeader'
@@ -162,8 +162,9 @@ export function SettingsPage() {
   const [monthlyUsage,  setMonthlyUsage]  = useState<MonthlyUsageRow | null>(null)
 
   useEffect(() => {
-    fetchProducts().then(p => setProductCount(p.length)).catch(() => {})
-  }, [])
+    if (!tenant?.id) return
+    fetchPublishedProductCount(tenant.id).then(setProductCount).catch(() => {})
+  }, [tenant?.id])
 
   useEffect(() => {
     if (!tenant) return
