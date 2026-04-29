@@ -111,6 +111,36 @@ export function calculatePrice(
 }
 
 /**
+ * Per-option breakdown of the modifier contributions used in calculatePrice.
+ * Returns one entry per selected characteristic that contributed a non-zero modifier.
+ */
+export interface OptionBreakdown {
+  char_id:    string
+  value_id:   string | null   // null when contribution comes from a rule price override
+  amount:     number
+  overridden: boolean
+}
+
+export function buildOptionBreakdown(
+  selection: Selection,
+  characteristics: Array<{ id: string; values: Array<{ id: string; price_modifier: number }> }>,
+  priceOverrides: Record<string, number>
+): OptionBreakdown[] {
+  const out: OptionBreakdown[] = []
+  for (const char of characteristics) {
+    const selectedValueId = selection[char.id]
+    if (!selectedValueId) continue
+    if (char.id in priceOverrides) {
+      out.push({ char_id: char.id, value_id: selectedValueId, amount: priceOverrides[char.id], overridden: true })
+      continue
+    }
+    const value = char.values.find(v => v.id === selectedValueId)
+    if (value) out.push({ char_id: char.id, value_id: value.id, amount: value.price_modifier, overridden: false })
+  }
+  return out
+}
+
+/**
  * Auto-deselect values that became hidden/disabled after a selection change.
  * Also enforce locked values (override selection if rule demands a specific value).
  */

@@ -63,6 +63,7 @@ const PDF_LABELS = {
     uom:              'UOM',
     unitPrice:        'Unit Price',
     total:            'Total',
+    basePrice:        'Base price',
     subtotal:         'Subtotal',
     totalLabel:       'TOTAL',
     notes:            'NOTES',
@@ -93,6 +94,7 @@ const PDF_LABELS = {
     uom:              'JM',
     unitPrice:        'Jed. cena',
     total:            'Ukupno',
+    basePrice:        'Osnovna cena',
     subtotal:         'Međuzbir',
     totalLabel:       'UKUPNO',
     notes:            'NAPOMENE',
@@ -318,10 +320,17 @@ export async function buildQuotationPdfBytes(
       const allTexts_ = productTexts?.[item.product_id] ?? []
       const texts_    = allTexts_.filter(pt => pt.language === lang)
 
+      // Pricing breakdown: derive base price from unit_price - sum(modifiers).
+      // Captures any residual (formula adjustments, manual overrides) into "base".
+      const modifierSum = cfg.reduce((sum, c) => sum + (Number(c.price_modifier) || 0), 0)
+      const derivedBase = item.unit_price - modifierSum
+      const showBreakdown = cfg.length > 0
+
       // Compute exact row height
       const wrapW = col - 28 - colUnit
       let rowHeight = 12  // product name line
       if (item.product_sku) rowHeight += 11
+      if (showBreakdown) rowHeight += 11      // "Base price" line
       rowHeight += cfg.length * 11
       for (const pt of texts_) {
         rowHeight += 11  // label
@@ -349,9 +358,24 @@ export async function buildQuotationPdfBytes(
         y -= 11
       }
 
-      // Configuration rows
+      // Pricing breakdown — base price first
+      if (showBreakdown) {
+        text(L.basePrice, margin + 24, y, 8, fontR, C.muted)
+        rText(derivedBase.toFixed(2), margin + colTotal - 6, y, 8, fontR, C.muted)
+        y -= 11
+      }
+
+      // Configuration rows with their price modifier
       for (const c of cfg) {
         text(`${c.characteristic_name}: ${c.value_label}`, margin + 24, y, 8, fontR, C.muted)
+        const mod = Number(c.price_modifier) || 0
+        if (mod !== 0) {
+          const modStr  = `${mod >= 0 ? '+' : ''}${mod.toFixed(2)}`
+          const modColor = mod >= 0 ? C.positive : C.negative
+          rText(modStr, margin + colTotal - 6, y, 8, fontR, modColor)
+        } else {
+          rText('0.00', margin + colTotal - 6, y, 8, fontR, C.muted)
+        }
         y -= 11
       }
 

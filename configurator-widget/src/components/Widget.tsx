@@ -2,8 +2,8 @@ import { h } from 'preact'
 import { useState, useEffect, useMemo, useRef } from 'preact/hooks'
 import type { FullProductConfig, Selection, NumericInputs, WidgetConfig, ConfigLineItem } from '../types'
 import { loadProductConfig } from '../api'
-import { evaluateRules, calculatePrice, sanitizeSelection, applyDefaultValues, applyNumericDefaults } from '../rules'
-import { calculateFormulaTotal } from '../formulaEngine'
+import { evaluateRules, calculatePrice, buildOptionBreakdown, sanitizeSelection, applyDefaultValues, applyNumericDefaults } from '../rules'
+import { calculateFormulaTotal, calculateFormulaBreakdown } from '../formulaEngine'
 import { t, getLang, setLang, LANGS, pickTranslation, type Lang } from '../i18n'
 import { Visualization } from './Visualization'
 import { CharacteristicInput } from './CharacteristicInput'
@@ -116,6 +116,19 @@ export function Widget({ config, track }: Props) {
       characteristics: state.data.characteristics,
     })
     return Math.max(0, base + formulaAdj)
+  }, [state, selection, numericInputs, ruleEffect])
+
+  // Per-component breakdown shown above the total price
+  const priceBreakdown = useMemo(() => {
+    if (state.phase !== 'ready') return null
+    const options = buildOptionBreakdown(selection, state.data.characteristics, ruleEffect.priceOverrides)
+    const formulas = calculateFormulaBreakdown(state.data.formulas, {
+      base_price:      state.data.product.base_price,
+      selection,
+      numericInputs,
+      characteristics: state.data.characteristics,
+    })
+    return { base: state.data.product.base_price, options, formulas }
   }, [state, selection, numericInputs, ruleEffect])
 
   const lineItems = useMemo((): ConfigLineItem[] => {
@@ -236,6 +249,40 @@ export function Widget({ config, track }: Props) {
             ))}
           </div>
         )}
+
+        {/* Pricing breakdown */}
+        {priceBreakdown && (() => {
+          const rows: Array<{ label: string; amount: number }> = []
+          rows.push({ label: t('Base price'), amount: priceBreakdown.base })
+          for (const opt of priceBreakdown.options) {
+            if (opt.amount === 0) continue
+            const char = characteristics.find(c => c.id === opt.char_id)
+            if (!char) continue
+            const charName = pickTranslation(char.name_i18n, lang, char.name)
+            const value = char.values.find(v => v.id === opt.value_id)
+            const valueLabel = value ? pickTranslation(value.label_i18n, lang, value.label) : ''
+            rows.push({ label: `${charName}: ${valueLabel}`, amount: opt.amount })
+          }
+          for (const f of priceBreakdown.formulas) {
+            if (f.amount === 0) continue
+            rows.push({ label: f.name, amount: f.amount })
+          }
+          // Only render if there's at least one modifier or formula contribution
+          if (rows.length <= 1) return null
+          return (
+            <div class="cw-price-breakdown">
+              <div class="cw-breakdown-title">{t('Price breakdown')}</div>
+              {rows.map((r, i) => (
+                <div class="cw-breakdown-row" key={i}>
+                  <span class="cw-breakdown-label">{r.label}</span>
+                  <span class={`cw-breakdown-amount${i === 0 ? '' : (r.amount >= 0 ? ' positive' : ' negative')}`}>
+                    {i === 0 ? '' : (r.amount >= 0 ? '+' : '')}{r.amount.toFixed(2)} {product.currency}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )
+        })()}
 
         {/* Price */}
         <div class="cw-price-bar">

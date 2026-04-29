@@ -106,3 +106,32 @@ export function calculateFormulaTotal(
   }
   return total
 }
+
+/**
+ * Per-formula breakdown of contributions. Useful for UI displays that want to
+ * show the user how each named formula adds to (or subtracts from) the total.
+ */
+export interface FormulaBreakdownEntry {
+  id:     string
+  name:   string
+  amount: number
+}
+
+export function calculateFormulaBreakdown(
+  formulas: Array<{ id: string; name: string; formula: FormulaNode; is_active: boolean }>,
+  ctx: FormulaContext
+): FormulaBreakdownEntry[] {
+  const out: FormulaBreakdownEntry[] = []
+  const formulaResults: Record<string, number> = { ...ctx.formulaResults }
+  for (const f of formulas) {
+    if (!f.is_active) continue
+    try {
+      const result = evaluateFormula(f.formula, { ...ctx, formulaResults }) as number
+      formulaResults[f.id] = result
+      out.push({ id: f.id, name: f.name, amount: result })
+    } catch {
+      // Malformed formula — skip silently
+    }
+  }
+  return out
+}
