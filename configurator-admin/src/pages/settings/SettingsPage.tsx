@@ -403,14 +403,26 @@ export function SettingsPage() {
     if (!tenant) return
     setSavingProfile(true)
     try {
-      const { error } = await supabase.from('tenants').update({
+      const payload = {
         company_address: companyAddress.trim() || null,
         company_phone:   companyPhone.trim()   || null,
         company_email:   companyEmail.trim()   || null,
         company_website: companyWebsite.trim() || null,
         contact_person:  contactPerson.trim()  || null,
-      } as unknown as never).eq('id', tenant.id)
+      }
+      console.log('[profile save] sending payload', payload, 'for tenant', tenant.id)
+
+      const { data: updated, error } = await (supabase.from('tenants') as any)
+        .update(payload)
+        .eq('id', tenant.id)
+        .select('company_address, company_phone, company_email, company_website, contact_person')
+        .single()
+
+      console.log('[profile save] response', { updated, error })
+
       if (error) throw error
+      if (!updated) throw new Error('Update returned no row — check RLS or column names')
+
       await refreshTenant()
       toast({ title: t('Company profile saved') })
     } catch (e) {
