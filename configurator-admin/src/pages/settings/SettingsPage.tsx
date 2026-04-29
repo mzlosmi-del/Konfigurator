@@ -81,7 +81,7 @@ function FeatureRow({ label, enabled, note }: { label: string; enabled: boolean;
 }
 
 export function SettingsPage() {
-  const { tenant, user, planLimits } = useAuthContext()
+  const { tenant, user, planLimits, refreshTenant } = useAuthContext()
   const { toasts, toast, dismiss } = useToast()
   const navigate     = useNavigate()
   const logoInputRef = useRef<HTMLInputElement>(null)
@@ -93,14 +93,25 @@ export function SettingsPage() {
   const [saving, setSaving] = useState(false)
 
   // Company profile state
-  const [companyAddress, setCompanyAddress] = useState((tenant as any)?.company_address ?? '')
-  const [companyPhone,   setCompanyPhone]   = useState((tenant as any)?.company_phone   ?? '')
-  const [companyEmail,   setCompanyEmail]   = useState((tenant as any)?.company_email   ?? '')
-  const [companyWebsite, setCompanyWebsite] = useState((tenant as any)?.company_website ?? '')
-  const [contactPerson,  setContactPerson]  = useState((tenant as any)?.contact_person  ?? '')
-  const [logoUrl,        setLogoUrl]        = useState((tenant as any)?.logo_url        ?? '')
+  const [companyAddress, setCompanyAddress] = useState(tenant?.company_address ?? '')
+  const [companyPhone,   setCompanyPhone]   = useState(tenant?.company_phone   ?? '')
+  const [companyEmail,   setCompanyEmail]   = useState(tenant?.company_email   ?? '')
+  const [companyWebsite, setCompanyWebsite] = useState(tenant?.company_website ?? '')
+  const [contactPerson,  setContactPerson]  = useState(tenant?.contact_person  ?? '')
+  const [logoUrl,        setLogoUrl]        = useState(tenant?.logo_url        ?? '')
   const [savingProfile,  setSavingProfile]  = useState(false)
   const [uploadingLogo,  setUploadingLogo]  = useState(false)
+
+  // Re-sync form fields whenever tenant is refreshed in the auth context
+  useEffect(() => {
+    if (!tenant) return
+    setCompanyAddress(tenant.company_address ?? '')
+    setCompanyPhone(tenant.company_phone     ?? '')
+    setCompanyEmail(tenant.company_email     ?? '')
+    setCompanyWebsite(tenant.company_website ?? '')
+    setContactPerson(tenant.contact_person   ?? '')
+    setLogoUrl(tenant.logo_url               ?? '')
+  }, [tenant])
 
   async function handleSaveNotifyEmail() {
     if (!tenant) return
@@ -133,12 +144,14 @@ export function SettingsPage() {
     try {
       const ext  = file.name.toLowerCase().endsWith('.png') ? 'png' : 'jpg'
       const path = `${tenant.id}/logo.${ext}`
-      const { error } = await supabase.storage.from('logos').upload(path, file, { upsert: true, contentType: file.type })
-      if (error) throw new Error(error.message)
+      const { error: storageError } = await supabase.storage.from('logos').upload(path, file, { upsert: true, contentType: file.type })
+      if (storageError) throw new Error(storageError.message)
       const { data } = supabase.storage.from('logos').getPublicUrl(path)
       const url = data.publicUrl
-      await supabase.from('tenants').update({ logo_url: url } as unknown as never).eq('id', tenant.id)
+      const { error: dbError } = await supabase.from('tenants').update({ logo_url: url } as unknown as never).eq('id', tenant.id)
+      if (dbError) throw new Error(dbError.message)
       setLogoUrl(url)
+      await refreshTenant()
       toast({ title: t('Logo uploaded') })
     } catch (e) {
       toast({ title: t('Logo upload failed'), description: e instanceof Error ? e.message : undefined, variant: 'destructive' })
@@ -409,6 +422,7 @@ export function SettingsPage() {
         contact_person:  contactPerson.trim()  || null,
       } as unknown as never).eq('id', tenant.id)
       if (error) throw error
+      await refreshTenant()
       toast({ title: t('Company profile saved') })
     } catch (e) {
       toast({ title: t('Failed to save'), description: e instanceof Error ? e.message : undefined, variant: 'destructive' })

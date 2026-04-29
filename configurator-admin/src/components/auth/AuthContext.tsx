@@ -11,6 +11,7 @@ interface AuthContextValue {
   tenant: Tenant | null
   planLimits: PlanLimits | null
   loading: boolean
+  refreshTenant: () => Promise<void>
   signOut: () => Promise<void>
 }
 
