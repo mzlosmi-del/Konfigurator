@@ -239,13 +239,53 @@ export const WIDGET_STYLES = `
     border-radius: 4px;
   }
 
+  /* ── Price breakdown ──────────────────────────────── */
+  .cw-price-breakdown {
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 1px solid var(--cw-surface-alt);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .cw-breakdown-title {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--cw-text-muted);
+    margin-bottom: 4px;
+  }
+  .cw-breakdown-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    font-size: 13px;
+  }
+  .cw-breakdown-label {
+    color: var(--cw-text-label);
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .cw-breakdown-amount {
+    color: var(--cw-text);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  .cw-breakdown-amount.positive { color: #059669; }
+  .cw-breakdown-amount.negative { color: #dc2626; }
+
   /* ── Price bar ──────────────────────────────────── */
   .cw-price-bar {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-top: 24px;
-    padding-top: 20px;
+    margin-top: 16px;
+    padding-top: 14px;
     border-top: 1px solid var(--cw-surface-alt);
   }
   .cw-price-label { font-size: 13px; color: var(--cw-text-muted); }

@@ -7,6 +7,8 @@ const sr: Record<string, string> = {
   'Thank you. We\'ll get back to you as soon as possible.': 'Hvala. Javićemo vam se što pre moguće.',
   'Powered by Konfigurator':               'Pokretano od Konfiguratora',
   'Total price':                           'Ukupna cena',
+  'Base price':                            'Osnovna cena',
+  'Price breakdown':                       'Pregled cene',
   'Request a quote':                       'Zatraži ponudu',
   'Select all options to continue':        'Izaberite sve opcije da biste nastavili',
 
