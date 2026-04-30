@@ -4,13 +4,15 @@ import type { PdfSection } from '@/pages/quotations/PdfLayoutDialog'
 import { calcLineTotal } from '@/lib/quotations'
 
 export interface TenantProfile {
-  name:             string
-  logo_url?:        string | null
-  company_address?: string | null
-  company_phone?:   string | null
-  company_email?:   string | null
-  company_website?: string | null
-  contact_person?:  string | null
+  name:                string
+  logo_url?:           string | null
+  company_address?:    string | null
+  company_phone?:      string | null
+  company_email?:      string | null
+  company_website?:    string | null
+  contact_person?:     string | null
+  vat_number?:         string | null
+  company_reg_number?: string | null
 }
 
 // ── Palette ────────────────────────────────────────────────────────────────────
@@ -57,12 +59,17 @@ const PDF_LABELS = {
   en: {
     quotation:    'QUOTATION',
     billTo:       'BILL TO',
+    shipTo:       'SHIP TO',
     quoteDetails: 'QUOTE DETAILS',
     reference:    'Reference',
     issued:       'Issue Date',
     validUntil:   'Valid Until',
     currency:     'Currency',
     preparedBy:   'Prepared By',
+    paymentTerms: 'Payment Terms',
+    vatNumber:    'VAT No.',
+    regNumber:    'Reg. No.',
+    customerVat:  'VAT / Tax ID',
     lineItems:    'LINE ITEMS',
     product:      'PRODUCT',
     qty:          'QTY',
@@ -91,12 +98,17 @@ const PDF_LABELS = {
   sr: {
     quotation:    'PONUDA',
     billTo:       'NARUČILAC',
+    shipTo:       'ADRESA ISPORUKE',
     quoteDetails: 'DETALJI PONUDE',
     reference:    'Referenca',
     issued:       'Datum',
     validUntil:   'Važi do',
     currency:     'Valuta',
     preparedBy:   'Izradio',
+    paymentTerms: 'Uslovi plaćanja',
+    vatNumber:    'PDV br.',
+    regNumber:    'Mat. br.',
+    customerVat:  'PIB / PDV br.',
     lineItems:    'STAVKE',
     product:      'PROIZVOD',
     qty:          'KOL.',
@@ -251,17 +263,25 @@ export async function buildQuotationPdfBytes(
   const HDR_TOP   = H - HDR_H + 70
 
   rText(L.quotation, HDR_RIGHT, HDR_TOP, 26, fontB, C.white)
-  rText(quotation.reference_number, HDR_RIGHT, HDR_TOP - 22, 9.5, fontR, C.navyDim)
-  rText(issueDate, HDR_RIGHT, HDR_TOP - 35, 8.5, fontR, C.navyDim)
+  // Optional quotation title (subject) shown below the document type
+  let hdrMetaY = HDR_TOP - 22
+  if (quotation.title) {
+    rText(quotation.title, HDR_RIGHT, hdrMetaY, 9, fontR, C.navyDim)
+    hdrMetaY -= 13
+  }
+  rText(quotation.reference_number, HDR_RIGHT, hdrMetaY, 9.5, fontR, C.navyDim)
+  hdrMetaY -= 13
+  rText(issueDate, HDR_RIGHT, hdrMetaY, 8.5, fontR, C.navyDim)
+  hdrMetaY -= 11
   if (quotation.valid_until) {
     const expDate = new Date(quotation.valid_until).toLocaleDateString(L.dateLocale, { dateStyle: 'long' })
-    rText(`${L.validUntil}: ${expDate}`, HDR_RIGHT, HDR_TOP - 48, 8.5, fontR, C.navyDim)
+    rText(`${L.validUntil}: ${expDate}`, HDR_RIGHT, hdrMetaY, 8.5, fontR, C.navyDim)
   }
 
   // ══════════════════════════════════════════════════════════════════════════
   // SECTION 2 — Sender strip (company info, flush below header)
   // ══════════════════════════════════════════════════════════════════════════
-  // y was set to H - HDR_H - 16 at the end of section 1
+  y = H - HDR_H - 16
   text(tenant.name.toUpperCase(), MX, y, 9, fontB, C.ink)
 
   const senderParts = [
@@ -277,6 +297,15 @@ export async function buildQuotationPdfBytes(
       text(line, MX, y, 8, fontR, C.muted)
       y -= 11
     }
+  }
+  // VAT / registration numbers on a second detail line
+  const tenantRegParts = [
+    tenant.vat_number         ? `${L.vatNumber} ${tenant.vat_number}`         : null,
+    tenant.company_reg_number ? `${L.regNumber} ${tenant.company_reg_number}` : null,
+  ].filter(Boolean) as string[]
+  if (tenantRegParts.length > 0) {
+    text(tenantRegParts.join('   '), MX, y, 8, fontR, C.faint)
+    y -= 11
   }
   y -= 12
   rule(y)
@@ -308,6 +337,19 @@ export async function buildQuotationPdfBytes(
       text(line, LX, y, 9, fontR, C.muted); y -= 12
     }
   }
+  if (quotation.customer_vat_number) {
+    text(`${L.customerVat}: ${quotation.customer_vat_number}`, LX, y, 8, fontR, C.faint)
+    y -= 11
+  }
+  if (quotation.delivery_address) {
+    y -= 6
+    text(L.shipTo, LX, y, 7, fontB, C.muted)
+    page.drawRectangle({ x: LX, y: y - 5, width: 24, height: 1.5, color: C.navy })
+    y -= 14
+    for (const line of wrapText(quotation.delivery_address, fontR, 9, half)) {
+      text(line, LX, y, 9, fontR, C.muted); y -= 12
+    }
+  }
 
   // ─── Right: QUOTE DETAILS ─────────────────────────────────────────────────
   let ry = secTopY
@@ -328,6 +370,7 @@ export async function buildQuotationPdfBytes(
   }
   detailRow(L.currency, quotation.currency)
   if (tenant.contact_person) detailRow(L.preparedBy, tenant.contact_person)
+  if (quotation.payment_terms) detailRow(L.paymentTerms, quotation.payment_terms)
 
   // Vertical hairline separator
   const secBotY = Math.min(y, ry) - 8

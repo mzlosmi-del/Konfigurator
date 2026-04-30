@@ -97,10 +97,12 @@ export function SettingsPage() {
   const [companyPhone,   setCompanyPhone]   = useState(tenant?.company_phone   ?? '')
   const [companyEmail,   setCompanyEmail]   = useState(tenant?.company_email   ?? '')
   const [companyWebsite, setCompanyWebsite] = useState(tenant?.company_website ?? '')
-  const [contactPerson,  setContactPerson]  = useState(tenant?.contact_person  ?? '')
-  const [logoUrl,        setLogoUrl]        = useState(tenant?.logo_url        ?? '')
-  const [savingProfile,  setSavingProfile]  = useState(false)
-  const [uploadingLogo,  setUploadingLogo]  = useState(false)
+  const [contactPerson,     setContactPerson]     = useState(tenant?.contact_person  ?? '')
+  const [logoUrl,           setLogoUrl]           = useState(tenant?.logo_url        ?? '')
+  const [vatNumber,         setVatNumber]         = useState((tenant as any)?.vat_number          ?? '')
+  const [companyRegNumber,  setCompanyRegNumber]  = useState((tenant as any)?.company_reg_number  ?? '')
+  const [savingProfile,     setSavingProfile]     = useState(false)
+  const [uploadingLogo,     setUploadingLogo]     = useState(false)
 
   async function handleSaveNotifyEmail() {
     if (!tenant) return
@@ -404,11 +406,13 @@ export function SettingsPage() {
     setSavingProfile(true)
     try {
       const { error } = await supabase.from('tenants').update({
-        company_address: companyAddress.trim() || null,
-        company_phone:   companyPhone.trim()   || null,
-        company_email:   companyEmail.trim()   || null,
-        company_website: companyWebsite.trim() || null,
-        contact_person:  contactPerson.trim()  || null,
+        company_address:    companyAddress.trim()   || null,
+        company_phone:      companyPhone.trim()     || null,
+        company_email:      companyEmail.trim()     || null,
+        company_website:    companyWebsite.trim()   || null,
+        contact_person:     contactPerson.trim()    || null,
+        vat_number:         vatNumber.trim()        || null,
+        company_reg_number: companyRegNumber.trim() || null,
       } as unknown as never).eq('id', tenant.id)
       if (error) throw error
       await refreshTenant()
@@ -573,6 +577,25 @@ export function SettingsPage() {
                 placeholder="https://www.company.com"
               />
             </FormField>
+
+            <div className="grid grid-cols-2 gap-3">
+              <FormField label={t('VAT Number')} htmlFor="vat-number">
+                <Input
+                  id="vat-number"
+                  value={vatNumber}
+                  onChange={e => setVatNumber(e.target.value)}
+                  placeholder={t('e.g. DE123456789')}
+                />
+              </FormField>
+              <FormField label={t('Company Reg. Number')} htmlFor="company-reg-number">
+                <Input
+                  id="company-reg-number"
+                  value={companyRegNumber}
+                  onChange={e => setCompanyRegNumber(e.target.value)}
+                  placeholder={t('e.g. HRB 12345')}
+                />
+              </FormField>
+            </div>
 
             <Button size="sm" onClick={handleSaveProfile} loading={savingProfile}>
               {t('Save company profile')}

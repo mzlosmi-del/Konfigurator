@@ -76,7 +76,9 @@ export interface Database {
           company_email:   string | null
           company_website: string | null
           contact_person:  string | null
-          logo_url:        string | null
+          logo_url:            string | null
+          vat_number:          string | null
+          company_reg_number:  string | null
           created_at: string
           updated_at: string
         }
@@ -309,8 +311,12 @@ export interface Database {
           customer_email: string
           customer_company: string | null
           customer_phone: string | null
-          customer_address: string | null
+          customer_address:     string | null
+          customer_vat_number:  string | null
+          delivery_address:     string | null
           notes: string | null
+          title: string | null
+          payment_terms: string | null
           valid_until: string | null
           currency: string
           subtotal: number

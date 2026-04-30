@@ -95,16 +95,20 @@ export function QuotationFormPage() {
   } | null>(null)
 
   // ── Customer fields ────────────────────────────────────────────────────────
-  const [customerName,    setCustomerName]    = useState('')
-  const [customerEmail,   setCustomerEmail]   = useState('')
-  const [customerCompany, setCustomerCompany] = useState('')
-  const [customerPhone,   setCustomerPhone]   = useState('')
-  const [customerAddress, setCustomerAddress] = useState('')
+  const [customerName,       setCustomerName]       = useState('')
+  const [customerEmail,      setCustomerEmail]      = useState('')
+  const [customerCompany,    setCustomerCompany]    = useState('')
+  const [customerPhone,      setCustomerPhone]      = useState('')
+  const [customerAddress,    setCustomerAddress]    = useState('')
+  const [customerVatNumber,  setCustomerVatNumber]  = useState('')
+  const [deliveryAddress,    setDeliveryAddress]    = useState('')
 
   // ── Quote meta ─────────────────────────────────────────────────────────────
-  const [validUntil, setValidUntil] = useState(defaultExpiry())
-  const [currency,   setCurrency]   = useState('EUR')
-  const [notes,      setNotes]      = useState('')
+  const [title,        setTitle]        = useState('')
+  const [validUntil,   setValidUntil]   = useState(defaultExpiry())
+  const [currency,     setCurrency]     = useState('EUR')
+  const [paymentTerms, setPaymentTerms] = useState('')
+  const [notes,        setNotes]        = useState('')
 
   // ── Line items ─────────────────────────────────────────────────────────────
   const [lineItems,   setLineItems]   = useState<LineItemDraft[]>([])
@@ -140,8 +144,12 @@ export function QuotationFormPage() {
         setCustomerCompany(q.customer_company ?? '')
         setCustomerPhone(q.customer_phone ?? '')
         setCustomerAddress(q.customer_address ?? '')
+        setCustomerVatNumber((q as any).customer_vat_number ?? '')
+        setDeliveryAddress((q as any).delivery_address ?? '')
+        setTitle((q as any).title ?? '')
         setValidUntil(q.valid_until ?? defaultExpiry())
         setCurrency(q.currency)
+        setPaymentTerms((q as any).payment_terms ?? '')
         setNotes(q.notes ?? '')
 
         const items = (Array.isArray(q.line_items) ? q.line_items : []) as unknown as QuotationLineItem[]
@@ -368,19 +376,23 @@ export function QuotationFormPage() {
       const tot   = calcTotal(sub, adjs)
 
       const payload = {
-        customer_name:    customerName.trim(),
-        customer_email:   customerEmail.trim(),
-        customer_company: customerCompany.trim() || null,
-        customer_phone:   customerPhone.trim()   || null,
-        customer_address: customerAddress.trim() || null,
-        notes:            notes.trim()            || null,
-        valid_until:      validUntil              || null,
+        customer_name:       customerName.trim(),
+        customer_email:      customerEmail.trim(),
+        customer_company:    customerCompany.trim()   || null,
+        customer_phone:      customerPhone.trim()     || null,
+        customer_address:    customerAddress.trim()   || null,
+        customer_vat_number: customerVatNumber.trim() || null,
+        delivery_address:    deliveryAddress.trim()   || null,
+        title:               title.trim()             || null,
+        payment_terms:       paymentTerms.trim()      || null,
+        notes:               notes.trim()             || null,
+        valid_until:         validUntil               || null,
         currency,
-        subtotal:         sub,
-        total_price:      tot,
+        subtotal:            sub,
+        total_price:         tot,
         status,
-        line_items:       items as unknown as Json,
-        adjustments:      adjs  as unknown as Json,
+        line_items:          items as unknown as Json,
+        adjustments:         adjs  as unknown as Json,
       }
 
       let savedId: string
@@ -429,13 +441,15 @@ export function QuotationFormPage() {
     try {
       const savedQuotation = await fetchQuotation(savedId)
       const tenantProfile: TenantProfile = {
-        name:            tenant?.name            ?? 'Your store',
-        logo_url:        (tenant as any)?.logo_url,
-        company_address: (tenant as any)?.company_address,
-        company_phone:   (tenant as any)?.company_phone,
-        company_email:   (tenant as any)?.company_email,
-        company_website: (tenant as any)?.company_website,
-        contact_person:  (tenant as any)?.contact_person,
+        name:                tenant?.name                ?? 'Your store',
+        logo_url:            (tenant as any)?.logo_url,
+        company_address:     (tenant as any)?.company_address,
+        company_phone:       (tenant as any)?.company_phone,
+        company_email:       (tenant as any)?.company_email,
+        company_website:     (tenant as any)?.company_website,
+        contact_person:      (tenant as any)?.contact_person,
+        vat_number:          (tenant as any)?.vat_number,
+        company_reg_number:  (tenant as any)?.company_reg_number,
       }
       setPendingPdfData({ savedId, savedQuotation, tenantProfile })
       setLayoutDialogOpen(true)
@@ -554,8 +568,16 @@ export function QuotationFormPage() {
               <Input value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} placeholder="+1 234 567 890" />
             </div>
             <div className="col-span-2 space-y-1.5">
-              <label className="text-sm font-medium">{t('Address')}</label>
+              <label className="text-sm font-medium">{t('Billing Address')}</label>
               <Input value={customerAddress} onChange={e => setCustomerAddress(e.target.value)} placeholder={t('Street, city, country')} />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">{t('VAT / Tax ID')}</label>
+              <Input value={customerVatNumber} onChange={e => setCustomerVatNumber(e.target.value)} placeholder={t('e.g. DE123456789')} />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">{t('Delivery Address')}</label>
+              <Input value={deliveryAddress} onChange={e => setDeliveryAddress(e.target.value)} placeholder={t('Leave blank if same as billing')} />
             </div>
           </CardContent>
         </Card>
@@ -564,6 +586,10 @@ export function QuotationFormPage() {
         <Card>
           <CardHeader><CardTitle>{t('Quote Details')}</CardTitle></CardHeader>
           <CardContent className="grid grid-cols-2 gap-4">
+            <div className="col-span-2 space-y-1.5">
+              <label className="text-sm font-medium">{t('Subject / Title')}</label>
+              <Input value={title} onChange={e => setTitle(e.target.value)} placeholder={t('e.g. Custom furniture package for office renovation')} />
+            </div>
             <div className="space-y-1.5">
               <label className="text-sm font-medium">{t('Valid Until')}</label>
               <Input type="date" value={validUntil} onChange={e => setValidUntil(e.target.value)} />
@@ -573,6 +599,10 @@ export function QuotationFormPage() {
               <Select value={currency} onChange={e => setCurrency(e.target.value)}>
                 {CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)}
               </Select>
+            </div>
+            <div className="col-span-2 space-y-1.5">
+              <label className="text-sm font-medium">{t('Payment Terms')}</label>
+              <Input value={paymentTerms} onChange={e => setPaymentTerms(e.target.value)} placeholder={t('e.g. Net 30, 50% upfront')} />
             </div>
             <div className="col-span-2 space-y-1.5">
               <label className="text-sm font-medium">{t('Notes')}</label>
