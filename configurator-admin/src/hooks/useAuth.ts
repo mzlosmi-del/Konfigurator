@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { Session, User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import type { Profile, Tenant } from '@/types/database'
@@ -22,6 +22,10 @@ export function useAuth() {
     planLimits: null,
     loading: true,
   })
+
+  // Keep a ref to current state so async callbacks always see fresh values
+  const stateRef = useRef(state)
+  stateRef.current = state
 
   useEffect(() => {
     // Get initial session
@@ -68,19 +72,31 @@ export function useAuth() {
 
     const planLimits = tenant ? await fetchPlanLimits(tenant.plan) : null
 
-    setState({
+    setState(s => ({
+      ...s,
       session,
       user: session.user,
       profile,
       tenant,
       planLimits,
       loading: false,
-    })
+    }))
+  }
+
+  async function refreshTenant() {
+    const tenantId = stateRef.current.profile?.tenant_id
+    if (!tenantId) return
+    const { data } = await supabase
+      .from('tenants')
+      .select('*')
+      .eq('id', tenantId)
+      .single()
+    if (data) setState(prev => ({ ...prev, tenant: data as Tenant }))
   }
 
   async function signOut() {
     await supabase.auth.signOut()
   }
 
-  return { ...state, signOut }
+  return { ...state, refreshTenant, signOut }
 }

@@ -131,8 +131,13 @@ export async function uploadQuotationPdf(
   return url
 }
 
+export function calcLineTotal(item: QuotationLineItem): number {
+  const base = item.unit_price * item.quantity
+  return calcTotal(base, item.adjustments ?? [])
+}
+
 export function calcSubtotal(items: QuotationLineItem[]): number {
-  return items.reduce((sum, item) => sum + item.unit_price * item.quantity, 0)
+  return items.reduce((sum, item) => sum + calcLineTotal(item), 0)
 }
 
 export function calcTotal(subtotal: number, adjustments: QuotationAdjustment[]): number {

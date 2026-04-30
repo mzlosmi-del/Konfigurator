@@ -1,6 +1,7 @@
 import { PDFDocument, PDFPage, PDFFont, rgb, StandardFonts } from 'pdf-lib'
 import type { Quotation, QuotationLineItem, QuotationAdjustment, ProductText } from '@/types/database'
 import type { PdfSection } from '@/pages/quotations/PdfLayoutDialog'
+import { calcLineTotal } from '@/lib/quotations'
 
 export interface TenantProfile {
   name:             string
@@ -29,21 +30,23 @@ const C = {
   rowRule:     rgb(0.920, 0.920, 0.920),
 }
 
-function wrapText(text: string, font: PDFFont, size: number, maxWidth: number): string[] {
-  const words = text.split(' ')
-  const lines: string[] = []
-  let line = ''
-  for (const word of words) {
-    const test = line ? `${line} ${word}` : word
-    if (font.widthOfTextAtSize(test, size) > maxWidth) {
-      if (line) lines.push(line)
-      line = word
-    } else {
-      line = test
+function wrapText(rawText: string, font: PDFFont, size: number, maxWidth: number): string[] {
+  const result: string[] = []
+  for (const paragraph of rawText.split(/\r?\n/)) {
+    const words = paragraph.split(' ')
+    let line = ''
+    for (const word of words) {
+      const test = line ? `${line} ${word}` : word
+      if (font.widthOfTextAtSize(test, size) > maxWidth) {
+        if (line) result.push(line)
+        line = word
+      } else {
+        line = test
+      }
     }
+    result.push(line)   // always push, even empty (preserves blank lines between paragraphs)
   }
-  if (line) lines.push(line)
-  return lines.length ? lines : ['']
+  return result.length ? result : ['']
 }
 
 // ── PDF label translations ────────────────────────────────────────────────────
@@ -146,6 +149,7 @@ export async function buildQuotationPdfBytes(
 
   // ── Drawing helpers ────────────────────────────────────────────────────────
   function text(str: string, x: number, yPos: number, size: number, font: PDFFont, color = C.black) {
+    str = str.replace(/[\x00-\x09\x0b-\x1f\x7f]/g, ' ')  // strip control chars WinAnsi can't encode
     if (!str) return
     page.drawText(str, { x, y: yPos, size, font, color })
   }
@@ -177,14 +181,18 @@ export async function buildQuotationPdfBytes(
   let logoEmbedded = false
   if (tenant.logo_url) {
     try {
-      const buf = await fetch(tenant.logo_url).then(r => r.arrayBuffer())
-      const isPNG = tenant.logo_url.toLowerCase().includes('.png')
-      const img   = isPNG ? await pdfDoc.embedPng(buf) : await pdfDoc.embedJpg(buf)
-      const dims  = img.scaleToFit(logoBoxW, logoBoxH)
-      const imgX  = logoBoxX + (logoBoxW - dims.width) / 2
-      const imgY  = logoBoxY + (logoBoxH - dims.height) / 2
-      page.drawImage(img, { x: imgX, y: imgY, width: dims.width, height: dims.height })
-      logoEmbedded = true
+      const res = await fetch(tenant.logo_url)
+      if (res.ok) {
+        const contentType = res.headers.get('content-type') ?? ''
+        const buf = await res.arrayBuffer()
+        const isPNG = contentType.includes('png') || tenant.logo_url.toLowerCase().includes('.png')
+        const img   = isPNG ? await pdfDoc.embedPng(buf) : await pdfDoc.embedJpg(buf)
+        const dims  = img.scaleToFit(logoBoxW, logoBoxH)
+        const imgX  = logoBoxX + (logoBoxW - dims.width) / 2
+        const imgY  = logoBoxY + (logoBoxH - dims.height) / 2
+        page.drawImage(img, { x: imgX, y: imgY, width: dims.width, height: dims.height })
+        logoEmbedded = true
+      }
     } catch {
       // fall through to placeholder
     }
@@ -315,7 +323,9 @@ export async function buildQuotationPdfBytes(
 
     for (let i = 0; i < items.length; i++) {
       const item      = items[i]
-      const lineTotal = item.unit_price * item.quantity
+      const baseLine  = item.unit_price * item.quantity
+      const itemAdjs  = Array.isArray(item.adjustments) ? item.adjustments : []
+      const lineTotal = calcLineTotal(item)
       const cfg       = Array.isArray(item.configuration) ? item.configuration : []
       const allTexts_ = productTexts?.[item.product_id] ?? []
       const texts_    = allTexts_.filter(pt => pt.language === lang)
@@ -335,6 +345,11 @@ export async function buildQuotationPdfBytes(
       for (const pt of texts_) {
         rowHeight += 11  // label
         rowHeight += wrapText(pt.content, fontR, 8, wrapW).length * 11
+      }
+      if (itemAdjs.length > 0) {
+        rowHeight += 4                       // small gap before adjustments
+        rowHeight += 11                      // "Subtotal" line
+        rowHeight += itemAdjs.length * 11    // one row per adjustment
       }
       rowHeight += 10  // bottom padding
       ensureSpace(rowHeight)
@@ -388,6 +403,27 @@ export async function buildQuotationPdfBytes(
             text(line, margin + 28, y, 8, fontR, C.muted)
             y -= 11
           }
+        }
+      }
+
+      // Per-item adjustments (item-level tax / discount / surcharge)
+      if (itemAdjs.length > 0) {
+        y -= 4
+        text(L.subtotal, margin + 24, y, 8, fontR, C.muted)
+        rText(baseLine.toFixed(2), margin + colTotal - 6, y, 8, fontR, C.muted)
+        y -= 11
+        let runningItem = baseLine
+        for (const adj of itemAdjs) {
+          const amount = adj.mode === 'percent' ? (runningItem * adj.value) / 100 : adj.value
+          const sign   = adj.type === 'discount' ? -1 : 1
+          const applied = sign * amount
+          runningItem += applied
+          const label = adj.label || adj.type
+          const suffix = adj.mode === 'percent' ? ` (${adj.value}%)` : ''
+          text(`${label}${suffix}`, margin + 24, y, 8, fontR, C.muted)
+          const amtStr = `${applied >= 0 ? '+' : ''}${applied.toFixed(2)}`
+          rText(amtStr, margin + colTotal - 6, y, 8, fontR, applied >= 0 ? C.positive : C.negative)
+          y -= 11
         }
       }
 

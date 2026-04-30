@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
-import { Plus, Trash2, ArrowLeft, FileText, Settings2 } from 'lucide-react'
+import { useNavigate, useParams, useSearchParams, Link } from 'react-router-dom'
+import { Plus, Trash2, ArrowLeft, FileText, Settings2, Inbox } from 'lucide-react'
 import {
   fetchQuotation,
   createQuotation,
@@ -8,6 +8,7 @@ import {
   uploadQuotationPdf,
   calcSubtotal,
   calcTotal,
+  calcLineTotal,
   generateReferenceNumber,
 } from '@/lib/quotations'
 import {
@@ -16,6 +17,8 @@ import {
   fetchProductTexts,
   fetchGlobalTexts,
 } from '@/lib/products'
+import { fetchInquiry } from '@/lib/inquiries'
+import { inquiryToQuotationDraft } from '@/lib/inquiryConversion'
 import { evaluateRules } from '@/lib/configurationRules'
 import { calculateFormulaTotal, type FormulaContext } from '@/lib/formulaEngine'
 import { buildQuotationPdfBytes, openPdfBlob, type TenantProfile } from '@/lib/quotationPdf'
@@ -26,7 +29,6 @@ import type {
   Json,
   QuotationLineItem,
   QuotationAdjustment,
-  AdjustmentType,
   QuotationConfigItem,
   ConfigurationRule,
   PricingFormula,
@@ -34,7 +36,8 @@ import type {
 } from '@/types/database'
 import type { CharacteristicWithValues } from '@/lib/products'
 import { ConfigureProductDialog } from './ConfigureProductDialog'
-import { PdfLayoutDialog, type PdfSection } from './PdfLayoutDialog'
+import { PdfLayoutDialog, type PdfSection, type ProductTextGroup } from './PdfLayoutDialog'
+import { AdjustmentEditor, buildAdjustmentData, adjustmentToDraft, type AdjustmentDraft } from './AdjustmentEditor'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Button } from '@/components/ui/button'
@@ -51,25 +54,13 @@ import { t } from '@/i18n'
 // ── Internal draft types ──────────────────────────────────────────────────────
 
 interface LineItemDraft {
-  product_id: string
-  quantity:   number
-  selection:  Record<string, string>  // charId → valueId
-}
-
-interface AdjustmentDraft {
-  type:  AdjustmentType
-  label: string
-  mode:  'percent' | 'fixed'
-  value: string
+  product_id:  string
+  quantity:    number
+  selection:   Record<string, string>  // charId → valueId
+  adjustments: AdjustmentDraft[]
 }
 
 const CURRENCIES = ['EUR', 'USD', 'GBP', 'CHF', 'RSD']
-
-const ADJ_TYPE_LABELS: Record<AdjustmentType, string> = {
-  surcharge: 'Surcharge',
-  discount:  'Discount',
-  tax:       'Tax',
-}
 
 function defaultExpiry(): string {
   const d = new Date()
@@ -83,6 +74,8 @@ export function QuotationFormPage() {
   const { id } = useParams<{ id: string }>()
   const isEdit  = Boolean(id)
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const inquiryIdParam = searchParams.get('inquiry_id')
   const { toasts, toast, dismiss } = useToast()
   const { tenant } = useAuthContext()
 
@@ -116,6 +109,10 @@ export function QuotationFormPage() {
   // ── Line items ─────────────────────────────────────────────────────────────
   const [lineItems,   setLineItems]   = useState<LineItemDraft[]>([])
   const [adjustments, setAdjustments] = useState<AdjustmentDraft[]>([])
+
+  // ── Source inquiry (for traceability + auto-mark on save) ──────────────────
+  const [sourceInquiryId, setSourceInquiryId] = useState<string | null>(null)
+  const [inquiryHydrating, setInquiryHydrating] = useState(false)
 
   // ── Saving state ───────────────────────────────────────────────────────────
   const [saving,        setSaving]        = useState(false)
@@ -160,14 +157,11 @@ export function QuotationFormPage() {
           selection:  Object.fromEntries(
             item.configuration.map(c => [c.characteristic_id, c.value_id])
           ),
+          adjustments: (item.adjustments ?? []).map(adjustmentToDraft),
         })))
 
-        setAdjustments(adjs.map(a => ({
-          type:  a.type,
-          label: a.label,
-          mode:  a.mode,
-          value: String(a.value),
-        })))
+        setAdjustments(adjs.map(adjustmentToDraft))
+        setSourceInquiryId(q.source_inquiry_id ?? null)
       })
       .catch(() => toast({ title: t('Failed to load quotation'), variant: 'destructive' }))
       .finally(() => setPageLoading(false))
@@ -199,7 +193,7 @@ export function QuotationFormPage() {
 
   // ── Line item helpers ───────────────────────────────────────────────────────
   function addLineItem() {
-    setLineItems(prev => [...prev, { product_id: '', quantity: 1, selection: {} }])
+    setLineItems(prev => [...prev, { product_id: '', quantity: 1, selection: {}, adjustments: [] }])
   }
 
   function removeLineItem(index: number) {
@@ -215,18 +209,55 @@ export function QuotationFormPage() {
     if (productId) await ensureProductData(productId)
   }
 
-  // ── Adjustment helpers ─────────────────────────────────────────────────────
-  function addAdjustment() {
-    setAdjustments(prev => [...prev, { type: 'tax', label: '', mode: 'percent', value: '' }])
-  }
+  // ── Inquiry → quotation hydration (new quotations with ?inquiry_id=…) ──────
+  useEffect(() => {
+    if (isEdit || !inquiryIdParam) return
+    let cancelled = false
+    setInquiryHydrating(true)
+    ;(async () => {
+      try {
+        const inquiry = await fetchInquiry(inquiryIdParam)
+        const { data: prodRow } = await supabase
+          .from('products')
+          .select('*')
+          .eq('id', inquiry.product_id)
+          .single()
+        if (!prodRow) throw new Error('Source product not found')
+        const product = prodRow as Product
+        const chars = await fetchProductCharacteristicsWithValues(product.id)
+        if (cancelled) return
 
-  function removeAdjustment(index: number) {
-    setAdjustments(prev => prev.filter((_, i) => i !== index))
-  }
+        const draft = inquiryToQuotationDraft(inquiry, product, chars)
 
-  function updateAdjustment(index: number, patch: Partial<AdjustmentDraft>) {
-    setAdjustments(prev => prev.map((a, i) => i === index ? { ...a, ...patch } : a))
-  }
+        // Hydrate caches so LineItemRow can compute price + render chips
+        setDetailsCache(prev => ({ ...prev, [product.id]: chars }))
+        await ensureProductData(product.id)
+
+        setCustomerName(draft.customer_name)
+        setCustomerEmail(draft.customer_email)
+        setCustomerCompany(draft.customer_company ?? '')
+        setCustomerPhone(draft.customer_phone ?? '')
+        setCustomerAddress(draft.customer_address ?? '')
+        setCurrency(draft.currency)
+        setNotes(draft.notes ?? '')
+        setLineItems([{ product_id: product.id, quantity: 1, selection: draft.selection, adjustments: [] }])
+        setSourceInquiryId(draft.source_inquiry_id)
+
+        if (draft.dropped.length > 0) {
+          toast({
+            title: t('Some options could not be carried over'),
+            description: t('The product was edited since the inquiry was submitted.') + ' ' + draft.dropped.join(', '),
+            variant: 'destructive',
+          })
+        }
+      } catch (err) {
+        if (!cancelled) toast({ title: t('Failed to load inquiry'), description: String(err), variant: 'destructive' })
+      } finally {
+        if (!cancelled) setInquiryHydrating(false)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [isEdit, inquiryIdParam])
 
   // ── Price calculation ──────────────────────────────────────────────────────
   function buildFormulaCtx(
@@ -295,23 +326,13 @@ export function QuotationFormPage() {
           quantity:        li.quantity,
           unit_price:      Math.max(0, unitPrice + formulaAdj),
           configuration:   config,
+          adjustments:     buildAdjustmentData(li.adjustments),
         }
       })
   }
 
-  function buildAdjustmentData(): QuotationAdjustment[] {
-    return adjustments
-      .filter(a => a.label.trim())
-      .map(a => ({
-        type:  a.type,
-        label: a.label.trim(),
-        mode:  a.mode,
-        value: parseFloat(a.value) || 0,
-      }))
-  }
-
   const builtItems = buildLineItemData()
-  const builtAdjs  = buildAdjustmentData()
+  const builtAdjs  = buildAdjustmentData(adjustments)
   const subtotal   = calcSubtotal(builtItems)
   const total      = calcTotal(subtotal, builtAdjs)
 
@@ -342,7 +363,7 @@ export function QuotationFormPage() {
     setSaving(true)
     try {
       const items = buildLineItemData()
-      const adjs  = buildAdjustmentData()
+      const adjs  = buildAdjustmentData(adjustments)
       const sub   = calcSubtotal(items)
       const tot   = calcTotal(sub, adjs)
 
@@ -362,9 +383,10 @@ export function QuotationFormPage() {
         adjustments:      adjs  as unknown as Json,
       }
 
+      let savedId: string
       if (isEdit && id) {
         await updateQuotation(id, payload)
-        return id
+        savedId = id
       } else {
         const q = await createQuotation({
           ...payload,
@@ -372,9 +394,21 @@ export function QuotationFormPage() {
           pdf_url:             null,
           rejection_reason_id: null,
           rejection_note:      null,
+          source_inquiry_id:   sourceInquiryId,
         })
-        return q.id
+        savedId = q.id
       }
+
+      // Best-effort: mark source inquiry as replied. Do not block on failure.
+      if (!isEdit && sourceInquiryId) {
+        try {
+          await supabase.from('inquiries').update({ status: 'replied' } as unknown as never).eq('id', sourceInquiryId)
+        } catch (e) {
+          console.warn('Failed to mark source inquiry as replied', e)
+        }
+      }
+
+      return savedId
     } catch (err) {
       toast({ title: t('Failed to save quotation'), description: String(err), variant: 'destructive' })
       return null
@@ -417,9 +451,14 @@ export function QuotationFormPage() {
     const { savedId, savedQuotation, tenantProfile } = pendingPdfData
     setGeneratingPdf(true)
     try {
+      const enabledPtIds = new Set(
+        sections.filter(s => s.productTextId && s.visible).map(s => s.productTextId!)
+      )
+      const hasPtSections = sections.some(s => s.productTextId !== undefined)
       const pdfProductTexts: Record<string, ProductText[]> = {}
       for (const [pid, texts] of Object.entries(productTextsCache)) {
-        pdfProductTexts[pid] = texts
+        const kept = hasPtSections ? texts.filter(pt => enabledPtIds.has(pt.id)) : texts
+        if (kept.length) pdfProductTexts[pid] = kept
       }
       const bytes = await buildQuotationPdfBytes(tenantProfile, savedQuotation, pdfProductTexts, globalTexts, sections, lang)
       setLayoutDialogOpen(false)
@@ -476,6 +515,23 @@ export function QuotationFormPage() {
       />
 
       <div className="p-6 space-y-6 max-w-4xl">
+
+        {/* Source inquiry breadcrumb (when present) */}
+        {sourceInquiryId && (
+          <Link
+            to={`/inquiries/${sourceInquiryId}`}
+            className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <Inbox className="h-3.5 w-3.5" />
+            {t('Created from inquiry')} #{sourceInquiryId.slice(0, 8)}
+          </Link>
+        )}
+
+        {inquiryHydrating && (
+          <div className="rounded-md border bg-muted/30 px-3 py-2 text-sm text-muted-foreground flex items-center gap-2">
+            <Spinner /> {t('Loading inquiry…')}
+          </div>
+        )}
 
         {/* ── Customer ─────────────────────────────────────────────────── */}
         <Card>
@@ -552,49 +608,28 @@ export function QuotationFormPage() {
                 onProductChange={pid => handleProductChange(idx, pid)}
                 onQtyChange={qty => updateLineItem(idx, { quantity: qty })}
                 onSelectionChange={sel => updateLineItem(idx, { selection: sel })}
+                onAdjustmentsChange={adjs => updateLineItem(idx, { adjustments: adjs })}
                 onRemove={() => removeLineItem(idx)}
               />
             ))}
           </CardContent>
         </Card>
 
-        {/* ── Adjustments ──────────────────────────────────────────────── */}
+        {/* ── Adjustments (whole quotation) ────────────────────────────── */}
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
+          <CardHeader>
             <CardTitle>{t('Surcharges, Discounts & Taxes')}</CardTitle>
-            <Button variant="outline" size="sm" onClick={addAdjustment}>
-              <Plus className="h-4 w-4 mr-1" />
-              {t('Add adjustment')}
-            </Button>
+            <p className="text-xs text-muted-foreground mt-1">
+              {t('Applied to the subtotal. For per-item adjustments, use the controls inside each line item.')}
+            </p>
           </CardHeader>
-          <CardContent className="space-y-3">
-            {adjustments.length === 0 && (
-              <p className="text-sm text-muted-foreground text-center py-4">
-                {t('No adjustments. Add tax, surcharges, or discounts.')}
-              </p>
-            )}
-            {adjustments.map((adj, idx) => (
-              <div key={idx} className="flex items-center gap-2">
-                <Select value={adj.type} onChange={e => updateAdjustment(idx, { type: e.target.value as AdjustmentType })} className="w-32">
-                  {(Object.keys(ADJ_TYPE_LABELS) as AdjustmentType[]).map(k => (
-                    <option key={k} value={k}>{t(ADJ_TYPE_LABELS[k])}</option>
-                  ))}
-                </Select>
-                <Input value={adj.label} onChange={e => updateAdjustment(idx, { label: e.target.value })} placeholder={t('Label (e.g. VAT 20%)')} className="flex-1" />
-                <Select value={adj.mode} onChange={e => updateAdjustment(idx, { mode: e.target.value as 'percent' | 'fixed' })} className="w-24">
-                  <option value="percent">%</option>
-                  <option value="fixed">{currency}</option>
-                </Select>
-                <Input
-                  type="number" min="0" step="0.01"
-                  value={adj.value} onChange={e => updateAdjustment(idx, { value: e.target.value })}
-                  className="w-28 text-right" placeholder="0"
-                />
-                <Button variant="ghost" size="icon" onClick={() => removeAdjustment(idx)} className="text-muted-foreground hover:text-destructive">
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
-            ))}
+          <CardContent>
+            <AdjustmentEditor
+              adjustments={adjustments}
+              currency={currency}
+              onChange={setAdjustments}
+              emptyText={t('No adjustments. Add tax, surcharges, or discounts.')}
+            />
           </CardContent>
         </Card>
 
@@ -651,6 +686,18 @@ export function QuotationFormPage() {
           if (!open && pendingPdfData) navigate(`/quotations/${pendingPdfData.savedId}`)
         }}
         globalTexts={globalTexts}
+        productTexts={lineItems
+          .filter(li => li.product_id && productTextsCache[li.product_id]?.length)
+          .reduce<ProductTextGroup[]>((acc, li) => {
+            if (acc.some(g => g.productId === li.product_id)) return acc
+            const prod = products.find(p => p.id === li.product_id)
+            acc.push({
+              productId:   li.product_id,
+              productName: prod?.name ?? li.product_id,
+              texts:       productTextsCache[li.product_id],
+            })
+            return acc
+          }, [])}
         quotationHasNotes={!!notes.trim()}
         onConfirm={handleLayoutConfirm}
         loading={generatingPdf}
@@ -674,16 +721,17 @@ export function QuotationFormPage() {
 // ── LineItemRow sub-component ──────────────────────────────────────────────────
 
 interface LineItemRowProps {
-  item:              LineItemDraft
-  products:          Product[]
-  details:           CharacteristicWithValues[]
-  rules:             ConfigurationRule[]
-  formulas:          PricingFormula[]
-  currency:          string
-  onProductChange:   (pid: string) => void
-  onQtyChange:       (qty: number) => void
-  onSelectionChange: (sel: Record<string, string>) => void
-  onRemove:          () => void
+  item:                LineItemDraft
+  products:            Product[]
+  details:             CharacteristicWithValues[]
+  rules:               ConfigurationRule[]
+  formulas:            PricingFormula[]
+  currency:            string
+  onProductChange:     (pid: string) => void
+  onQtyChange:         (qty: number) => void
+  onSelectionChange:   (sel: Record<string, string>) => void
+  onAdjustmentsChange: (adjs: AdjustmentDraft[]) => void
+  onRemove:            () => void
 }
 
 function buildFormulaCtxLocal(
@@ -705,7 +753,7 @@ function buildFormulaCtxLocal(
 
 function LineItemRow({
   item, products, details, rules, formulas, currency,
-  onProductChange, onQtyChange, onSelectionChange, onRemove,
+  onProductChange, onQtyChange, onSelectionChange, onAdjustmentsChange, onRemove,
 }: LineItemRowProps) {
   const [dialogOpen, setDialogOpen] = useState(false)
   const product = products.find(p => p.id === item.product_id)
@@ -796,12 +844,48 @@ function LineItemRow({
         </div>
       )}
 
-      {/* Row total */}
+      {/* Per-item adjustments */}
       {item.product_id && (
-        <div className="text-right text-sm text-muted-foreground">
-          {t('Line total')}: <span className="font-medium text-foreground">{(unitPrice * item.quantity).toFixed(2)} {currency}</span>
+        <div className="border-t pt-3 mt-1 space-y-2">
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+            {t('Item adjustments')}
+          </p>
+          <AdjustmentEditor
+            adjustments={item.adjustments}
+            currency={currency}
+            onChange={onAdjustmentsChange}
+            compact
+          />
         </div>
       )}
+
+      {/* Row total (after item adjustments) */}
+      {item.product_id && (() => {
+        const base = unitPrice * item.quantity
+        const lineTotal = calcLineTotal({
+          product_id:      item.product_id,
+          product_name:    product?.name ?? '',
+          product_sku:     null,
+          unit_of_measure: null,
+          quantity:        item.quantity,
+          unit_price:      unitPrice,
+          configuration:   [],
+          adjustments:     buildAdjustmentData(item.adjustments),
+        })
+        const hasAdjs = item.adjustments.some(a => a.label.trim())
+        return (
+          <div className="text-right text-sm text-muted-foreground space-y-0.5">
+            <div>
+              {t('Subtotal')}: <span className="font-medium text-foreground">{base.toFixed(2)} {currency}</span>
+            </div>
+            {hasAdjs && (
+              <div>
+                {t('Line total')}: <span className="font-semibold text-foreground">{lineTotal.toFixed(2)} {currency}</span>
+              </div>
+            )}
+          </div>
+        )
+      })()}
 
       {/* Configure dialog */}
       {item.product_id && hasCharacteristics && (
