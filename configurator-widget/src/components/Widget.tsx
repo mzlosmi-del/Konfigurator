@@ -18,7 +18,7 @@ type State =
   | { phase: 'loading' }
   | { phase: 'error'; message: string }
   | { phase: 'ready'; data: FullProductConfig }
-  | { phase: 'success' }
+  | { phase: 'success'; data: FullProductConfig }
 
 export function Widget({ config, track }: Props) {
   const [state, setState] = useState<State>({ phase: 'loading' })
@@ -316,7 +316,7 @@ export function Widget({ config, track }: Props) {
             formConfig={product.form_config}
             onSuccess={() => {
               track('inquiry_submitted', { price: totalPrice, currency: product.currency })
-              setState({ phase: 'success' })
+              setState({ phase: 'success', data: state.data })
             }}
           />
         )}
