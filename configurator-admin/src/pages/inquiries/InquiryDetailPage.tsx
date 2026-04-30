@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, Mail, ExternalLink, FileText } from 'lucide-react'
+import { ArrowLeft, Mail, ExternalLink, FileText, ArrowRight } from 'lucide-react'
 import { fetchInquiry, updateInquiryStatus } from '@/lib/inquiries'
 import { fetchQuotesForInquiry, generateAndSendQuote } from '@/lib/quotes'
+import { supabase } from '@/lib/supabase'
 import type { Inquiry, InquiryStatus, Quote } from '@/types/database'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Button } from '@/components/ui/button'
@@ -54,6 +55,7 @@ export function InquiryDetailPage() {
 
   const [quotes, setQuotes] = useState<Quote[]>([])
   const [generatingQuote, setGeneratingQuote] = useState(false)
+  const [linkedQuotationId, setLinkedQuotationId] = useState<string | null>(null)
   const defaultExpiry = () => {
     const d = new Date()
     d.setDate(d.getDate() + 30)
@@ -69,12 +71,18 @@ export function InquiryDetailPage() {
   async function load(inquiryId: string) {
     setLoading(true)
     try {
-      const [data, quotesData] = await Promise.all([
+      const [data, quotesData, linkedQ] = await Promise.all([
         fetchInquiry(inquiryId),
         fetchQuotesForInquiry(inquiryId),
+        supabase
+          .from('quotations')
+          .select('id')
+          .eq('source_inquiry_id', inquiryId)
+          .maybeSingle(),
       ])
       setInquiry(data as InquiryWithProduct)
       setQuotes(quotesData)
+      setLinkedQuotationId((linkedQ.data as { id: string } | null)?.id ?? null)
 
       // Auto-mark as read when opened
       if (data.status === 'new') {
@@ -246,6 +254,45 @@ export function InquiryDetailPage() {
 
         {/* Right column — sidebar details */}
         <div className="space-y-5">
+
+          {/* Convert / linked quotation */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">{t('Quotation')}</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {linkedQuotationId ? (
+                <>
+                  <p className="text-sm text-muted-foreground">
+                    {t('A quotation has already been created from this inquiry.')}
+                  </p>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => navigate(`/quotations/${linkedQuotationId}/edit`)}
+                  >
+                    <FileText className="h-4 w-4" />
+                    {t('View linked quotation')}
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <p className="text-sm text-muted-foreground">
+                    {t('Pre-fill a new quotation with the customer info, product, and selected options from this inquiry.')}
+                  </p>
+                  <Button
+                    size="sm"
+                    className="w-full"
+                    onClick={() => navigate(`/quotations/new?inquiry_id=${inquiry.id}`)}
+                  >
+                    <ArrowRight className="h-4 w-4" />
+                    {t('Convert to quotation')}
+                  </Button>
+                </>
+              )}
+            </CardContent>
+          </Card>
 
           {/* Status control */}
           <Card>

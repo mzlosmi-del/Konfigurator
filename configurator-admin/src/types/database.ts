@@ -36,6 +36,7 @@ export interface QuotationLineItem {
   quantity:        number
   unit_price:      number
   configuration:   QuotationConfigItem[]
+  adjustments?:    QuotationAdjustment[]
 }
 
 export interface QuotationAdjustment {
@@ -320,6 +321,7 @@ export interface Database {
           pdf_url: string | null
           rejection_reason_id: string | null
           rejection_note:      string | null
+          source_inquiry_id:   string | null
           created_at: string
           updated_at: string
         }
