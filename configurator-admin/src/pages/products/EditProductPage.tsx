@@ -244,6 +244,11 @@ export function EditProductPage() {
                   const updated = await updateProduct(product.id, { ar_enabled: v })
                   setProduct(updated as Product)
                 }}
+                arPlacement={product.ar_placement ?? 'floor'}
+                onArPlacementChange={async (p) => {
+                  const updated = await updateProduct(product.id, { ar_placement: p })
+                  setProduct(updated as Product)
+                }}
               />
             </CardContent>
           </Card>

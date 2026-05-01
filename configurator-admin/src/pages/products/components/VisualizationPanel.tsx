@@ -53,9 +53,11 @@ function ModelViewerThumb({ src }: { src: string }) {
 }
 
 interface Props {
-  productId: string
-  arEnabled?: boolean
-  onArToggle?: (v: boolean) => Promise<void>
+  productId:            string
+  arEnabled?:           boolean
+  onArToggle?:          (v: boolean) => Promise<void>
+  arPlacement?:         'floor' | 'wall'
+  onArPlacementChange?: (placement: 'floor' | 'wall') => Promise<void>
 }
 
 const ASSET_TYPE_LABELS: Record<AssetType, string> = {
@@ -84,7 +86,7 @@ const emptyForm = (): AddFormState => ({
   uploading: false,
 })
 
-export function VisualizationPanel({ productId, arEnabled = true, onArToggle }: Props) {
+export function VisualizationPanel({ productId, arEnabled = true, onArToggle, arPlacement = 'floor', onArPlacementChange }: Props) {
   const { tenant, planLimits } = useAuthContext()
   const { toasts, toast, dismiss } = useToast()
 
@@ -554,6 +556,36 @@ export function VisualizationPanel({ productId, arEnabled = true, onArToggle }: 
               {t('Enable AR (augmented reality) button on 3D model')}
             </span>
           </label>
+
+          {/* Surface placement — only meaningful when AR is on */}
+          {arEnabled && onArPlacementChange && (
+            <div className="flex items-center gap-3 mt-3 ml-12">
+              <span className="text-sm text-muted-foreground shrink-0">{t('Surface type')}:</span>
+              <div className="flex rounded-md border overflow-hidden text-xs font-medium">
+                {(['floor', 'wall'] as const).map(p => (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => onArPlacementChange(p)}
+                    className={[
+                      'px-3 py-1.5 transition-colors',
+                      arPlacement === p
+                        ? 'bg-primary text-primary-foreground'
+                        : 'bg-background hover:bg-muted text-foreground',
+                      p === 'wall' ? 'border-l' : '',
+                    ].join(' ')}
+                  >
+                    {p === 'floor' ? t('Floor') : t('Wall')}
+                  </button>
+                ))}
+              </div>
+              <span className="text-xs text-muted-foreground">
+                {arPlacement === 'wall'
+                  ? t('For windows, paintings, shelves')
+                  : t('For furniture, appliances')}
+              </span>
+            </div>
+          )}
         </div>
       )}
 

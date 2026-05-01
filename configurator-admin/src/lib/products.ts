@@ -88,7 +88,7 @@ export async function createProduct(
 
 export async function updateProduct(
   id: string,
-  input: Partial<Pick<Product, 'name' | 'description' | 'base_price' | 'currency' | 'status' | 'sku' | 'unit_of_measure' | 'ar_enabled' | 'form_config' | 'public_preview_enabled'>>
+  input: Partial<Pick<Product, 'name' | 'description' | 'base_price' | 'currency' | 'status' | 'sku' | 'unit_of_measure' | 'ar_enabled' | 'ar_placement' | 'form_config' | 'public_preview_enabled'>>
     & { name_i18n?: Record<string,string>; description_i18n?: Record<string,string> }
 ): Promise<Product> {
   const { data, error } = await supabase

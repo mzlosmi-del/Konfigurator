@@ -65,6 +65,40 @@ export const WIDGET_STYLES = `
     height: 100%;
     background: transparent;
   }
+  .cw-ar-btn {
+    position: absolute;
+    bottom: 16px;
+    right: 16px;
+    background: rgba(0,0,0,0.70);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 8px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    letter-spacing: 0.01em;
+  }
+  .cw-ar-btn:hover {
+    background: rgba(0,0,0,0.85);
+  }
+  .cw-ar-hint {
+    position: absolute;
+    bottom: 56px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0,0,0,0.55);
+    color: #fff;
+    border-radius: 6px;
+    padding: 4px 12px;
+    font-size: 11px;
+    white-space: nowrap;
+    pointer-events: none;
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+  }
   .cw-visual-placeholder {
     width: 100%;
     height: 100%;

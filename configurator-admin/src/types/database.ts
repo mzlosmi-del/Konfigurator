@@ -114,6 +114,7 @@ export interface Database {
           public_preview_enabled: boolean
           read_only: boolean
           ar_enabled: boolean
+          ar_placement: 'floor' | 'wall'
           form_config: Json
           name_i18n: Json
           description_i18n: Json

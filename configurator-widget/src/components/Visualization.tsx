@@ -7,10 +7,11 @@ import { t } from '../i18n'
 const MODEL_VIEWER_CDN = 'https://ajax.googleapis.com/ajax/libs/model-viewer/3.5.0/model-viewer.min.js'
 
 interface Props {
-  assets: VisualizationAsset[]
-  selection: Selection
+  assets:         VisualizationAsset[]
+  selection:      Selection
   numericInputs?: NumericInputs
-  arEnabled?: boolean
+  arEnabled?:     boolean
+  arPlacement?:   'floor' | 'wall'
 }
 
 function loadModelViewer() {
@@ -100,16 +101,19 @@ function ModelViewer3D({
   selection,
   numericInputs,
   arEnabled,
+  arPlacement,
 }: {
-  url: string
-  rules: MeshRule[]
-  selection: Selection
+  url:          string
+  rules:        MeshRule[]
+  selection:    Selection
   numericInputs: NumericInputs
-  arEnabled: boolean
+  arEnabled:    boolean
+  arPlacement:  'floor' | 'wall'
 }) {
   const containerRef = useRef<HTMLDivElement>(null)
-  const mvRef = useRef<HTMLElement | null>(null)
-  const loadedRef = useRef(false)
+  const mvRef        = useRef<HTMLElement | null>(null)
+  const hintRef      = useRef<HTMLElement | null>(null)
+  const loadedRef    = useRef(false)
 
   // Mount the model-viewer element once when url changes
   useEffect(() => {
@@ -123,22 +127,57 @@ function ModelViewer3D({
     mv.setAttribute('camera-controls', '')
     mv.setAttribute('auto-rotate', '')
     mv.setAttribute('shadow-intensity', '1')
+    mv.setAttribute('shadow-softness', '1')
+    mv.setAttribute('environment-image', 'neutral')
+    mv.style.width = '100%'
+    mv.style.height = '100%'
+
     if (arEnabled) {
       mv.setAttribute('ar', '')
       mv.setAttribute('ar-modes', 'webxr scene-viewer quick-look')
+      mv.setAttribute('ar-placement', arPlacement)
+      // Keep the product at real-world scale — prevents accidental resizing in AR
+      mv.setAttribute('ar-scale', 'fixed')
+
+      // Custom styled AR launch button (replaces model-viewer's default badge)
+      const arBtn = document.createElement('button')
+      arBtn.setAttribute('slot', 'ar-button')
+      arBtn.className = 'cw-ar-btn'
+      arBtn.textContent = t('View in AR')
+      mv.appendChild(arBtn)
+
+      // Surface guidance hint — shown before placement, hidden once placed
+      const hint = document.createElement('div')
+      hint.className = 'cw-ar-hint'
+      hint.textContent = arPlacement === 'wall'
+        ? t('AR ready — point at a wall to place')
+        : t('AR ready — point at the floor to place')
+      hint.style.display = 'none'
+      mv.appendChild(hint)
+      hintRef.current = hint
+
+      mv.addEventListener('ar-status', (e: Event) => {
+        const status = (e as CustomEvent<{ status: string }>).detail?.status ?? ''
+        if (hint) hint.style.display = status === 'object-placed' ? 'none' : 'block'
+      })
     }
-    mv.style.width = '100%'
-    mv.style.height = '100%'
 
     mv.addEventListener('load', () => {
       loadedRef.current = true
       applyMeshRules(mv, rules, selection, numericInputs)
+      // Show hint after model loads (only for AR-enabled products)
+      if (arEnabled && hintRef.current) hintRef.current.style.display = 'block'
     })
 
     mvRef.current = mv
     container.appendChild(mv)
-    return () => { container.innerHTML = ''; mvRef.current = null; loadedRef.current = false }
-  }, [url])
+    return () => {
+      container.innerHTML = ''
+      mvRef.current = null
+      hintRef.current = null
+      loadedRef.current = false
+    }
+  }, [url, arEnabled, arPlacement])
 
   // Re-apply rules whenever selection or numericInputs change
   useEffect(() => {
@@ -149,7 +188,7 @@ function ModelViewer3D({
   return <div ref={containerRef} style="width:100%;height:100%" />
 }
 
-export function Visualization({ assets, selection, numericInputs = {}, arEnabled = true }: Props) {
+export function Visualization({ assets, selection, numericInputs = {}, arEnabled = true, arPlacement = 'floor' }: Props) {
   const url3d    = resolve3DAsset(assets, selection)
   const urlImg   = resolveImage(assets, selection)
   const [failed, setFailed] = useState(false)
@@ -175,6 +214,7 @@ export function Visualization({ assets, selection, numericInputs = {}, arEnabled
             selection={selection}
             numericInputs={numericInputs}
             arEnabled={arEnabled}
+            arPlacement={arPlacement}
           />
         : <img src={urlImg!} alt={t('Product visualization')} onError={() => setFailed(true)} />
       }

@@ -223,7 +223,7 @@ export function Widget({ config, track }: Props) {
   return (
     <div class="cw-root" key={lang}>
       {/* Product image */}
-      <Visualization assets={assets} selection={selection} numericInputs={numericInputs} arEnabled={product.ar_enabled} />
+      <Visualization assets={assets} selection={selection} numericInputs={numericInputs} arEnabled={product.ar_enabled} arPlacement={product.ar_placement ?? 'floor'} />
 
       <div class="cw-body">
         {/* Product info */}
