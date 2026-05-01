@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, Link } from 'react-router-dom'
 import { AlertCircle, ArrowLeft, CloudUpload, Download, Pencil, FileText } from 'lucide-react'
 import {
   fetchQuotation, updateQuotation, uploadQuotationPdf,
@@ -291,6 +291,20 @@ export function QuotationDetailPage() {
             </Badge>
           )}
         </div>
+
+        {/* ── Source inquiry link ────────────────────────────────────────── */}
+        {quotation.source_inquiry_id && (
+          <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+            <FileText className="h-3.5 w-3.5 shrink-0" />
+            {t('Created from inquiry')}{' '}
+            <Link
+              to={`/inquiries/${quotation.source_inquiry_id}`}
+              className="font-mono text-xs text-primary hover:underline"
+            >
+              #{quotation.source_inquiry_id.slice(0, 8)}
+            </Link>
+          </div>
+        )}
 
         {/* ── Rejection info ─────────────────────────────────────────────── */}
         {quotation.status === 'rejected' && (rejectionReason || quotation.rejection_note) && (
