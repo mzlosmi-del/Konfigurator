@@ -47,6 +47,11 @@ Key JSONB columns (types defined in `database.ts` around line 20–60):
 ### PDF generation (`configurator-admin/src/lib/quotationPdf.ts`)
 Uses `pdf-lib` with Helvetica/HelveticaBold (no custom font loading). Canvas is A4 (595 × 842 pt). Coordinate origin is bottom-left; `y` tracks the current drawing position from the top. Call `ensureSpace(page, n)` before rendering a block to trigger a page break if fewer than `n` points remain. The design is minimal: no filled colour rectangles — separators are thin rules, hierarchy is typographic.
 
+### PDF preview dialog (`configurator-admin/src/pages/quotations/PdfLayoutDialog.tsx`)
+`PdfLayoutDialog` is a two-panel visual preview dialog (not just a section list). Left panel: drag-to-reorder section controls + language toggle + Generate button. Right panel: live A4-shaped HTML approximation of the PDF showing actual quotation data. Fixed blocks (header, sender strip, bill-to, line items) are non-interactive. Configurable section cards (notes, terms, global/product text blocks) show their actual content and have an eye icon to toggle visibility directly in the preview.
+
+`TenantProfile` must be pre-fetched before opening the dialog — in `QuotationDetailPage`, this happens inside `handleGeneratePdf` so it is ready by the time the dialog renders.
+
 ### Supabase Edge Functions (`supabase/functions/`)
 16 functions covering: product config serving (for the widget), inquiry submission, quotation PDF email delivery, plan enforcement, Stripe webhooks, etc. Each function is a standalone Deno module. Shared code lives in `supabase/functions/_shared/`.
 

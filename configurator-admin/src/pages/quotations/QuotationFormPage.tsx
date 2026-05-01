@@ -731,6 +731,8 @@ export function QuotationFormPage() {
         quotationHasNotes={!!notes.trim()}
         onConfirm={handleLayoutConfirm}
         loading={generatingPdf}
+        quotation={pendingPdfData?.savedQuotation ?? ({ customer_name: customerName, customer_email: customerEmail, line_items: [], adjustments: [], currency } as unknown as import('@/types/database').Quotation)}
+        tenant={pendingPdfData?.tenantProfile ?? { name: tenant?.name ?? 'Your store' }}
       />
 
       <ConfirmDialog

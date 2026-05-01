@@ -49,6 +49,7 @@ export function QuotationDetailPage() {
   const [pdfProductTexts,  setPdfProductTexts]  = useState<Record<string, ProductText[]>>({})
   const [pdfGlobalTexts,   setPdfGlobalTexts]   = useState<ProductText[]>([])
   const [productTextGroups, setProductTextGroups] = useState<ProductTextGroup[]>([])
+  const [tenantProfile,    setTenantProfile]    = useState<TenantProfile | null>(null)
 
   // Rejection dialog state
   const [rejectionReasons,    setRejectionReasons]    = useState<QuotationRejectionReason[]>([])
@@ -139,9 +140,11 @@ export function QuotationDetailPage() {
         }
       }
 
+      const prof = await buildTenantProfile()
       setPdfProductTexts(textsMap)
       setPdfGlobalTexts(globalTexts)
       setProductTextGroups(groups)
+      setTenantProfile(prof)
       setLayoutOpen(true)
     } catch (err) {
       toast({ title: t('Failed to load product data'), description: String(err), variant: 'destructive' })
@@ -163,7 +166,7 @@ export function QuotationDetailPage() {
         const kept = hasPtSections ? texts.filter(pt => enabledPtIds.has(pt.id)) : texts
         if (kept.length) filtered[pid] = kept
       }
-      const bytes = await buildQuotationPdfBytes(await buildTenantProfile(), quotation, filtered, pdfGlobalTexts, sections, lang)
+      const bytes = await buildQuotationPdfBytes(tenantProfile ?? { name: tenant?.name ?? 'Your store' }, quotation, filtered, pdfGlobalTexts, sections, lang)
       setLayoutOpen(false)
       openPdfBlob(bytes)
       setPendingBytes(bytes)
@@ -497,6 +500,8 @@ export function QuotationDetailPage() {
         quotationHasNotes={!!quotation?.notes?.trim()}
         onConfirm={handleLayoutConfirm}
         loading={generatingPdf}
+        quotation={quotation}
+        tenant={tenantProfile ?? { name: tenant?.name ?? 'Your store' }}
       />
 
       {/* ── Save PDF confirm ───────────────────────────────────────────────── */}
