@@ -68,7 +68,7 @@ export function InquiriesPage() {
       />
 
       {/* Filter tabs */}
-      <div className="px-6 pt-4">
+      <div className="px-4 pt-4 sm:px-6">
         <div className="flex gap-1 border-b">
           {FILTERS.map(f => (
             <button
@@ -86,7 +86,7 @@ export function InquiriesPage() {
         </div>
       </div>
 
-      <div className="p-6">
+      <div className="p-4 md:p-6">
         {loading ? (
           <div className="flex justify-center py-16"><Spinner /></div>
         ) : inquiries.length === 0 ? (
@@ -103,56 +103,58 @@ export function InquiriesPage() {
           </Card>
         ) : (
           <div className="rounded-lg border bg-card overflow-hidden">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b bg-muted/40">
-                  <th className="px-4 py-3 text-left font-medium text-muted-foreground w-6" />
-                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">{t('Customer')}</th>
-                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">{t('Product')}</th>
-                  <th className="px-4 py-3 text-right font-medium text-muted-foreground">{t('Total')}</th>
-                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">{t('Status')}</th>
-                  <th className="px-4 py-3 text-right font-medium text-muted-foreground">{t('Received')}</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {inquiries.map(inq => (
-                  <tr
-                    key={inq.id}
-                    className="hover:bg-muted/20 transition-colors cursor-pointer"
-                    onClick={() => navigate(`/inquiries/${inq.id}`)}
-                  >
-                    {/* Unread dot */}
-                    <td className="px-4 py-3">
-                      {inq.status === 'new' && (
-                        <Circle className="h-2 w-2 fill-destructive text-destructive" />
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      <p className={`font-medium ${inq.status === 'new' ? '' : 'font-normal'}`}>
-                        {inq.customer_name}
-                      </p>
-                      <p className="text-xs text-muted-foreground">{inq.customer_email}</p>
-                    </td>
-                    <td className="px-4 py-3 text-muted-foreground">
-                      {inq.product?.name ?? '—'}
-                    </td>
-                    <td className="px-4 py-3 text-right tabular-nums">
-                      {inq.total_price != null
-                        ? `${inq.total_price.toFixed(2)} ${inq.currency}`
-                        : '—'}
-                    </td>
-                    <td className="px-4 py-3">
-                      <Badge variant={statusVariant[inq.status]} className="capitalize">
-                        {t(inq.status)}
-                      </Badge>
-                    </td>
-                    <td className="px-4 py-3 text-right text-muted-foreground text-xs">
-                      {timeAgo(inq.created_at)}
-                    </td>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b bg-muted/40">
+                    <th className="px-4 py-3 text-left font-medium text-muted-foreground w-6" />
+                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">{t('Customer')}</th>
+                    <th className="px-4 py-3 text-left font-medium text-muted-foreground hidden sm:table-cell">{t('Product')}</th>
+                    <th className="px-4 py-3 text-right font-medium text-muted-foreground hidden sm:table-cell">{t('Total')}</th>
+                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">{t('Status')}</th>
+                    <th className="px-4 py-3 text-right font-medium text-muted-foreground hidden sm:table-cell">{t('Received')}</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y">
+                  {inquiries.map(inq => (
+                    <tr
+                      key={inq.id}
+                      className="hover:bg-muted/20 transition-colors cursor-pointer"
+                      onClick={() => navigate(`/inquiries/${inq.id}`)}
+                    >
+                      {/* Unread dot */}
+                      <td className="px-4 py-3">
+                        {inq.status === 'new' && (
+                          <Circle className="h-2 w-2 fill-destructive text-destructive" />
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        <p className={`font-medium ${inq.status === 'new' ? '' : 'font-normal'}`}>
+                          {inq.customer_name}
+                        </p>
+                        <p className="text-xs text-muted-foreground">{inq.customer_email}</p>
+                      </td>
+                      <td className="px-4 py-3 text-muted-foreground hidden sm:table-cell">
+                        {inq.product?.name ?? '—'}
+                      </td>
+                      <td className="px-4 py-3 text-right tabular-nums hidden sm:table-cell">
+                        {inq.total_price != null
+                          ? `${inq.total_price.toFixed(2)} ${inq.currency}`
+                          : '—'}
+                      </td>
+                      <td className="px-4 py-3">
+                        <Badge variant={statusVariant[inq.status]} className="capitalize">
+                          {t(inq.status)}
+                        </Badge>
+                      </td>
+                      <td className="px-4 py-3 text-right text-muted-foreground text-xs hidden sm:table-cell">
+                        {timeAgo(inq.created_at)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
       </div>
