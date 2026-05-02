@@ -547,6 +547,23 @@ export function QuotationFormPage() {
           </div>
         )}
 
+        {/* Source inquiry breadcrumb (when present) */}
+        {sourceInquiryId && (
+          <Link
+            to={`/inquiries/${sourceInquiryId}`}
+            className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <Inbox className="h-3.5 w-3.5" />
+            {t('Created from inquiry')} #{sourceInquiryId.slice(0, 8)}
+          </Link>
+        )}
+
+        {inquiryHydrating && (
+          <div className="rounded-md border bg-muted/30 px-3 py-2 text-sm text-muted-foreground flex items-center gap-2">
+            <Spinner /> {t('Loading inquiry…')}
+          </div>
+        )}
+
         {/* ── Customer ─────────────────────────────────────────────────── */}
         <Card>
           <CardHeader><CardTitle>{t('Customer')}</CardTitle></CardHeader>
@@ -731,6 +748,8 @@ export function QuotationFormPage() {
         quotationHasNotes={!!notes.trim()}
         onConfirm={handleLayoutConfirm}
         loading={generatingPdf}
+        quotation={pendingPdfData?.savedQuotation ?? ({ customer_name: customerName, customer_email: customerEmail, line_items: [], adjustments: [], currency } as unknown as import('@/types/database').Quotation)}
+        tenant={pendingPdfData?.tenantProfile ?? { name: tenant?.name ?? 'Your store' }}
       />
 
       <ConfirmDialog

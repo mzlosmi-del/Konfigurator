@@ -13,6 +13,7 @@ import { DashboardPage } from '@/pages/dashboard/DashboardPage'
 import { ProductsPage } from '@/pages/products/ProductsPage'
 import { NewProductPage } from '@/pages/products/NewProductPage'
 import { EditProductPage } from '@/pages/products/EditProductPage'
+import { ProductsImportPage } from '@/pages/products/ProductsImportPage'
 import { InquiriesPage } from '@/pages/inquiries/InquiriesPage'
 import { InquiryDetailPage } from '@/pages/inquiries/InquiryDetailPage'
 import { SettingsPage } from '@/pages/settings/SettingsPage'
@@ -23,6 +24,9 @@ import { QuotationsReportPage } from '@/pages/quotations/QuotationsReportPage'
 import { QuotationFormPage } from '@/pages/quotations/QuotationFormPage'
 import { QuotationDetailPage } from '@/pages/quotations/QuotationDetailPage'
 import { TextsPage } from '@/pages/texts/TextsPage'
+import { AnalyticsPage } from '@/pages/analytics/AnalyticsPage'
+import { EmbedDocsPage } from '@/pages/embed-docs/EmbedDocsPage'
+import { PublicPreviewPage } from '@/pages/public/PublicPreviewPage'
 
 export function App() {
   const [lang, setLangState] = useState<Lang>(getLang())
@@ -45,6 +49,7 @@ export function App() {
           <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/invite/:token" element={<InvitePage />} />
           <Route path="/preview/:productId" element={<PreviewPage />} />
+          <Route path="/p/:slug" element={<PublicPreviewPage />} />
 
           {/* Protected routes — require auth */}
           <Route element={<ProtectedRoute />}>
@@ -52,6 +57,7 @@ export function App() {
               <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/products" element={<ProductsPage />} />
               <Route path="/products/new" element={<NewProductPage />} />
+              <Route path="/products/import" element={<ProductsImportPage />} />
               <Route path="/products/:id/edit" element={<EditProductPage />} />
               <Route path="/library" element={<LibraryPage />} />
               <Route path="/inquiries" element={<InquiriesPage />} />
@@ -62,6 +68,8 @@ export function App() {
               <Route path="/quotations/:id" element={<QuotationDetailPage />} />
               <Route path="/quotations/:id/edit" element={<QuotationFormPage />} />
               <Route path="/texts" element={<TextsPage />} />
+              <Route path="/analytics" element={<AnalyticsPage />} />
+              <Route path="/embed-docs" element={<EmbedDocsPage />} />
               <Route path="/settings" element={<SettingsPage />} />
             </Route>
           </Route>

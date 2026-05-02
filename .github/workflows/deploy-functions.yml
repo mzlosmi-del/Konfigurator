@@ -1,0 +1,89 @@
+name: Deploy Edge Functions
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/functions/**'
+      - 'supabase/config.toml'
+      - '.github/workflows/deploy-functions.yml'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Deploy ai-product-setup
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: supabase functions deploy ai-product-setup --project-ref ${{ secrets.SUPABASE_PROJECT_ID }}
+
+      - name: Deploy clone-template
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: supabase functions deploy clone-template --project-ref ${{ secrets.SUPABASE_PROJECT_ID }}
+
+      - name: Deploy create-billing-portal-session
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: supabase functions deploy create-billing-portal-session --project-ref ${{ secrets.SUPABASE_PROJECT_ID }}
+
+      - name: Deploy create-checkout-session
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: supabase functions deploy create-checkout-session --project-ref ${{ secrets.SUPABASE_PROJECT_ID }}
+
+      - name: Deploy delete-account
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: supabase functions deploy delete-account --project-ref ${{ secrets.SUPABASE_PROJECT_ID }}
+
+      - name: Deploy deliver-webhook
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: supabase functions deploy deliver-webhook --project-ref ${{ secrets.SUPABASE_PROJECT_ID }}
+
+      - name: Deploy embed (no JWT)
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: supabase functions deploy embed --no-verify-jwt --project-ref ${{ secrets.SUPABASE_PROJECT_ID }}
+
+      - name: Deploy generate-quotation
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: supabase functions deploy generate-quotation --project-ref ${{ secrets.SUPABASE_PROJECT_ID }}
+
+      - name: Deploy generate-quote
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: supabase functions deploy generate-quote --project-ref ${{ secrets.SUPABASE_PROJECT_ID }}
+
+      - name: Deploy ingest-events (no JWT)
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: supabase functions deploy ingest-events --no-verify-jwt --project-ref ${{ secrets.SUPABASE_PROJECT_ID }}
+
+      - name: Deploy notify-inquiry
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: supabase functions deploy notify-inquiry --project-ref ${{ secrets.SUPABASE_PROJECT_ID }}
+
+      - name: Deploy public-preview (no JWT)
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: supabase functions deploy public-preview --no-verify-jwt --project-ref ${{ secrets.SUPABASE_PROJECT_ID }}
+
+      - name: Deploy send-invite
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: supabase functions deploy send-invite --project-ref ${{ secrets.SUPABASE_PROJECT_ID }}
+
+      - name: Deploy stripe-webhook
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: supabase functions deploy stripe-webhook --project-ref ${{ secrets.SUPABASE_PROJECT_ID }}

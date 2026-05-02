@@ -18,7 +18,7 @@ type State =
   | { phase: 'loading' }
   | { phase: 'error'; message: string }
   | { phase: 'ready'; data: FullProductConfig }
-  | { phase: 'success' }
+  | { phase: 'success'; data: FullProductConfig }
 
 export function Widget({ config, track }: Props) {
   const [state, setState] = useState<State>({ phase: 'loading' })
@@ -223,7 +223,7 @@ export function Widget({ config, track }: Props) {
   return (
     <div class="cw-root" key={lang}>
       {/* Product image */}
-      <Visualization assets={assets} selection={selection} numericInputs={numericInputs} arEnabled={product.ar_enabled} />
+      <Visualization assets={assets} selection={selection} numericInputs={numericInputs} arEnabled={product.ar_enabled} arPlacement={product.ar_placement ?? 'floor'} />
 
       <div class="cw-body">
         {/* Product info */}
@@ -316,7 +316,7 @@ export function Widget({ config, track }: Props) {
             formConfig={product.form_config}
             onSuccess={() => {
               track('inquiry_submitted', { price: totalPrice, currency: product.currency })
-              setState({ phase: 'success' })
+              setState({ phase: 'success', data: state.data })
             }}
           />
         )}

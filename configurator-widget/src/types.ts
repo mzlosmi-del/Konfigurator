@@ -23,6 +23,7 @@ export interface ProductData {
   base_price: number
   currency: string
   ar_enabled: boolean
+  ar_placement: 'floor' | 'wall'
   form_config: FormConfig
 }
 

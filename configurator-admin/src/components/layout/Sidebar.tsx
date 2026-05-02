@@ -28,7 +28,7 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
     { to: '/products',   icon: Package,         label: 'Products',    badge: 0 },
     { to: '/library',    icon: Layers,          label: 'Library',     badge: 0 },
     { to: '/texts',      icon: AlignLeft,       label: 'Texts',       badge: 0 },
-    { to: '/inquiries',  icon: Inbox,           label: 'Inquiries',   badge: newCount },
+    { to: '/inquiries',  icon: Inbox,            label: 'Inquiries',   badge: newCount },
     { to: '/quotations', icon: FileText,        label: 'Quotations',  badge: 0 },
     { to: '/analytics',  icon: BarChart2,       label: 'Analytics',   badge: 0 },
     { to: '/embed-docs', icon: Code2,           label: 'Embed',       badge: 0 },

@@ -3,7 +3,7 @@ import { loadPlanLimits, makePlanError, gateForbidden } from '../_shared/planGat
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
 interface InviteBody {

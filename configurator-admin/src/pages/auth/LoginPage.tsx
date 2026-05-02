@@ -3,8 +3,8 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Boxes } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { Logo } from '@/components/ui/Logo'
 import { useAuthContext } from '@/components/auth/AuthContext'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -50,11 +50,8 @@ export function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
       <div className="w-full max-w-sm space-y-6">
         {/* Logo */}
-        <div className="flex flex-col items-center gap-2">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary">
-            <Boxes className="h-5 w-5 text-primary-foreground" />
-          </div>
-          <span className="text-lg font-semibold">{t('Configurator')}</span>
+        <div className="flex flex-col items-center">
+          <Logo lockup="vertical" size={96} />
         </div>
 
         <Card>

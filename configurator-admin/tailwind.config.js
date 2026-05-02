@@ -5,10 +5,21 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['DM Sans', 'sans-serif'],
-        mono: ['JetBrains Mono', 'monospace'],
+        sans:    ['Geist', 'sans-serif'],
+        body:    ['Geist', 'sans-serif'],
+        display: ['Sora', 'sans-serif'],
+        mono:    ['JetBrains Mono', 'monospace'],
       },
       colors: {
+        turq: {
+          50:  '#e6fbf8',
+          200: '#7de4d3',
+          300: '#38d3bb',
+          500: '#0fa392',
+          700: '#0a665b',
+        },
+        ink:   '#0c1414',
+        paper: '#f7f5f1',
         border: 'hsl(var(--border))',
         input: 'hsl(var(--input))',
         ring: 'hsl(var(--ring))',

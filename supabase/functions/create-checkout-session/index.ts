@@ -3,7 +3,7 @@ import Stripe from 'https://esm.sh/stripe@14?target=deno'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
 // Stripe price IDs must be set as Edge Function secrets:

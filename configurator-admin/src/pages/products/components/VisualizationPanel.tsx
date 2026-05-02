@@ -9,6 +9,7 @@ import {
   uploadAssetFile,
 } from '@/lib/assets'
 import { fetchProductCharacteristicsWithValues, type CharacteristicWithValues } from '@/lib/products'
+import { parseMeshNames } from '@/lib/glbParser'
 import type { VisualizationAsset, AssetType } from '@/types/database'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -52,7 +53,11 @@ function ModelViewerThumb({ src }: { src: string }) {
 }
 
 interface Props {
-  productId: string
+  productId:            string
+  arEnabled?:           boolean
+  onArToggle?:          (v: boolean) => Promise<void>
+  arPlacement?:         'floor' | 'wall'
+  onArPlacementChange?: (placement: 'floor' | 'wall') => Promise<void>
 }
 
 const ASSET_TYPE_LABELS: Record<AssetType, string> = {
@@ -81,8 +86,8 @@ const emptyForm = (): AddFormState => ({
   uploading: false,
 })
 
-export function VisualizationPanel({ productId }: Props) {
-  const { tenant } = useAuthContext()
+export function VisualizationPanel({ productId, arEnabled = true, onArToggle, arPlacement = 'floor', onArPlacementChange }: Props) {
+  const { tenant, planLimits } = useAuthContext()
   const { toasts, toast, dismiss } = useToast()
 
   const [loading, setLoading] = useState(true)
@@ -94,6 +99,9 @@ export function VisualizationPanel({ productId }: Props) {
   const [toDelete, setToDelete] = useState<VisualizationAsset | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [meshEditorAssetId, setMeshEditorAssetId] = useState<string | null>(null)
+  const [arToggling, setArToggling] = useState(false)
+  // Mesh names parsed client-side from the selected GLB file before upload
+  const [pendingMeshNames, setPendingMeshNames] = useState<string[]>([])
 
   useEffect(() => {
     load()
@@ -179,6 +187,10 @@ export function VisualizationPanel({ productId }: Props) {
       setForm(emptyForm())
       setShowAddForm(false)
       toast({ title: t('Asset uploaded and saved') })
+      // Auto-open mesh rules editor for newly uploaded 3D models
+      if (created.asset_type === '3d_model') {
+        setMeshEditorAssetId(created.id)
+      }
     } catch (e) {
       setForm(f => ({ ...f, uploading: false }))
       toast({
@@ -358,9 +370,10 @@ export function VisualizationPanel({ productId }: Props) {
                   assetId={asset.id}
                   assetUrl={asset.url}
                   initialRules={(Array.isArray(asset.mesh_rules) ? asset.mesh_rules : []) as MeshRule[]}
+                  initialMeshNames={pendingMeshNames}
                   characteristics={chars}
                   onSave={rules => handleSaveMeshRules(asset.id, rules)}
-                  onClose={() => setMeshEditorAssetId(null)}
+                  onClose={() => { setMeshEditorAssetId(null); setPendingMeshNames([]) }}
                 />
               )}
             </div>
@@ -411,7 +424,23 @@ export function VisualizationPanel({ productId }: Props) {
                 type="file"
                 accept="image/*,.glb,.gltf"
                 className="text-sm"
-                onChange={e => setForm(f => ({ ...f, file: e.target.files?.[0] ?? null }))}
+                onChange={e => {
+                  const file = e.target.files?.[0] ?? null
+                  const is3d = !!file && /\.(glb|gltf)$/i.test(file.name)
+                  setForm(f => ({
+                    ...f,
+                    file,
+                    asset_type: is3d ? '3d_model' : f.asset_type,
+                  }))
+                  if (is3d && file) {
+                    setPendingMeshNames([])
+                    parseMeshNames(file)
+                      .then(names => setPendingMeshNames(names))
+                      .catch(() => {})
+                  } else {
+                    setPendingMeshNames([])
+                  }
+                }}
               />
               {form.file && (
                 <Button
@@ -497,6 +526,67 @@ export function VisualizationPanel({ productId }: Props) {
           <Plus className="h-4 w-4" />
           {t('Add visualization asset')}
         </button>
+      )}
+
+      {/* AR toggle — shown only when the plan includes 3D and there are 3D assets */}
+      {planLimits?.three_d && assets.some(a => a.asset_type === '3d_model') && onArToggle && (
+        <div className="pt-2 border-t">
+          <label className="flex items-center gap-3 cursor-pointer select-none">
+            <button
+              role="switch"
+              aria-checked={arEnabled}
+              disabled={arToggling}
+              onClick={async () => {
+                setArToggling(true)
+                try { await onArToggle(!arEnabled) } finally { setArToggling(false) }
+              }}
+              className={[
+                'relative inline-flex h-5 w-9 shrink-0 rounded-full border-2 border-transparent transition-colors',
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                arEnabled ? 'bg-primary' : 'bg-input',
+                arToggling ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer',
+              ].join(' ')}
+            >
+              <span className={[
+                'pointer-events-none block h-4 w-4 rounded-full bg-background shadow-lg ring-0 transition-transform',
+                arEnabled ? 'translate-x-4' : 'translate-x-0',
+              ].join(' ')} />
+            </button>
+            <span className="text-sm">
+              {t('Enable AR (augmented reality) button on 3D model')}
+            </span>
+          </label>
+
+          {/* Surface placement — only meaningful when AR is on */}
+          {arEnabled && onArPlacementChange && (
+            <div className="flex items-center gap-3 mt-3 ml-12">
+              <span className="text-sm text-muted-foreground shrink-0">{t('Surface type')}:</span>
+              <div className="flex rounded-md border overflow-hidden text-xs font-medium">
+                {(['floor', 'wall'] as const).map(p => (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => onArPlacementChange(p)}
+                    className={[
+                      'px-3 py-1.5 transition-colors',
+                      arPlacement === p
+                        ? 'bg-primary text-primary-foreground'
+                        : 'bg-background hover:bg-muted text-foreground',
+                      p === 'wall' ? 'border-l' : '',
+                    ].join(' ')}
+                  >
+                    {p === 'floor' ? t('Floor') : t('Wall')}
+                  </button>
+                ))}
+              </div>
+              <span className="text-xs text-muted-foreground">
+                {arPlacement === 'wall'
+                  ? t('For windows, paintings, shelves')
+                  : t('For furniture, appliances')}
+              </span>
+            </div>
+          )}
+        </div>
       )}
 
       <ConfirmDialog

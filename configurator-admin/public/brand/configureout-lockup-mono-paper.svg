@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 380" width="480" height="380">
+  <g transform="translate(160 30)">
+    <rect x="1.2" y="1.2" width="77.6" height="157.6" rx="7.199999999999999" fill="#f7f5f1"></rect>
+    <rect x="81.2" y="1.2" width="77.6" height="37.6" rx="7.199999999999999" fill="#f7f5f1"></rect>
+    <rect x="81.2" y="121.2" width="77.6" height="37.6" rx="7.199999999999999" fill="#f7f5f1"></rect>
+    <circle cx="120" cy="80" r="12.8" fill="#f7f5f1"></circle>
+  </g>
+  <text x="240" y="246" font-family="Sora, sans-serif" font-weight="700" font-size="38" letter-spacing="-1.2" fill="#f7f5f1" text-anchor="middle">configureout<tspan fill="#f7f5f1">.</tspan></text>
+  <text x="240" y="280" font-family="JetBrains Mono, monospace" font-weight="500" font-size="13" letter-spacing="4.5" fill="#f7f5f1" text-anchor="middle">COMMERCE · CONFIGURATORS</text>
+</svg>

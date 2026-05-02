@@ -30,6 +30,7 @@ interface Props {
   assetId: string
   assetUrl: string
   initialRules: MeshRule[]
+  initialMeshNames?: string[]
   characteristics: CharacteristicWithValues[]
   onSave: (rules: MeshRule[]) => Promise<void>
   onClose: () => void
@@ -46,10 +47,10 @@ function asFloat(s: string, fallback: number): number {
   return isNaN(n) ? fallback : n
 }
 
-export function MeshRulesEditor({ assetId: _assetId, assetUrl, initialRules, characteristics, onSave, onClose }: Props) {
+export function MeshRulesEditor({ assetId: _assetId, assetUrl, initialRules, initialMeshNames = [], characteristics, onSave, onClose }: Props) {
   const [tab, setTab] = useState<'visibility' | 'dimension'>('visibility')
   const [rules, setRules] = useState<MeshRule[]>(initialRules)
-  const [meshNames, setMeshNames] = useState<string[]>([])
+  const [meshNames, setMeshNames] = useState<string[]>(initialMeshNames)
   const [parsing, setParsing] = useState(false)
   const [parseError, setParseError] = useState('')
   const [saving, setSaving] = useState(false)
@@ -166,7 +167,13 @@ export function MeshRulesEditor({ assetId: _assetId, assetUrl, initialRules, cha
             {t('Show a mesh only when a specific value is selected. Meshes not listed here are always visible.')}
           </p>
 
-          {visRules.length === 0 && (
+          {allValues.length === 0 && (
+            <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2">
+              {t('No characteristic values found for this product. Add characteristics with values in the Characteristics tab first.')}
+            </p>
+          )}
+
+          {visRules.length === 0 && allValues.length > 0 && (
             <p className="text-xs text-muted-foreground italic">{t('No visibility rules yet.')}</p>
           )}
 
@@ -210,7 +217,7 @@ export function MeshRulesEditor({ assetId: _assetId, assetUrl, initialRules, cha
             </div>
           ))}
 
-          <Button size="sm" variant="outline" onClick={addVisRule} className="flex items-center gap-1.5">
+          <Button size="sm" variant="outline" onClick={addVisRule} disabled={allValues.length === 0} className="flex items-center gap-1.5">
             <Plus className="h-3.5 w-3.5" />
             {t('Add visibility rule')}
           </Button>

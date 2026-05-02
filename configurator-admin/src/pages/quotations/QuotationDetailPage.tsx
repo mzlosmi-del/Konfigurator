@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, Link } from 'react-router-dom'
 import { AlertCircle, ArrowLeft, CloudUpload, Download, Pencil, FileText } from 'lucide-react'
 import {
   fetchQuotation, updateQuotation, uploadQuotationPdf,
@@ -49,6 +49,7 @@ export function QuotationDetailPage() {
   const [pdfProductTexts,  setPdfProductTexts]  = useState<Record<string, ProductText[]>>({})
   const [pdfGlobalTexts,   setPdfGlobalTexts]   = useState<ProductText[]>([])
   const [productTextGroups, setProductTextGroups] = useState<ProductTextGroup[]>([])
+  const [tenantProfile,    setTenantProfile]    = useState<TenantProfile | null>(null)
 
   // Rejection dialog state
   const [rejectionReasons,    setRejectionReasons]    = useState<QuotationRejectionReason[]>([])
@@ -139,9 +140,11 @@ export function QuotationDetailPage() {
         }
       }
 
+      const prof = await buildTenantProfile()
       setPdfProductTexts(textsMap)
       setPdfGlobalTexts(globalTexts)
       setProductTextGroups(groups)
+      setTenantProfile(prof)
       setLayoutOpen(true)
     } catch (err) {
       toast({ title: t('Failed to load product data'), description: String(err), variant: 'destructive' })
@@ -163,7 +166,7 @@ export function QuotationDetailPage() {
         const kept = hasPtSections ? texts.filter(pt => enabledPtIds.has(pt.id)) : texts
         if (kept.length) filtered[pid] = kept
       }
-      const bytes = await buildQuotationPdfBytes(await buildTenantProfile(), quotation, filtered, pdfGlobalTexts, sections, lang)
+      const bytes = await buildQuotationPdfBytes(tenantProfile ?? { name: tenant?.name ?? 'Your store' }, quotation, filtered, pdfGlobalTexts, sections, lang)
       setLayoutOpen(false)
       openPdfBlob(bytes)
       setPendingBytes(bytes)
@@ -288,6 +291,20 @@ export function QuotationDetailPage() {
             </Badge>
           )}
         </div>
+
+        {/* ── Source inquiry link ────────────────────────────────────────── */}
+        {quotation.source_inquiry_id && (
+          <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+            <FileText className="h-3.5 w-3.5 shrink-0" />
+            {t('Created from inquiry')}{' '}
+            <Link
+              to={`/inquiries/${quotation.source_inquiry_id}`}
+              className="font-mono text-xs text-primary hover:underline"
+            >
+              #{quotation.source_inquiry_id.slice(0, 8)}
+            </Link>
+          </div>
+        )}
 
         {/* ── Rejection info ─────────────────────────────────────────────── */}
         {quotation.status === 'rejected' && (rejectionReason || quotation.rejection_note) && (
@@ -499,6 +516,8 @@ export function QuotationDetailPage() {
         quotationHasNotes={!!quotation?.notes?.trim()}
         onConfirm={handleLayoutConfirm}
         loading={generatingPdf}
+        quotation={quotation}
+        tenant={tenantProfile ?? { name: tenant?.name ?? 'Your store' }}
       />
 
       {/* ── Save PDF confirm ───────────────────────────────────────────────── */}

@@ -141,6 +141,31 @@ Deno.serve(async (req: Request) => {
     }
 
     console.log(`notify-inquiry: sent for inquiry ${inquiry_id} to ${toEmail}`)
+
+    // Fire-and-forget webhook delivery — don't block the response on this
+    fetch(`${supabaseUrl}/functions/v1/deliver-webhook`, {
+      method: 'POST',
+      headers: {
+        'Content-Type':  'application/json',
+        'Authorization': `Bearer ${serviceRoleKey}`,
+      },
+      body: JSON.stringify({
+        event:     'inquiry.created',
+        tenant_id: inq.tenant_id,
+        payload: {
+          inquiry_id:     inq.id,
+          customer_name:  inq.customer_name,
+          customer_email: inq.customer_email,
+          product_name:   productName,
+          product_id:     inq.product_id,
+          total_price:    inq.total_price,
+          currency:       inq.currency,
+          configuration:  inq.configuration,
+          created_at:     inq.created_at,
+        },
+      }),
+    }).catch(err => console.warn('notify-inquiry: deliver-webhook call failed', err))
+
     return new Response(JSON.stringify({ ok: true }), {
       headers: { 'Content-Type': 'application/json' },
     })

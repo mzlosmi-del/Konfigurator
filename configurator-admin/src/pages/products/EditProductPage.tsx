@@ -15,13 +15,14 @@ import { FormulaPanel } from './components/FormulaPanel'
 import { VisualizationPanel } from './components/VisualizationPanel'
 import { EmbedPanel } from './components/EmbedPanel'
 import { TextsPanel } from './components/TextsPanel'
+import { FormConfigPanel, type FormConfig } from './components/FormConfigPanel'
 import { useToast } from '@/hooks/useToast'
 import { Toaster } from '@/components/ui/toast'
 import { t } from '@/i18n'
 
-type Tab = 'details' | 'characteristics' | 'rules' | 'formulas' | 'visualization' | 'embed' | 'texts'
+type Tab = 'details' | 'characteristics' | 'rules' | 'formulas' | 'visualization' | 'form' | 'embed' | 'texts'
 
-const TAB_KEYS: Tab[] = ['details', 'characteristics', 'rules', 'formulas', 'visualization', 'embed', 'texts']
+const TAB_KEYS: Tab[] = ['details', 'characteristics', 'rules', 'formulas', 'visualization', 'form', 'embed', 'texts']
 
 const TAB_LABELS: Record<Tab, string> = {
   details:         'Details',
@@ -29,6 +30,7 @@ const TAB_LABELS: Record<Tab, string> = {
   rules:           'Rules',
   formulas:        'Formula pricing',
   visualization:   'Visualization',
+  form:            'Form',
   embed:           'Embed',
   texts:           'Texts',
 }
@@ -235,7 +237,37 @@ export function EditProductPage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <VisualizationPanel productId={product.id} />
+              <VisualizationPanel
+                productId={product.id}
+                arEnabled={product.ar_enabled}
+                onArToggle={async (v) => {
+                  const updated = await updateProduct(product.id, { ar_enabled: v })
+                  setProduct(updated as Product)
+                }}
+                arPlacement={product.ar_placement ?? 'floor'}
+                onArPlacementChange={async (p) => {
+                  const updated = await updateProduct(product.id, { ar_placement: p })
+                  setProduct(updated as Product)
+                }}
+              />
+            </CardContent>
+          </Card>
+        )}
+
+        {activeTab === 'form' && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">{t('Inquiry form')}</CardTitle>
+              <CardDescription>
+                {t('Configure the lead-capture form shown to customers, including optional fields and GDPR consent.')}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <FormConfigPanel
+                productId={product.id}
+                initialConfig={(product.form_config as FormConfig | null) ?? {}}
+                onSaved={(cfg) => setProduct(p => p ? { ...p, form_config: cfg as unknown as import('@/types/database').Json } : p)}
+              />
             </CardContent>
           </Card>
         )}
