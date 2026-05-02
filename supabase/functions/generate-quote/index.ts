@@ -26,11 +26,22 @@ interface InquiryRow {
 interface ProductRow { name: string }
 interface TenantRow  { name: string }
 
+// ── CORS ───────────────────────────────────────────────────────────────────
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin':  '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+}
+
 // ── Main handler ───────────────────────────────────────────────────────────
 
 Deno.serve(async (req: Request) => {
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders })
+  }
   if (req.method !== 'POST') {
-    return new Response('Method not allowed', { status: 405 })
+    return new Response('Method not allowed', { status: 405, headers: corsHeaders })
   }
 
   const supabaseUrl    = Deno.env.get('SUPABASE_URL')!
@@ -41,14 +52,14 @@ Deno.serve(async (req: Request) => {
   // ── 1. Verify caller is an authenticated admin ──────────────────────────
   const authHeader = req.headers.get('Authorization')
   if (!authHeader) {
-    return new Response('Unauthorized', { status: 401 })
+    return new Response('Unauthorized', { status: 401, headers: corsHeaders })
   }
   const userClient = createClient(supabaseUrl, Deno.env.get('SUPABASE_ANON_KEY')!, {
     global: { headers: { Authorization: authHeader } },
   })
   const { data: { user }, error: authErr } = await userClient.auth.getUser()
   if (authErr || !user) {
-    return new Response('Unauthorized', { status: 401 })
+    return new Response('Unauthorized', { status: 401, headers: corsHeaders })
   }
 
   // ── 2. Parse request body ───────────────────────────────────────────────
@@ -60,12 +71,12 @@ Deno.serve(async (req: Request) => {
     expires_at = body.expires_at ?? null
     if (!inquiry_id) throw new Error('missing inquiry_id')
   } catch {
-    return new Response('Bad request', { status: 400 })
+    return new Response('Bad request', { status: 400, headers: corsHeaders })
   }
 
   if (!resendApiKey) {
     console.error('generate-quote: RESEND_API_KEY not set')
-    return new Response('Email provider not configured', { status: 500 })
+    return new Response('Email provider not configured', { status: 500, headers: corsHeaders })
   }
 
   // Service-role client bypasses RLS for data fetching
@@ -81,7 +92,7 @@ Deno.serve(async (req: Request) => {
 
     if (inqErr || !inquiryData) {
       console.error('generate-quote: inquiry not found', inqErr)
-      return new Response('Inquiry not found', { status: 404 })
+      return new Response('Inquiry not found', { status: 404, headers: corsHeaders })
     }
     const inq = inquiryData as InquiryRow
 
@@ -96,9 +107,9 @@ Deno.serve(async (req: Request) => {
 
     // ── Plan gate: quotations feature ─────────────────────────────────────
     const limits = await loadPlanLimits(sb, inq.tenant_id)
-    if (!limits) return new Response('Tenant not found', { status: 404 })
+    if (!limits) return new Response('Tenant not found', { status: 404, headers: corsHeaders })
     if (!limits.quotations) {
-      return gateForbidden(makePlanError('quotations', limits.plan))
+      return gateForbidden(makePlanError('quotations', limits.plan), corsHeaders)
     }
 
     // ── 5. Generate PDF ───────────────────────────────────────────────────
@@ -122,7 +133,7 @@ Deno.serve(async (req: Request) => {
 
     if (uploadErr) {
       console.error('generate-quote: storage upload failed', uploadErr)
-      return new Response('Failed to store PDF', { status: 500 })
+      return new Response('Failed to store PDF', { status: 500, headers: corsHeaders })
     }
 
     const { data: { publicUrl } } = sb.storage.from('quotes').getPublicUrl(filePath)
@@ -143,7 +154,7 @@ Deno.serve(async (req: Request) => {
 
     if (insertErr) {
       console.error('generate-quote: quote insert failed', insertErr)
-      return new Response('Failed to save quote record', { status: 500 })
+      return new Response('Failed to save quote record', { status: 500, headers: corsHeaders })
     }
 
     // ── 8. Send email to customer via Resend ──────────────────────────────
@@ -182,12 +193,12 @@ Deno.serve(async (req: Request) => {
     }
 
     return new Response(JSON.stringify({ quote_id: quoteId, pdf_url: publicUrl, ...quoteRow }), {
-      headers: { 'Content-Type': 'application/json' },
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
 
   } catch (err) {
     console.error('generate-quote: unexpected error', err)
-    return new Response('Internal error', { status: 500 })
+    return new Response('Internal error', { status: 500, headers: corsHeaders })
   }
 })
 
