@@ -173,7 +173,7 @@ export function CharacteristicValuesEditor({
             <div className="flex items-center gap-1 shrink-0">
               <span className="text-muted-foreground text-xs">±</span>
               <input
-                className="w-20 bg-transparent text-right outline-none focus:ring-0 tabular-nums text-xs"
+                className="w-16 bg-transparent text-right outline-none focus:ring-0 tabular-nums text-xs"
                 type="number"
                 step="0.01"
                 defaultValue={value.price_modifier}
@@ -200,40 +200,44 @@ export function CharacteristicValuesEditor({
         adding ? (
           <form
             onSubmit={handleSubmit(handleAdd)}
-            className="flex items-start gap-2 pt-1"
+            className="space-y-2 pt-1"
           >
-            <div className="flex-1 space-y-1">
-              <Input
-                placeholder="Value label (e.g. Oak)"
-                className="h-8 text-sm"
-                autoFocus
-                {...register('label')}
-              />
-              {errors.label && (
-                <p className="text-xs text-destructive">{errors.label.message}</p>
-              )}
+            <div className="flex items-start gap-2">
+              <div className="flex-1 space-y-1">
+                <Input
+                  placeholder="Value label (e.g. Oak)"
+                  className="h-8 text-sm"
+                  autoFocus
+                  {...register('label')}
+                />
+                {errors.label && (
+                  <p className="text-xs text-destructive">{errors.label.message}</p>
+                )}
+              </div>
+              <div className="w-20 shrink-0 space-y-1">
+                <Input
+                  type="number"
+                  step="0.01"
+                  placeholder="±0.00"
+                  className="h-8 text-sm text-right"
+                  {...register('price_modifier')}
+                />
+              </div>
             </div>
-            <div className="w-24 space-y-1">
-              <Input
-                type="number"
-                step="0.01"
-                placeholder="±0.00"
-                className="h-8 text-sm text-right"
-                {...register('price_modifier')}
-              />
+            <div className="flex gap-2">
+              <Button type="submit" size="sm" className="h-8" loading={isSubmitting}>
+                Add
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-8"
+                onClick={() => { setAdding(false); reset() }}
+              >
+                Cancel
+              </Button>
             </div>
-            <Button type="submit" size="sm" className="h-8" loading={isSubmitting}>
-              Add
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="h-8"
-              onClick={() => { setAdding(false); reset() }}
-            >
-              Cancel
-            </Button>
           </form>
         ) : (
           <button

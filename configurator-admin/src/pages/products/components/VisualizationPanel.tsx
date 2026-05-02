@@ -457,7 +457,7 @@ export function VisualizationPanel({ productId, arEnabled = true, onArToggle, ar
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {/* Asset type */}
             <div className="space-y-1">
               <label className="text-xs font-medium text-muted-foreground">{t('Type')}</label>

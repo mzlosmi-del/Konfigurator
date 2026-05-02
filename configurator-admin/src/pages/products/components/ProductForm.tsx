@@ -74,7 +74,7 @@ export function ProductForm({
       </FormField>
 
       {/* Name translations */}
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <FormField label={t('Name (EN)')} htmlFor="name_en" error={errors.name_en?.message}>
           <Input
             id="name_en"
@@ -106,7 +106,7 @@ export function ProductForm({
       </FormField>
 
       {/* Description translations */}
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <FormField label={t('Description (EN)')} htmlFor="description_en">
           <Textarea
             id="description_en"
@@ -125,7 +125,7 @@ export function ProductForm({
         </FormField>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <FormField
           label={t('SKU / Code')}
           htmlFor="sku"
@@ -153,7 +153,7 @@ export function ProductForm({
         </FormField>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <FormField
           label={t('Base price')}
           htmlFor="base_price"

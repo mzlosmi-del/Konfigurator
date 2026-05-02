@@ -139,7 +139,7 @@ export function EditProductPage() {
       />
 
       {/* Back link */}
-      <div className="px-6 pt-4">
+      <div className="px-4 pt-4 md:px-6">
         <button
           onClick={() => navigate('/products')}
           className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
@@ -150,26 +150,28 @@ export function EditProductPage() {
       </div>
 
       {/* Tabs */}
-      <div className="px-6 pt-4">
-        <div className="flex gap-1 border-b">
-          {TAB_KEYS.map(tab => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
-                activeTab === tab
-                  ? 'border-primary text-foreground'
-                  : 'border-transparent text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              {t(TAB_LABELS[tab])}
-            </button>
-          ))}
+      <div className="px-4 pt-4 md:px-6">
+        <div className="overflow-x-auto">
+          <div className="flex gap-1 border-b min-w-max">
+            {TAB_KEYS.map(tab => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`px-3 py-2 text-sm font-medium transition-colors border-b-2 -mb-px whitespace-nowrap ${
+                  activeTab === tab
+                    ? 'border-primary text-foreground'
+                    : 'border-transparent text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                {t(TAB_LABELS[tab])}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
       {/* Tab content */}
-      <div className="p-6 max-w-2xl">
+      <div className="p-4 max-w-2xl md:p-6">
         {activeTab === 'details' && (
           <Card>
             <CardHeader>
