@@ -303,6 +303,68 @@ export interface Database {
         Insert: Omit<Database['public']['Tables']['quotation_rejection_reasons']['Row'], 'id' | 'created_at'> & { id?: string }
         Update: Partial<Database['public']['Tables']['quotation_rejection_reasons']['Insert']>
       }
+      product_price_schedules: {
+        Row: {
+          id:         string
+          tenant_id:  string
+          product_id: string
+          price:      number
+          valid_from: string
+          valid_to:   string | null
+          note:       string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: Omit<Database['public']['Tables']['product_price_schedules']['Row'], 'id' | 'created_at' | 'updated_at'> & { id?: string }
+        Update: Partial<Database['public']['Tables']['product_price_schedules']['Insert']>
+      }
+      characteristic_modifier_schedules: {
+        Row: {
+          id:                      string
+          tenant_id:               string
+          characteristic_value_id: string
+          price_modifier:          number
+          valid_from:              string
+          valid_to:                string | null
+          note:                    string | null
+          created_at:              string
+          updated_at:              string
+        }
+        Insert: Omit<Database['public']['Tables']['characteristic_modifier_schedules']['Row'], 'id' | 'created_at' | 'updated_at'> & { id?: string }
+        Update: Partial<Database['public']['Tables']['characteristic_modifier_schedules']['Insert']>
+      }
+      product_tax_presets: {
+        Row: {
+          id:         string
+          tenant_id:  string
+          product_id: string
+          label:      string
+          rate:       number
+          valid_from: string
+          valid_to:   string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: Omit<Database['public']['Tables']['product_tax_presets']['Row'], 'id' | 'created_at' | 'updated_at'> & { id?: string }
+        Update: Partial<Database['public']['Tables']['product_tax_presets']['Insert']>
+      }
+      product_adjustment_presets: {
+        Row: {
+          id:              string
+          tenant_id:       string
+          product_id:      string
+          label:           string
+          adjustment_type: 'surcharge' | 'discount'
+          mode:            'percent' | 'fixed'
+          value:           number
+          valid_from:      string
+          valid_to:        string | null
+          created_at:      string
+          updated_at:      string
+        }
+        Insert: Omit<Database['public']['Tables']['product_adjustment_presets']['Row'], 'id' | 'created_at' | 'updated_at'> & { id?: string }
+        Update: Partial<Database['public']['Tables']['product_adjustment_presets']['Insert']>
+      }
       quotations: {
         Row: {
           id: string
