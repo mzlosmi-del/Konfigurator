@@ -110,7 +110,7 @@ export function ProductsPage() {
           </div>
         }
       />
-      <div className="p-6">
+      <div className="p-4 md:p-6">
         {loading ? (
           <div className="flex justify-center py-16"><Spinner /></div>
         ) : products.length === 0 ? (
@@ -128,6 +128,7 @@ export function ProductsPage() {
           </Card>
         ) : (
           <div className="rounded-lg border bg-card overflow-hidden">
+            <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b bg-muted/40">
@@ -184,6 +185,7 @@ export function ProductsPage() {
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
         )}
       </div>

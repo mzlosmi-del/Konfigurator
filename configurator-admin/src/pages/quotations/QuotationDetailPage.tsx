@@ -259,7 +259,7 @@ export function QuotationDetailPage() {
         }
       />
 
-      <div className="p-6 space-y-6 max-w-4xl">
+      <div className="p-4 space-y-4 md:p-6 md:space-y-6 max-w-4xl">
 
         {/* ── Status + meta ──────────────────────────────────────────────── */}
         <div className="flex items-center gap-4 flex-wrap">
@@ -324,7 +324,7 @@ export function QuotationDetailPage() {
         {/* ── Customer ───────────────────────────────────────────────────── */}
         <Card>
           <CardHeader><CardTitle>{t('Customer')}</CardTitle></CardHeader>
-          <CardContent className="grid grid-cols-2 gap-3 text-sm">
+          <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
             <div>
               <span className="text-muted-foreground">{t('Name')}: </span>
               <span className="font-medium">{quotation.customer_name}</span>
@@ -358,13 +358,14 @@ export function QuotationDetailPage() {
         <Card>
           <CardHeader><CardTitle>{t('Line Items')}</CardTitle></CardHeader>
           <CardContent className="p-0">
+            <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b bg-muted/40">
                   <th className="px-4 py-3 text-left font-medium text-muted-foreground">#</th>
                   <th className="px-4 py-3 text-left font-medium text-muted-foreground">{t('Product')}</th>
-                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">{t('SKU')}</th>
-                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">{t('Configuration')}</th>
+                  <th className="px-4 py-3 text-left font-medium text-muted-foreground hidden sm:table-cell">{t('SKU')}</th>
+                  <th className="px-4 py-3 text-left font-medium text-muted-foreground hidden md:table-cell">{t('Configuration')}</th>
                   <th className="px-4 py-3 text-right font-medium text-muted-foreground">{t('Qty')}</th>
                   <th className="px-4 py-3 text-right font-medium text-muted-foreground">{t('Unit Price')}</th>
                   <th className="px-4 py-3 text-right font-medium text-muted-foreground">{t('Total')}</th>
@@ -375,10 +376,10 @@ export function QuotationDetailPage() {
                   <tr key={i}>
                     <td className="px-4 py-3 text-muted-foreground">{i + 1}</td>
                     <td className="px-4 py-3 font-medium">{item.product_name}</td>
-                    <td className="px-4 py-3 font-mono text-sm text-muted-foreground">
+                    <td className="px-4 py-3 font-mono text-sm text-muted-foreground hidden sm:table-cell">
                       {item.product_sku ?? <span className="opacity-40">—</span>}
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3 hidden md:table-cell">
                       {item.configuration.length > 0 ? (
                         <div className="space-y-0.5">
                           {item.configuration.map((c, ci) => (
@@ -408,6 +409,7 @@ export function QuotationDetailPage() {
                 ))}
               </tbody>
             </table>
+            </div>
           </CardContent>
         </Card>
 

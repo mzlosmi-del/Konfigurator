@@ -528,7 +528,24 @@ export function QuotationFormPage() {
         }
       />
 
-      <div className="p-6 space-y-6 max-w-4xl">
+      <div className="p-4 space-y-4 md:p-6 md:space-y-6 max-w-4xl">
+
+        {/* Source inquiry breadcrumb (when present) */}
+        {sourceInquiryId && (
+          <Link
+            to={`/inquiries/${sourceInquiryId}`}
+            className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <Inbox className="h-3.5 w-3.5" />
+            {t('Created from inquiry')} #{sourceInquiryId.slice(0, 8)}
+          </Link>
+        )}
+
+        {inquiryHydrating && (
+          <div className="rounded-md border bg-muted/30 px-3 py-2 text-sm text-muted-foreground flex items-center gap-2">
+            <Spinner /> {t('Loading inquiry…')}
+          </div>
+        )}
 
         {/* Source inquiry breadcrumb (when present) */}
         {sourceInquiryId && (
@@ -550,7 +567,7 @@ export function QuotationFormPage() {
         {/* ── Customer ─────────────────────────────────────────────────── */}
         <Card>
           <CardHeader><CardTitle>{t('Customer')}</CardTitle></CardHeader>
-          <CardContent className="grid grid-cols-2 gap-4">
+          <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <label className="text-sm font-medium">{t('Name')} *</label>
               <Input value={customerName} onChange={e => setCustomerName(e.target.value)} placeholder={t('Customer name')} />
@@ -567,7 +584,7 @@ export function QuotationFormPage() {
               <label className="text-sm font-medium">{t('Phone')}</label>
               <Input value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} placeholder="+1 234 567 890" />
             </div>
-            <div className="col-span-2 space-y-1.5">
+            <div className="sm:col-span-2 space-y-1.5">
               <label className="text-sm font-medium">{t('Billing Address')}</label>
               <Input value={customerAddress} onChange={e => setCustomerAddress(e.target.value)} placeholder={t('Street, city, country')} />
             </div>
@@ -585,8 +602,8 @@ export function QuotationFormPage() {
         {/* ── Quote meta ────────────────────────────────────────────────── */}
         <Card>
           <CardHeader><CardTitle>{t('Quote Details')}</CardTitle></CardHeader>
-          <CardContent className="grid grid-cols-2 gap-4">
-            <div className="col-span-2 space-y-1.5">
+          <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="sm:col-span-2 space-y-1.5">
               <label className="text-sm font-medium">{t('Subject / Title')}</label>
               <Input value={title} onChange={e => setTitle(e.target.value)} placeholder={t('e.g. Custom furniture package for office renovation')} />
             </div>
@@ -600,11 +617,11 @@ export function QuotationFormPage() {
                 {CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)}
               </Select>
             </div>
-            <div className="col-span-2 space-y-1.5">
+            <div className="sm:col-span-2 space-y-1.5">
               <label className="text-sm font-medium">{t('Payment Terms')}</label>
               <Input value={paymentTerms} onChange={e => setPaymentTerms(e.target.value)} placeholder={t('e.g. Net 30, 50% upfront')} />
             </div>
-            <div className="col-span-2 space-y-1.5">
+            <div className="sm:col-span-2 space-y-1.5">
               <label className="text-sm font-medium">{t('Notes')}</label>
               <Textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder={t('Internal notes or terms…')} rows={3} />
             </div>
@@ -695,7 +712,7 @@ export function QuotationFormPage() {
         </div>
 
         {/* ── Actions ───────────────────────────────────────────────────── */}
-        <div className="flex items-center gap-3 pt-2">
+        <div className="flex flex-wrap items-center gap-3 pt-2">
           <Button variant="outline" onClick={() => navigate('/quotations')} disabled={isBusy}>
             {t('Cancel')}
           </Button>

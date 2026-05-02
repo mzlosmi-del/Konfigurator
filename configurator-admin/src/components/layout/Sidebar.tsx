@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { NavLink } from 'react-router-dom'
-import { LayoutDashboard, Package, Inbox, Settings, LogOut, Layers, FileText, AlignLeft, BarChart2, Code2 } from 'lucide-react'
+import { LayoutDashboard, Package, Inbox, Settings, LogOut, Layers, FileText, AlignLeft, BarChart2, Code2, X } from 'lucide-react'
 import { Logo } from '@/components/ui/Logo'
 import { cn } from '@/lib/utils'
 import { useAuthContext } from '@/components/auth/AuthContext'
@@ -8,7 +8,12 @@ import { Separator } from '@/components/ui/separator'
 import { useInquiryCounts } from '@/hooks/useInquiryCounts'
 import { t, getLang, setLang, LANGS, type Lang } from '@/i18n'
 
-export function Sidebar() {
+interface SidebarProps {
+  mobileOpen?: boolean
+  onClose?:    () => void
+}
+
+export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
   const { signOut } = useAuthContext()
   const { newCount } = useInquiryCounts()
   const [lang, setLangState] = useState<Lang>(getLang())
@@ -31,18 +36,38 @@ export function Sidebar() {
   ]
 
   return (
-    <aside className="flex h-screen w-56 shrink-0 flex-col border-r bg-card">
+    <aside
+      className={cn(
+        'flex flex-col bg-card border-r shrink-0',
+        // Mobile: full-height fixed overlay that slides in from the left
+        'fixed inset-y-0 left-0 z-50 w-72 transition-transform duration-200 ease-in-out',
+        // Desktop: back in document flow, standard sidebar width
+        'md:relative md:inset-auto md:h-screen md:w-56 md:translate-x-0',
+        mobileOpen ? 'translate-x-0' : '-translate-x-full',
+      )}
+    >
       {/* Logo / brand */}
-      <div className="flex h-14 items-center px-4 border-b">
+      <div className="flex h-14 items-center justify-between px-4 border-b">
         <Logo lockup="horizontal" size={28} />
+        {/* Close button — mobile only */}
+        {onClose && (
+          <button
+            onClick={onClose}
+            className="text-muted-foreground hover:text-foreground md:hidden"
+            aria-label="Close menu"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        )}
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 space-y-0.5 p-2 pt-3">
+      <nav className="flex-1 space-y-0.5 p-2 pt-3 overflow-y-auto">
         {navItems.map(({ to, icon: Icon, label, badge }) => (
           <NavLink
             key={to}
             to={to}
+            onClick={onClose}
             className={({ isActive }) =>
               cn(
                 'flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors',

@@ -496,7 +496,7 @@ export async function buildQuotationPdfBytes(
       if (i < items.length - 1)
         page.drawLine({ start: { x: MX, y: y + 4 }, end: { x: MX + col, y: y + 4 }, thickness: 0.25, color: C.rule })
     }
-    y -= 10
+    y -= 12
   }
 
   // ══════════════════════════════════════════════════════════════════════════
