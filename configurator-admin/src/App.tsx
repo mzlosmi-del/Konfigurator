@@ -23,6 +23,7 @@ import { QuotationsPage } from '@/pages/quotations/QuotationsPage'
 import { QuotationsReportPage } from '@/pages/quotations/QuotationsReportPage'
 import { QuotationFormPage } from '@/pages/quotations/QuotationFormPage'
 import { QuotationDetailPage } from '@/pages/quotations/QuotationDetailPage'
+import { PricingCenterPage } from '@/pages/pricing/PricingCenterPage'
 import { TextsPage } from '@/pages/texts/TextsPage'
 import { AnalyticsPage } from '@/pages/analytics/AnalyticsPage'
 import { EmbedDocsPage } from '@/pages/embed-docs/EmbedDocsPage'
@@ -59,6 +60,7 @@ export function App() {
               <Route path="/products/new" element={<NewProductPage />} />
               <Route path="/products/import" element={<ProductsImportPage />} />
               <Route path="/products/:id/edit" element={<EditProductPage />} />
+              <Route path="/pricing" element={<PricingCenterPage />} />
               <Route path="/library" element={<LibraryPage />} />
               <Route path="/inquiries" element={<InquiriesPage />} />
               <Route path="/inquiries/:id" element={<InquiryDetailPage />} />

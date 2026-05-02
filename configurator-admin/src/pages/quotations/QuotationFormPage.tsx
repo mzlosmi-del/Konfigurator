@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useNavigate, useParams, useSearchParams, Link } from 'react-router-dom'
-import { Plus, Trash2, ArrowLeft, FileText, Settings2, Inbox } from 'lucide-react'
+import { Plus, Trash2, ArrowLeft, FileText, Settings2, Inbox, CalendarRange } from 'lucide-react'
 import {
   fetchQuotation,
   createQuotation,
@@ -18,6 +18,7 @@ import {
   fetchGlobalTexts,
 } from '@/lib/products'
 import { fetchInquiry } from '@/lib/inquiries'
+import { fetchActivePricing, type ActivePricing } from '@/lib/pricing'
 import { inquiryToQuotationDraft } from '@/lib/inquiryConversion'
 import { evaluateRules } from '@/lib/configurationRules'
 import { calculateFormulaTotal, type FormulaContext } from '@/lib/formulaEngine'
@@ -33,6 +34,7 @@ import type {
   ConfigurationRule,
   PricingFormula,
   ProductText,
+  AdjustmentType,
 } from '@/types/database'
 import type { CharacteristicWithValues } from '@/lib/products'
 import { ConfigureProductDialog } from './ConfigureProductDialog'
@@ -54,10 +56,11 @@ import { t } from '@/i18n'
 // ── Internal draft types ──────────────────────────────────────────────────────
 
 interface LineItemDraft {
-  product_id:  string
-  quantity:    number
-  selection:   Record<string, string>  // charId → valueId
-  adjustments: AdjustmentDraft[]
+  product_id:     string
+  quantity:       number
+  selection:      Record<string, string>  // charId → valueId
+  adjustments:    AdjustmentDraft[]
+  price_override: number | null  // active scheduled price, null = use product.base_price
 }
 
 const CURRENCIES = ['EUR', 'USD', 'GBP', 'CHF', 'RSD']
@@ -86,6 +89,7 @@ export function QuotationFormPage() {
   const [rulesCache,        setRulesCache]        = useState<Record<string, ConfigurationRule[]>>({})
   const [formulasCache,     setFormulasCache]     = useState<Record<string, PricingFormula[]>>({})
   const [productTextsCache, setProductTextsCache] = useState<Record<string, ProductText[]>>({})
+  const [pricingCache,      setPricingCache]      = useState<Record<string, ActivePricing>>({})
   const [globalTexts,       setGlobalTexts]       = useState<ProductText[]>([])
   const [layoutDialogOpen,  setLayoutDialogOpen]  = useState(false)
   const [pendingPdfData,    setPendingPdfData]    = useState<{
@@ -160,12 +164,13 @@ export function QuotationFormPage() {
         await Promise.all(uniqueIds.map(pid => ensureProductData(pid)))
 
         setLineItems(items.map(item => ({
-          product_id: item.product_id,
-          quantity:   item.quantity,
-          selection:  Object.fromEntries(
+          product_id:     item.product_id,
+          quantity:        item.quantity,
+          selection:       Object.fromEntries(
             item.configuration.map(c => [c.characteristic_id, c.value_id])
           ),
-          adjustments: (item.adjustments ?? []).map(adjustmentToDraft),
+          adjustments:    (item.adjustments ?? []).map(adjustmentToDraft),
+          price_override: null,
         })))
 
         setAdjustments(adjs.map(adjustmentToDraft))
@@ -201,7 +206,7 @@ export function QuotationFormPage() {
 
   // ── Line item helpers ───────────────────────────────────────────────────────
   function addLineItem() {
-    setLineItems(prev => [...prev, { product_id: '', quantity: 1, selection: {}, adjustments: [] }])
+    setLineItems(prev => [...prev, { product_id: '', quantity: 1, selection: {}, adjustments: [], price_override: null }])
   }
 
   function removeLineItem(index: number) {
@@ -213,8 +218,27 @@ export function QuotationFormPage() {
   }
 
   async function handleProductChange(index: number, productId: string) {
-    updateLineItem(index, { product_id: productId, selection: {} })
-    if (productId) await ensureProductData(productId)
+    updateLineItem(index, { product_id: productId, selection: {}, price_override: null, adjustments: [] })
+    if (productId) {
+      await ensureProductData(productId)
+      try {
+        const todayStr = new Date().toISOString().slice(0, 10)
+        const pricing = await fetchActivePricing(productId, todayStr)
+        setPricingCache(prev => ({ ...prev, [productId]: pricing }))
+        const taxDrafts: AdjustmentDraft[] = pricing.taxPresets.map(tp => ({
+          type: 'tax' as AdjustmentType,
+          label: tp.label,
+          mode: 'percent' as const,
+          value: String(tp.rate),
+        }))
+        updateLineItem(index, {
+          price_override: pricing.scheduledPrice,
+          adjustments:    taxDrafts,
+        })
+      } catch {
+        // non-critical — pricing defaults unavailable
+      }
+    }
   }
 
   // ── Inquiry → quotation hydration (new quotations with ?inquiry_id=…) ──────
@@ -248,7 +272,7 @@ export function QuotationFormPage() {
         setCustomerAddress(draft.customer_address ?? '')
         setCurrency(draft.currency)
         setNotes(draft.notes ?? '')
-        setLineItems([{ product_id: product.id, quantity: 1, selection: draft.selection, adjustments: [] }])
+        setLineItems([{ product_id: product.id, quantity: 1, selection: draft.selection, adjustments: [], price_override: null }])
         setSourceInquiryId(draft.source_inquiry_id)
 
         if (draft.dropped.length > 0) {
@@ -295,7 +319,9 @@ export function QuotationFormPage() {
         const formulas   = formulasCache[li.product_id] ?? []
         const ruleEffect = evaluateRules(rules, li.selection)
         const config: QuotationConfigItem[] = []
-        let   unitPrice = Number(product?.base_price ?? 0)
+        let   unitPrice = (li.price_override !== null && li.price_override !== undefined)
+          ? Number(li.price_override)
+          : Number(product?.base_price ?? 0)
 
         for (const char of chars) {
           if (char.display_type === 'number') {
@@ -652,6 +678,7 @@ export function QuotationFormPage() {
                 rules={rulesCache[item.product_id] ?? []}
                 formulas={formulasCache[item.product_id] ?? []}
                 currency={currency}
+                activePricing={pricingCache[item.product_id]}
                 onProductChange={pid => handleProductChange(idx, pid)}
                 onQtyChange={qty => updateLineItem(idx, { quantity: qty })}
                 onSelectionChange={sel => updateLineItem(idx, { selection: sel })}
@@ -776,6 +803,7 @@ interface LineItemRowProps {
   rules:               ConfigurationRule[]
   formulas:            PricingFormula[]
   currency:            string
+  activePricing?:      ActivePricing
   onProductChange:     (pid: string) => void
   onQtyChange:         (qty: number) => void
   onSelectionChange:   (sel: Record<string, string>) => void
@@ -801,7 +829,7 @@ function buildFormulaCtxLocal(
 }
 
 function LineItemRow({
-  item, products, details, rules, formulas, currency,
+  item, products, details, rules, formulas, currency, activePricing,
   onProductChange, onQtyChange, onSelectionChange, onAdjustmentsChange, onRemove,
 }: LineItemRowProps) {
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -809,7 +837,9 @@ function LineItemRow({
 
   // Compute current unit price from selection (respecting price_override rules + formulas)
   const lineRuleEffect = evaluateRules(rules, item.selection)
-  let unitPrice = Number(product?.base_price ?? 0)
+  let unitPrice = (item.price_override !== null && item.price_override !== undefined)
+    ? Number(item.price_override)
+    : Number(product?.base_price ?? 0)
   for (const char of details) {
     if (char.display_type === 'number') continue
     const valueId = item.selection[char.id]
@@ -867,6 +897,15 @@ function LineItemRow({
         </div>
       </div>
 
+      {/* Scheduled price indicator */}
+      {item.price_override !== null && item.price_override !== undefined && product && (
+        <div className="flex items-center gap-1.5 text-xs text-blue-600">
+          <CalendarRange className="h-3 w-3" />
+          {t('Scheduled price')}: {product.currency} {Number(item.price_override).toFixed(2)}
+          <span className="text-muted-foreground">({t('replaces catalogue price')} {product.currency} {Number(product.base_price).toFixed(2)})</span>
+        </div>
+      )}
+
       {/* Configure button + summary chips */}
       {item.product_id && hasCharacteristics && (
         <div className="flex items-center gap-3 flex-wrap pt-1">
@@ -905,6 +944,39 @@ function LineItemRow({
             onChange={onAdjustmentsChange}
             compact
           />
+          {/* Preset adjustment suggestions */}
+          {activePricing && activePricing.adjustmentPresets.length > 0 && (() => {
+            const suggestions = activePricing.adjustmentPresets.filter(
+              preset => !item.adjustments.some(a => a.label === preset.label)
+            )
+            if (!suggestions.length) return null
+            return (
+              <div className="pt-1">
+                <p className="text-xs text-muted-foreground mb-1.5">{t('Suggestions')}:</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {suggestions.map(preset => (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      onClick={() => {
+                        const newAdj: AdjustmentDraft = {
+                          type:  preset.adjustment_type as AdjustmentType,
+                          label: preset.label,
+                          mode:  preset.mode,
+                          value: String(preset.value),
+                        }
+                        onAdjustmentsChange([...item.adjustments, newAdj])
+                      }}
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border border-dashed border-primary/50 text-primary hover:bg-primary/10 transition-colors"
+                    >
+                      <Plus className="h-2.5 w-2.5" />
+                      {preset.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )
+          })()}
         </div>
       )}
 

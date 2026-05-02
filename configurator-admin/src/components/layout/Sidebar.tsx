@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { NavLink } from 'react-router-dom'
-import { LayoutDashboard, Package, Inbox, Settings, LogOut, Layers, FileText, AlignLeft, BarChart2, Code2, X } from 'lucide-react'
+import { LayoutDashboard, Package, Inbox, Settings, LogOut, Layers, FileText, AlignLeft, BarChart2, Code2, X, DollarSign } from 'lucide-react'
 import { Logo } from '@/components/ui/Logo'
 import { cn } from '@/lib/utils'
 import { useAuthContext } from '@/components/auth/AuthContext'
@@ -26,6 +26,7 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
   const navItems = [
     { to: '/dashboard',  icon: LayoutDashboard, label: 'Dashboard',   badge: 0 },
     { to: '/products',   icon: Package,         label: 'Products',    badge: 0 },
+    { to: '/pricing',    icon: DollarSign,      label: 'Pricing',     badge: 0 },
     { to: '/library',    icon: Layers,          label: 'Library',     badge: 0 },
     { to: '/texts',      icon: AlignLeft,       label: 'Texts',       badge: 0 },
     { to: '/inquiries',  icon: Inbox,            label: 'Inquiries',   badge: newCount },
