@@ -214,11 +214,18 @@ export function SettingsPage() {
         headers: { Authorization: `Bearer ${session?.access_token}` },
       })
       if (res.error) {
-        // 409 = email already a member of this workspace
         const status = (res.error as { context?: Response }).context?.status
         if (status === 409) {
           toast({ title: t('Already a member'), description: t('This person is already a member of your workspace.'), variant: 'destructive' })
           return
+        }
+        if (status === 400) {
+          let body: { error?: string; message?: string } = {}
+          try { body = await (res.error as { context?: Response }).context?.clone().json() } catch { /* ignore */ }
+          if (body.error === 'invalid_email') {
+            toast({ title: t('Invalid email address'), description: t('Email address must contain only standard ASCII characters.'), variant: 'destructive' })
+            return
+          }
         }
         throw new Error(res.error.message)
       }

@@ -40,6 +40,14 @@ Deno.serve(async (req: Request) => {
     return new Response('Bad request', { status: 400, headers: CORS })
   }
 
+  // Resend rejects non-ASCII email addresses
+  if (!/^[\x00-\x7F]+$/.test(body.email)) {
+    return new Response(
+      JSON.stringify({ error: 'invalid_email', message: 'Email address must contain only standard ASCII characters.' }),
+      { status: 400, headers: { ...CORS, 'Content-Type': 'application/json' } },
+    )
+  }
+
   const sb = createClient(supabaseUrl, serviceRoleKey)
 
   const { data: { user }, error: authErr } = await sb.auth.getUser(token)
