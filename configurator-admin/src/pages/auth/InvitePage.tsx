@@ -3,7 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Boxes, UserCheck, XCircle } from 'lucide-react'
+import { UserCheck, XCircle } from 'lucide-react'
+import { Logo } from '@/components/ui/Logo'
 import { supabase } from '@/lib/supabase'
 import { useAuthContext } from '@/components/auth/AuthContext'
 import { Button } from '@/components/ui/button'
@@ -30,14 +31,7 @@ const schema = z.object({
 })
 type FormValues = z.infer<typeof schema>
 
-const logo = (
-  <div className="flex flex-col items-center gap-2">
-    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary">
-      <Boxes className="h-5 w-5 text-primary-foreground" />
-    </div>
-    <span className="text-lg font-semibold">{t('Configurator')}</span>
-  </div>
-)
+const logo = <Logo lockup="vertical" size={72} />
 
 export function InvitePage() {
   const { token }      = useParams<{ token: string }>()

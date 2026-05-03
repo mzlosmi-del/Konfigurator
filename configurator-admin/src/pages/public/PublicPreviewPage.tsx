@@ -99,8 +99,8 @@ export function PublicPreviewPage() {
         {showBranding && (
           <p style={{ marginTop: '32px', textAlign: 'center', fontSize: '.75rem', color: '#bbb' }}>
             Powered by{' '}
-            <a href="https://konfigurator.app" target="_blank" rel="noopener noreferrer" style={{ color: '#bbb' }}>
-              Konfigurator
+            <a href="https://configureout.com" target="_blank" rel="noopener noreferrer" style={{ color: '#bbb' }}>
+              Configureout
             </a>
           </p>
         )}
