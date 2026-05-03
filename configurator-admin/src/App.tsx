@@ -56,23 +56,50 @@ export function App() {
           <Route element={<ProtectedRoute />}>
             <Route element={<AppShell />}>
               <Route path="/dashboard" element={<DashboardPage />} />
-              <Route path="/products" element={<ProductsPage />} />
-              <Route path="/products/new" element={<NewProductPage />} />
-              <Route path="/products/import" element={<ProductsImportPage />} />
-              <Route path="/products/:id/edit" element={<EditProductPage />} />
-              <Route path="/pricing" element={<PricingCenterPage />} />
-              <Route path="/library" element={<LibraryPage />} />
-              <Route path="/inquiries" element={<InquiriesPage />} />
-              <Route path="/inquiries/:id" element={<InquiryDetailPage />} />
-              <Route path="/quotations" element={<QuotationsPage />} />
-              <Route path="/quotations/report" element={<QuotationsReportPage />} />
-              <Route path="/quotations/new" element={<QuotationFormPage />} />
-              <Route path="/quotations/:id" element={<QuotationDetailPage />} />
-              <Route path="/quotations/:id/edit" element={<QuotationFormPage />} />
-              <Route path="/texts" element={<TextsPage />} />
-              <Route path="/analytics" element={<AnalyticsPage />} />
-              <Route path="/embed-docs" element={<EmbedDocsPage />} />
-              <Route path="/settings" element={<SettingsPage />} />
+
+              <Route element={<ProtectedRoute functionality="products" />}>
+                <Route path="/products" element={<ProductsPage />} />
+                <Route path="/products/new" element={<NewProductPage />} />
+                <Route path="/products/import" element={<ProductsImportPage />} />
+                <Route path="/products/:id/edit" element={<EditProductPage />} />
+              </Route>
+
+              <Route element={<ProtectedRoute functionality="pricing" />}>
+                <Route path="/pricing" element={<PricingCenterPage />} />
+              </Route>
+
+              <Route element={<ProtectedRoute functionality="library" />}>
+                <Route path="/library" element={<LibraryPage />} />
+              </Route>
+
+              <Route element={<ProtectedRoute functionality="inquiries" />}>
+                <Route path="/inquiries" element={<InquiriesPage />} />
+                <Route path="/inquiries/:id" element={<InquiryDetailPage />} />
+              </Route>
+
+              <Route element={<ProtectedRoute functionality="quotations" />}>
+                <Route path="/quotations" element={<QuotationsPage />} />
+                <Route path="/quotations/report" element={<QuotationsReportPage />} />
+                <Route path="/quotations/new" element={<QuotationFormPage />} />
+                <Route path="/quotations/:id" element={<QuotationDetailPage />} />
+                <Route path="/quotations/:id/edit" element={<QuotationFormPage />} />
+              </Route>
+
+              <Route element={<ProtectedRoute functionality="texts" />}>
+                <Route path="/texts" element={<TextsPage />} />
+              </Route>
+
+              <Route element={<ProtectedRoute functionality="analytics" />}>
+                <Route path="/analytics" element={<AnalyticsPage />} />
+              </Route>
+
+              <Route element={<ProtectedRoute functionality="embed" />}>
+                <Route path="/embed-docs" element={<EmbedDocsPage />} />
+              </Route>
+
+              <Route element={<ProtectedRoute functionality="settings" />}>
+                <Route path="/settings" element={<SettingsPage />} />
+              </Route>
             </Route>
           </Route>
 

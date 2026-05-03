@@ -63,40 +63,51 @@ export function InvitePage() {
       })
   }, [token])
 
-  // If already logged in: accept directly
+  async function callAcceptInvite(accessToken: string): Promise<string | null> {
+    const res = await supabase.functions.invoke('accept-invite', {
+      body: { token },
+      headers: { Authorization: `Bearer ${accessToken}` },
+    })
+    if (res.error) return res.error.message
+    const body = res.data as { ok?: boolean; error?: string } | null
+    if (body?.error) return body.error
+    return null
+  }
+
+  // If already logged in: accept directly via edge function
   async function handleAcceptLoggedIn() {
     if (!session || !token) return
     setAccepting(true)
     setServerError(null)
-    const { error } = await supabase.auth.updateUser({
-      data: { invite_token: token },
-    })
-    if (error) {
-      setServerError(error.message)
+    const err = await callAcceptInvite(session.access_token)
+    if (err) {
+      setServerError(err)
       setAccepting(false)
       return
     }
-    // Trigger re-auth to reload profile with new tenant
     await supabase.auth.refreshSession()
     navigate('/dashboard', { replace: true })
   }
 
-  // If not logged in: register with invite token embedded in metadata
+  // If not logged in: sign up, then immediately call accept-invite with the new session
   async function onSubmit({ password }: FormValues) {
     if (!invite || !token) return
     setServerError(null)
     const { data, error } = await supabase.auth.signUp({
       email:    invite.email,
       password,
+      // Keep invite_token in metadata as a fallback for the DB trigger
       options: { data: { invite_token: token } },
     })
     if (error) { setServerError(error.message); return }
     if (!data.session) {
-      // Email confirmation required — but for invites we ideally skip this.
-      // Redirect to login with a message.
+      // Email confirmation required — the DB trigger handled profile assignment
       navigate('/login', { replace: true })
       return
     }
+    // Override whatever the trigger did to guarantee correct tenant + role
+    const err = await callAcceptInvite(data.session.access_token)
+    if (err) { setServerError(err); return }
     navigate('/dashboard', { replace: true })
   }
 

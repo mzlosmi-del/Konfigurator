@@ -89,12 +89,33 @@ export interface Database {
         Row: {
           id: string
           tenant_id: string
-          role: 'admin'
+          role: 'admin' | 'member' | 'viewer'
+          email: string | null
           created_at: string
           updated_at: string
         }
         Insert: Omit<Database['public']['Tables']['profiles']['Row'], 'created_at' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['profiles']['Insert']>
+      }
+      role_permissions: {
+        Row: {
+          tenant_id: string
+          role: 'member' | 'viewer'
+          functionality: string
+          level: 'none' | 'view' | 'edit'
+        }
+        Insert: {
+          tenant_id: string
+          role: 'member' | 'viewer'
+          functionality: string
+          level: 'none' | 'view' | 'edit'
+        }
+        Update: {
+          tenant_id?: string
+          role?: 'member' | 'viewer'
+          functionality?: string
+          level?: 'none' | 'view' | 'edit'
+        }
       }
       products: {
         Row: {
@@ -403,6 +424,14 @@ export interface Database {
         Args: Record<string, never>
         Returns: string
       }
+      auth_role: {
+        Args: Record<string, never>
+        Returns: string
+      }
+      auth_can: {
+        Args: { p_functionality: string; p_level: string }
+        Returns: boolean
+      }
       create_tenant_for_user: {
         Args: { user_id: string; tenant_name: string; tenant_slug: string }
         Returns: void
@@ -472,3 +501,5 @@ export type Quotation                  = Database['public']['Tables']['quotation
 export type ProductText                = Database['public']['Tables']['product_texts']['Row']
 export type ProductTextType            = 'product' | 'specification' | 'note' | 'terms'
 export type QuotationRejectionReason   = Database['public']['Tables']['quotation_rejection_reasons']['Row']
+export type RolePermission             = Database['public']['Tables']['role_permissions']['Row']
+export type PermLevel                  = 'none' | 'view' | 'edit'

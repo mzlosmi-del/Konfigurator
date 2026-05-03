@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { Session, User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
-import type { Profile, Tenant } from '@/types/database'
+import type { PermLevel, Profile, Tenant } from '@/types/database'
 import { fetchPlanLimits, type PlanLimits } from '@/lib/planLimits'
 
 interface AuthState {
@@ -10,6 +10,7 @@ interface AuthState {
   profile: Profile | null
   tenant: Tenant | null
   planLimits: PlanLimits | null
+  permissions: Record<string, PermLevel>
   loading: boolean
 }
 
@@ -20,6 +21,7 @@ export function useAuth() {
     profile: null,
     tenant: null,
     planLimits: null,
+    permissions: {},
     loading: true,
   })
 
@@ -43,7 +45,7 @@ export function useAuth() {
         if (session) {
           loadProfileAndTenant(session)
         } else {
-          setState({ session: null, user: null, profile: null, tenant: null, planLimits: null, loading: false })
+          setState({ session: null, user: null, profile: null, tenant: null, planLimits: null, permissions: {}, loading: false })
         }
       }
     )
@@ -72,6 +74,22 @@ export function useAuth() {
 
     const planLimits = tenant ? await fetchPlanLimits(tenant.plan) : null
 
+    // Load per-functionality permissions for non-admin roles
+    const permissions: Record<string, PermLevel> = {}
+    if (profile?.role && profile.role !== 'admin') {
+      const { data: perms } = await supabase
+        .from('role_permissions')
+        .select('functionality, level')
+        .eq('tenant_id', profile.tenant_id)
+        .eq('role', profile.role)
+      const rows = perms as { functionality: string; level: string }[] | null
+      if (rows) {
+        for (const p of rows) {
+          permissions[p.functionality] = p.level as PermLevel
+        }
+      }
+    }
+
     setState(s => ({
       ...s,
       session,
@@ -79,6 +97,7 @@ export function useAuth() {
       profile,
       tenant,
       planLimits,
+      permissions,
       loading: false,
     }))
   }

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Plus, Pencil, Trash2, Eye, EyeOff, Package } from 'lucide-react'
 import { useAuthContext } from '@/components/auth/AuthContext'
+import { useCanEdit } from '@/hooks/usePermission'
 import { fetchProducts, fetchPublishedProductCount, deleteProduct, updateProduct } from '@/lib/products'
 import { atLimit, isUnlimited, planLabel } from '@/lib/planLimits'
 import type { Product } from '@/types/database'
@@ -24,6 +25,7 @@ const statusVariant: Record<Product['status'], 'success' | 'warning' | 'secondar
 export function ProductsPage() {
   const navigate = useNavigate()
   const { tenant, planLimits } = useAuthContext()
+  const canEdit = useCanEdit('products')
   const { toasts, toast, dismiss } = useToast()
   const [products, setProducts] = useState<Product[]>([])
   const [publishedCount, setPublishedCount] = useState(0)
@@ -99,14 +101,18 @@ export function ProductsPage() {
                 {publishedCount} / {maxProducts} &middot; {planLabel(tenant?.plan ?? 'free')}
               </span>
             )}
-            <Button size="sm" variant="outline" onClick={() => navigate('/products/import')} disabled={overLimit}>
-              {t('Import CSV')}
-            </Button>
-            <div title={overLimit ? t('Upgrade your plan to add more products') : undefined}>
-              <Button size="sm" onClick={() => navigate('/products/new')} disabled={overLimit}>
-                <Plus className="h-4 w-4" /> {t('New product')}
-              </Button>
-            </div>
+            {canEdit && (
+              <>
+                <Button size="sm" variant="outline" onClick={() => navigate('/products/import')} disabled={overLimit}>
+                  {t('Import CSV')}
+                </Button>
+                <div title={overLimit ? t('Upgrade your plan to add more products') : undefined}>
+                  <Button size="sm" onClick={() => navigate('/products/new')} disabled={overLimit}>
+                    <Plus className="h-4 w-4" /> {t('New product')}
+                  </Button>
+                </div>
+              </>
+            )}
           </div>
         }
       />
@@ -121,9 +127,11 @@ export function ProductsPage() {
               <p className="text-sm text-muted-foreground mt-1 mb-4">
                 {t('Create your first configurable product to get started.')}
               </p>
-              <Button size="sm" onClick={() => navigate('/products/new')}>
-                <Plus className="h-4 w-4" /> {t('Create product')}
-              </Button>
+              {canEdit && (
+                <Button size="sm" onClick={() => navigate('/products/new')}>
+                  <Plus className="h-4 w-4" /> {t('Create product')}
+                </Button>
+              )}
             </CardContent>
           </Card>
         ) : (
@@ -159,26 +167,30 @@ export function ProductsPage() {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-1">
-                        <Button
-                          variant="ghost" size="icon"
-                          title={product.status === 'published' ? t('Unpublish') : t('Publish')}
-                          loading={toggling === product.id}
-                          onClick={() => handleToggleStatus(product)}
-                          disabled={product.status === 'archived'}
-                        >
-                          {product.status === 'published'
-                            ? <EyeOff className="h-4 w-4" />
-                            : <Eye className="h-4 w-4" />}
-                        </Button>
-                        <Button variant="ghost" size="icon" title={t('Edit')}
-                          onClick={() => navigate(`/products/${product.id}/edit`)}>
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" title={t('Delete')}
-                          className="text-destructive hover:text-destructive"
-                          onClick={() => setToDelete(product)}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                        {canEdit && (
+                          <>
+                            <Button
+                              variant="ghost" size="icon"
+                              title={product.status === 'published' ? t('Unpublish') : t('Publish')}
+                              loading={toggling === product.id}
+                              onClick={() => handleToggleStatus(product)}
+                              disabled={product.status === 'archived'}
+                            >
+                              {product.status === 'published'
+                                ? <EyeOff className="h-4 w-4" />
+                                : <Eye className="h-4 w-4" />}
+                            </Button>
+                            <Button variant="ghost" size="icon" title={t('Edit')}
+                              onClick={() => navigate(`/products/${product.id}/edit`)}>
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="icon" title={t('Delete')}
+                              className="text-destructive hover:text-destructive"
+                              onClick={() => setToDelete(product)}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </>
+                        )}
                       </div>
                     </td>
                   </tr>

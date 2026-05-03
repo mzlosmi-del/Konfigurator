@@ -1023,6 +1023,17 @@ const sr: Record<string, string> = {
   'Remove this preset adjustment?':        'Ukloniti ovo prilagođenje?',
   'Value must be > 0':                     'Vrednost mora biti > 0',
   'e.g. Bulk discount':                    'npr. Grupni popust',
+
+  // Authorizations
+  'Authorizations':                        'Ovlašćenja',
+  'Role Permissions':                      'Dozvole po ulozi',
+  'Configure what each role can access. Admin always has full access.':
+    'Podesite šta svaka uloga može da pristupa. Admin uvek ima pun pristup.',
+  'Functionality':                         'Funkcionalnost',
+  'Full access':                           'Pun pristup',
+  'No access':                             'Bez pristupa',
+  'View':                                  'Pregled',
+  'Failed to save permission':             'Nije uspelo čuvanje dozvole',
 }
 
 export const LANGS = ['en', 'sr'] as const
