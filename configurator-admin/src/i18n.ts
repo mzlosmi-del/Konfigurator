@@ -856,6 +856,8 @@ const sr: Record<string, string> = {
   'Send invitation':                       'Pošalji pozivnicu',
   'Invitation sent':                       'Pozivnica poslata',
   'Failed to send invitation':             'Slanje pozivnice nije uspelo',
+  'Already a member':                      'Već je član',
+  'This person is already a member of your workspace.': 'Ova osoba je već član vašeg radnog prostora.',
   'Pending invitations':                   'Pozivnice na čekanju',
   'colleague@company.com':                 'kolega@kompanija.com',
   'Accept invitation':                     'Prihvati pozivnicu',
