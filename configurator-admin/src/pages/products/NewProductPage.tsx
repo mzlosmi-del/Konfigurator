@@ -17,7 +17,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Spinner } from '@/components/ui/spinner'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
-import { ProductForm, buildI18nMap, type ProductFormValues } from './components/ProductForm'
+import { ProductForm, type ProductFormValues } from './components/ProductForm'
 import { useToast } from '@/hooks/useToast'
 import { Toaster } from '@/components/ui/toast'
 import { t } from '@/i18n'
@@ -103,9 +103,9 @@ export function NewProductPage() {
     try {
       const product = await createProduct({
         name:             values.name,
-        name_i18n:        buildI18nMap(values.name_en, values.name_sr),
+        name_i18n:        values.name_i18n,
         description:      values.description ?? null,
-        description_i18n: buildI18nMap(values.description_en, values.description_sr),
+        description_i18n: values.description_i18n,
         base_price:       values.base_price,
         currency:         values.currency,
         sku:              values.sku?.trim() || null,
