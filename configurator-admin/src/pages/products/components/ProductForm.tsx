@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -61,9 +61,22 @@ export function ProductForm({
 
   const [nameI18n, setNameI18n] = useState<Record<string, string>>(defaultValues?.name_i18n ?? {})
   const [descI18n, setDescI18n] = useState<Record<string, string>>(defaultValues?.description_i18n ?? {})
+  // Refs mirror state so handleFormSubmit always reads the latest value even when
+  // React 18 batches the blur-triggered state update with the form submit event.
+  const nameI18nRef = useRef(nameI18n)
+  const descI18nRef = useRef(descI18n)
+
+  function handleNameI18nChange(v: Record<string, string>) {
+    nameI18nRef.current = v
+    setNameI18n(v)
+  }
+  function handleDescI18nChange(v: Record<string, string>) {
+    descI18nRef.current = v
+    setDescI18n(v)
+  }
 
   async function handleFormSubmit(data: Omit<ProductFormValues, 'name_i18n' | 'description_i18n'>) {
-    await onSubmit({ ...data, name_i18n: nameI18n, description_i18n: descI18n })
+    await onSubmit({ ...data, name_i18n: nameI18nRef.current, description_i18n: descI18nRef.current })
   }
 
   return (
@@ -78,7 +91,7 @@ export function ProductForm({
 
       <div className="space-y-1.5">
         <p className="text-sm font-medium text-muted-foreground">{t('Name translations')}</p>
-        <I18nEditor value={nameI18n} onChange={setNameI18n} placeholder={t('Translated name')} />
+        <I18nEditor value={nameI18n} onChange={handleNameI18nChange} placeholder={t('Translated name')} />
       </div>
 
       <FormField
@@ -97,7 +110,7 @@ export function ProductForm({
 
       <div className="space-y-1.5">
         <p className="text-sm font-medium text-muted-foreground">{t('Description translations')}</p>
-        <I18nEditor value={descI18n} onChange={setDescI18n} multiline placeholder={t('Translated description')} />
+        <I18nEditor value={descI18n} onChange={handleDescI18nChange} multiline placeholder={t('Translated description')} />
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
