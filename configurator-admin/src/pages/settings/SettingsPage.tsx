@@ -231,7 +231,16 @@ export function SettingsPage() {
         .single()
       if (newInv) setInvitations(prev => [...prev, newInv as Invitation])
       setInviteEmail('')
-      toast({ title: t('Invitation sent') })
+      const { emailSent, inviteUrl } = (res.data ?? {}) as { emailSent?: boolean; inviteUrl?: string }
+      if (emailSent === false && inviteUrl) {
+        toast({
+          title: t('Invitation created — email not sent'),
+          description: `${t('Share this link manually:')} ${inviteUrl}`,
+          variant: 'destructive',
+        })
+      } else {
+        toast({ title: t('Invitation sent') })
+      }
     } catch (e) {
       toast({ title: t('Failed to send invitation'), description: e instanceof Error ? e.message : undefined, variant: 'destructive' })
     } finally {

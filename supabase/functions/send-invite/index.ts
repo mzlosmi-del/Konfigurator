@@ -148,8 +148,11 @@ Deno.serve(async (req: Request) => {
 </body>
 </html>`
 
-  if (resendApiKey) {
-    const res = await fetch('https://api.resend.com/emails', {
+  let emailSent = false
+  if (!resendApiKey) {
+    console.warn(`send-invite: RESEND_API_KEY not set — invite URL: ${inviteUrl}`)
+  } else {
+    const emailRes = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${resendApiKey}`,
@@ -162,14 +165,14 @@ Deno.serve(async (req: Request) => {
         html,
       }),
     })
-    if (!res.ok) {
-      console.warn('send-invite: Resend failed', res.status, await res.text())
+    if (emailRes.ok) {
+      emailSent = true
+    } else {
+      console.error('send-invite: Resend failed', emailRes.status, await emailRes.text())
     }
-  } else {
-    console.log(`send-invite: RESEND_API_KEY not set — invite URL: ${inviteUrl}`)
   }
 
-  return new Response(JSON.stringify({ ok: true }), {
+  return new Response(JSON.stringify({ ok: true, emailSent, inviteUrl }), {
     headers: { ...CORS, 'Content-Type': 'application/json' },
   })
 })
