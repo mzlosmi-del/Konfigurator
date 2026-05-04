@@ -103,7 +103,7 @@ export function FormConfigPanel({ productId, initialConfig, onSaved }: Props) {
           description={t('Require visitors to tick a consent box before submitting.')}
         />
         {cfg.gdpr_enabled && (
-          <div className="space-y-3 pl-12">
+          <div className="space-y-3 pl-0 sm:pl-12">
             <div className="space-y-1">
               <label className="text-xs text-muted-foreground">{t('Consent text')}</label>
               <Input
@@ -112,7 +112,7 @@ export function FormConfigPanel({ productId, initialConfig, onSaved }: Props) {
                 placeholder={t('I agree to the processing of my personal data.')}
               />
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div className="space-y-1">
                 <label className="text-xs text-muted-foreground">{t('Link text')}</label>
                 <Input

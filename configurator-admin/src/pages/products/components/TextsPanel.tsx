@@ -155,14 +155,14 @@ export function TextsPanel({ productId }: Props) {
           {texts.map(text => (
             editingId === text.id ? (
               <div key={text.id} className="border rounded-lg p-3 space-y-2 bg-muted/20">
-                <div className="flex gap-2">
-                  <Select value={editType} onChange={e => setEditType(e.target.value as ProductTextType)} className="w-44">
+                <div className="flex flex-wrap gap-2">
+                  <Select value={editType} onChange={e => setEditType(e.target.value as ProductTextType)} className="w-40">
                     {TEXT_TYPES.map(tt => <option key={tt.value} value={tt.value}>{t(tt.label)}</option>)}
                   </Select>
                   <Select value={editLang} onChange={e => setEditLang(e.target.value)} className="w-28">
                     {LANGS.map(l => <option key={l.value} value={l.value}>{t(l.label)}</option>)}
                   </Select>
-                  <Input value={editLabel} onChange={e => setEditLabel(e.target.value)} placeholder={t('Label')} className="flex-1" />
+                  <Input value={editLabel} onChange={e => setEditLabel(e.target.value)} placeholder={t('Label')} className="flex-1 min-w-0" />
                 </div>
                 <Textarea value={editContent} onChange={e => setEditContent(e.target.value)} rows={4} placeholder={t('Content...')} />
                 <div className="flex gap-2">
@@ -198,14 +198,14 @@ export function TextsPanel({ productId }: Props) {
 
       <div className="border rounded-lg p-3 space-y-2 bg-muted/10">
         <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{t('Add text block')}</p>
-        <div className="flex gap-2 flex-wrap">
-          <Select value={addType} onChange={e => setAddType(e.target.value as ProductTextType)} className="w-44">
+        <div className="flex flex-wrap gap-2">
+          <Select value={addType} onChange={e => setAddType(e.target.value as ProductTextType)} className="w-40">
             {TEXT_TYPES.map(tt => <option key={tt.value} value={tt.value}>{t(tt.label)}</option>)}
           </Select>
           <Select value={addLang} onChange={e => setAddLang(e.target.value)} className="w-28">
             {LANGS.map(l => <option key={l.value} value={l.value}>{t(l.label)}</option>)}
           </Select>
-          <Input value={addLabel} onChange={e => setAddLabel(e.target.value)} placeholder={t('e.g. Technical specs, Warranty, Note')} className="flex-1 min-w-48" />
+          <Input value={addLabel} onChange={e => setAddLabel(e.target.value)} placeholder={t('e.g. Technical specs, Warranty, Note')} className="flex-1 min-w-0 w-full sm:w-auto" />
         </div>
         <Textarea value={addContent} onChange={e => setAddContent(e.target.value)} rows={4} placeholder={t('Content...')} />
         <Button size="sm" onClick={handleAdd} loading={adding} disabled={!addLabel.trim()}>

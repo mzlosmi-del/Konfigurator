@@ -281,42 +281,44 @@ export function VisualizationPanel({ productId, arEnabled = true, onArToggle, ar
         <div className="space-y-2">
           {assets.map((asset, idx) => (
             <div key={asset.id}>
-              <div className="flex items-center gap-3 rounded-lg border bg-card px-3 py-2.5 text-sm">
-                {/* Thumbnail */}
-                <div className="h-12 w-16 shrink-0 rounded overflow-hidden border bg-muted flex items-center justify-center">
-                  {asset.asset_type === '3d_model' ? (
-                    <ModelViewerThumb src={asset.url} />
-                  ) : (
-                    <img
-                      src={asset.url}
-                      alt=""
-                      className="h-full w-full object-cover"
-                      onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
-                    />
-                  )}
-                </div>
-
-                {/* Info */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <Badge variant="secondary" className="text-xs capitalize">
-                      {t(ASSET_TYPE_LABELS[asset.asset_type])}
-                    </Badge>
-                    <span className="text-xs text-muted-foreground truncate">
-                      {valueLabel(asset.characteristic_value_id)}
-                    </span>
-                    {asset.is_default && (
-                      <Badge variant="success" className="text-xs">{t('Default')}</Badge>
-                    )}
-                    {asset.asset_type === '3d_model' && meshRulesCount(asset) > 0 && (
-                      <Badge variant="secondary" className="text-xs">
-                        {meshRulesCount(asset)} {t('mesh rules')}
-                      </Badge>
+              <div className="flex flex-col gap-2 rounded-lg border bg-card px-3 py-2.5 text-sm sm:flex-row sm:items-center">
+                {/* Thumbnail + info */}
+                <div className="flex items-center gap-3 min-w-0 flex-1">
+                  <div className="h-12 w-16 shrink-0 rounded overflow-hidden border bg-muted flex items-center justify-center">
+                    {asset.asset_type === '3d_model' ? (
+                      <ModelViewerThumb src={asset.url} />
+                    ) : (
+                      <img
+                        src={asset.url}
+                        alt=""
+                        className="h-full w-full object-cover"
+                        onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
+                      />
                     )}
                   </div>
-                  <p className="text-xs text-muted-foreground truncate mt-0.5 font-mono">
-                    {asset.url}
-                  </p>
+
+                  {/* Info */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Badge variant="secondary" className="text-xs capitalize">
+                        {t(ASSET_TYPE_LABELS[asset.asset_type])}
+                      </Badge>
+                      <span className="text-xs text-muted-foreground truncate">
+                        {valueLabel(asset.characteristic_value_id)}
+                      </span>
+                      {asset.is_default && (
+                        <Badge variant="success" className="text-xs">{t('Default')}</Badge>
+                      )}
+                      {asset.asset_type === '3d_model' && meshRulesCount(asset) > 0 && (
+                        <Badge variant="secondary" className="text-xs">
+                          {meshRulesCount(asset)} {t('mesh rules')}
+                        </Badge>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground truncate mt-0.5 font-mono">
+                      {asset.url}
+                    </p>
+                  </div>
                 </div>
 
                 {/* Actions */}
@@ -457,7 +459,7 @@ export function VisualizationPanel({ productId, arEnabled = true, onArToggle, ar
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {/* Asset type */}
             <div className="space-y-1">
               <label className="text-xs font-medium text-muted-foreground">{t('Type')}</label>
@@ -559,7 +561,7 @@ export function VisualizationPanel({ productId, arEnabled = true, onArToggle, ar
 
           {/* Surface placement — only meaningful when AR is on */}
           {arEnabled && onArPlacementChange && (
-            <div className="flex items-center gap-3 mt-3 ml-12">
+            <div className="flex flex-wrap items-center gap-2 mt-3 sm:ml-12">
               <span className="text-sm text-muted-foreground shrink-0">{t('Surface type')}:</span>
               <div className="flex rounded-md border overflow-hidden text-xs font-medium">
                 {(['floor', 'wall'] as const).map(p => (

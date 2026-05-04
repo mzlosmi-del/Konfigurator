@@ -1,3 +1,4 @@
+import { useState, useRef } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -6,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Select } from '@/components/ui/select'
 import { FormField } from '@/components/ui/form-field'
+import { I18nEditor } from '@/components/ui/i18n-editor'
 import type { Product } from '@/types/database'
 import { t } from '@/i18n'
 
@@ -13,11 +15,9 @@ const CURRENCIES = ['EUR', 'USD', 'GBP', 'CHF', 'HRK', 'RSD']
 
 export type ProductFormValues = {
   name: string
-  name_en?: string
-  name_sr?: string
+  name_i18n: Record<string, string>
   description?: string
-  description_en?: string
-  description_sr?: string
+  description_i18n: Record<string, string>
   base_price: number
   currency: string
   sku?: string
@@ -38,23 +38,19 @@ export function ProductForm({
   onCancel,
 }: ProductFormProps) {
   const schema = z.object({
-    name:             z.string().min(1, t('Name is required')).max(300),
-    name_en:          z.string().max(300).optional().or(z.literal('')),
-    name_sr:          z.string().max(300).optional().or(z.literal('')),
-    description:      z.string().optional(),
-    description_en:   z.string().optional(),
-    description_sr:   z.string().optional(),
-    base_price:       z.coerce.number().min(0, t('Price must be 0 or more')),
-    currency:         z.string().length(3),
-    sku:              z.string().max(100).optional().or(z.literal('')),
-    unit_of_measure:  z.string().max(50).optional().or(z.literal('')),
+    name:            z.string().min(1, t('Name is required')).max(300),
+    description:     z.string().optional(),
+    base_price:      z.coerce.number().min(0, t('Price must be 0 or more')),
+    currency:        z.string().length(3),
+    sku:             z.string().max(100).optional().or(z.literal('')),
+    unit_of_measure: z.string().max(50).optional().or(z.literal('')),
   })
 
   const {
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
-  } = useForm<ProductFormValues>({
+  } = useForm<Omit<ProductFormValues, 'name_i18n' | 'description_i18n'>>({
     resolver: zodResolver(schema),
     defaultValues: {
       currency:   'EUR',
@@ -63,8 +59,28 @@ export function ProductForm({
     },
   })
 
+  const [nameI18n, setNameI18n] = useState<Record<string, string>>(defaultValues?.name_i18n ?? {})
+  const [descI18n, setDescI18n] = useState<Record<string, string>>(defaultValues?.description_i18n ?? {})
+  // Refs mirror state so handleFormSubmit always reads the latest value even when
+  // React 18 batches the blur-triggered state update with the form submit event.
+  const nameI18nRef = useRef(nameI18n)
+  const descI18nRef = useRef(descI18n)
+
+  function handleNameI18nChange(v: Record<string, string>) {
+    nameI18nRef.current = v
+    setNameI18n(v)
+  }
+  function handleDescI18nChange(v: Record<string, string>) {
+    descI18nRef.current = v
+    setDescI18n(v)
+  }
+
+  async function handleFormSubmit(data: Omit<ProductFormValues, 'name_i18n' | 'description_i18n'>) {
+    await onSubmit({ ...data, name_i18n: nameI18nRef.current, description_i18n: descI18nRef.current })
+  }
+
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+    <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-5">
       <FormField label={t('Product name')} htmlFor="name" error={errors.name?.message} required>
         <Input
           id="name"
@@ -73,22 +89,9 @@ export function ProductForm({
         />
       </FormField>
 
-      {/* Name translations */}
-      <div className="grid grid-cols-2 gap-3">
-        <FormField label={t('Name (EN)')} htmlFor="name_en" error={errors.name_en?.message}>
-          <Input
-            id="name_en"
-            placeholder={t('English name')}
-            {...register('name_en')}
-          />
-        </FormField>
-        <FormField label={t('Name (SR)')} htmlFor="name_sr" error={errors.name_sr?.message}>
-          <Input
-            id="name_sr"
-            placeholder={t('Serbian name')}
-            {...register('name_sr')}
-          />
-        </FormField>
+      <div className="space-y-1.5">
+        <p className="text-sm font-medium text-muted-foreground">{t('Name translations')}</p>
+        <I18nEditor value={nameI18n} onChange={handleNameI18nChange} placeholder={t('Translated name')} />
       </div>
 
       <FormField
@@ -105,27 +108,12 @@ export function ProductForm({
         />
       </FormField>
 
-      {/* Description translations */}
-      <div className="grid grid-cols-2 gap-3">
-        <FormField label={t('Description (EN)')} htmlFor="description_en">
-          <Textarea
-            id="description_en"
-            placeholder={t('English description')}
-            rows={2}
-            {...register('description_en')}
-          />
-        </FormField>
-        <FormField label={t('Description (SR)')} htmlFor="description_sr">
-          <Textarea
-            id="description_sr"
-            placeholder={t('Serbian description')}
-            rows={2}
-            {...register('description_sr')}
-          />
-        </FormField>
+      <div className="space-y-1.5">
+        <p className="text-sm font-medium text-muted-foreground">{t('Description translations')}</p>
+        <I18nEditor value={descI18n} onChange={handleDescI18nChange} multiline placeholder={t('Translated description')} />
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <FormField
           label={t('SKU / Code')}
           htmlFor="sku"
@@ -153,7 +141,7 @@ export function ProductForm({
         </FormField>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <FormField
           label={t('Base price')}
           htmlFor="base_price"
@@ -194,24 +182,12 @@ export function ProductForm({
   )
 }
 
-// Build a name_i18n / description_i18n map from form values, skipping empty strings
-export function buildI18nMap(en?: string, sr?: string): Record<string, string> {
-  const map: Record<string, string> = {}
-  if (en?.trim()) map['en'] = en.trim()
-  if (sr?.trim()) map['sr'] = sr.trim()
-  return map
-}
-
 export function productToFormValues(p: Product): ProductFormValues {
-  const ni = p.name_i18n as Record<string, string> | null ?? {}
-  const di = p.description_i18n as Record<string, string> | null ?? {}
   return {
     name:            p.name,
-    name_en:         ni['en'] ?? '',
-    name_sr:         ni['sr'] ?? '',
+    name_i18n:       (p.name_i18n as Record<string, string> | null) ?? {},
     description:     p.description ?? '',
-    description_en:  di['en'] ?? '',
-    description_sr:  di['sr'] ?? '',
+    description_i18n: (p.description_i18n as Record<string, string> | null) ?? {},
     base_price:      p.base_price,
     currency:        p.currency,
     sku:             p.sku ?? '',

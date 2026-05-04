@@ -226,7 +226,22 @@ export function SettingsPage() {
         body: { email: inviteEmail.trim(), role: inviteRole },
         headers: { Authorization: `Bearer ${session?.access_token}` },
       })
-      if (res.error) throw new Error(res.error.message)
+      if (res.error) {
+        const status = (res.error as { context?: Response }).context?.status
+        if (status === 409) {
+          toast({ title: t('Already a member'), description: t('This person is already a member of your workspace.'), variant: 'destructive' })
+          return
+        }
+        if (status === 400) {
+          let body: { error?: string; message?: string } = {}
+          try { body = await (res.error as { context?: Response }).context?.clone().json() } catch { /* ignore */ }
+          if (body.error === 'invalid_email') {
+            toast({ title: t('Invalid email address'), description: t('Email address must contain only standard ASCII characters.'), variant: 'destructive' })
+            return
+          }
+        }
+        throw new Error(res.error.message)
+      }
       const { data: newInv } = await supabase.from('invitations')
         .select('id, email, role, expires_at')
         .eq('email', inviteEmail.trim())
@@ -236,7 +251,16 @@ export function SettingsPage() {
         .single()
       if (newInv) setInvitations(prev => [...prev, newInv as Invitation])
       setInviteEmail('')
-      toast({ title: t('Invitation sent') })
+      const { emailSent, inviteUrl } = (res.data ?? {}) as { emailSent?: boolean; inviteUrl?: string }
+      if (emailSent === false && inviteUrl) {
+        toast({
+          title: t('Invitation created — email not sent'),
+          description: `${t('Share this link manually:')} ${inviteUrl}`,
+          variant: 'destructive',
+        })
+      } else {
+        toast({ title: t('Invitation sent') })
+      }
     } catch (e) {
       toast({ title: t('Failed to send invitation'), description: e instanceof Error ? e.message : undefined, variant: 'destructive' })
     } finally {
