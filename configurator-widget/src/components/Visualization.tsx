@@ -28,16 +28,16 @@ function findScene(mv: HTMLElement): ThreeScene | null {
   // Try the named getter first (works on unminified / some CDN builds)
   const direct = (mv as unknown as { scene?: ThreeScene }).scene
   if (direct?.traverse) return direct
-  // ModelScene extends THREE.Scene which sets isScene = true on the instance.
-  // On the minified CDN build the getter is renamed, but the instance symbol
-  // property added by model-viewer is still enumerable via getOwnPropertySymbols.
+  // model-viewer stores its internal scene (ModelScene) as a private Symbol
+  // property on the element. In older builds ModelScene extends THREE.Scene
+  // (isScene=true); in 3.x it extends THREE.Group (isGroup=true). Accept either.
   for (const sym of Object.getOwnPropertySymbols(mv)) {
     try {
-      const v = (mv as unknown as Record<symbol, unknown>)[sym]
+      const v = (mv as unknown as Record<symbol, unknown>)[sym] as any
       if (
         v !== null && typeof v === 'object' &&
-        (v as ThreeScene).isScene === true &&
-        typeof (v as ThreeScene).traverse === 'function'
+        (v.isScene === true || v.isGroup === true) &&
+        typeof v.traverse === 'function'
       ) return v as ThreeScene
     } catch { /* symbol getter may throw */ }
   }

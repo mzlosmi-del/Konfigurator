@@ -380,8 +380,11 @@ const children = [
   b.addNode('Hinge_Heavy_C',       mHingeHeavyC),
 ]
 
-// Root node — dimension rules in mesh_rules will scale this node
-b.addNode('Door_Assembly', null, children)
+// Root node — dimension rules in mesh_rules will scale this node.
+// IMPORTANT: the scene must reference Door_Assembly (not a child mesh node),
+// otherwise Three.js only loads the first node and orphans everything else.
+const rootIdx = b.addNode('Door_Assembly', null, children)
+b.scenes[0] = { nodes: [rootIdx] }
 
 // ── Write file ─────────────────────────────────────────────────────────────
 
