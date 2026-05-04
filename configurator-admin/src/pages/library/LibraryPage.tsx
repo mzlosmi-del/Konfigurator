@@ -90,6 +90,9 @@ function DroppableClass({ cls, memberIds, characteristics, onRemoveMember, onDel
               )}
             </button>
           )}
+          <span className="font-mono text-[10px] text-muted-foreground/50 shrink-0 select-all" title={cls.id}>
+            #{cls.id.slice(0, 8)}
+          </span>
           <span className="text-xs text-muted-foreground shrink-0">
             ({memberIds.length})
           </span>
@@ -221,6 +224,9 @@ function DraggableChar({
           defaultValue={char.name}
           onBlur={e => onRename(e.target.value)}
         />
+        <span className="font-mono text-[10px] text-muted-foreground/50 shrink-0 select-all" title={char.id}>
+          #{char.id.slice(0, 8)}
+        </span>
 
         {/* Type selector */}
         <Select

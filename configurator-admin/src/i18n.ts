@@ -1030,6 +1030,13 @@ const sr: Record<string, string> = {
     'Prikazuje se korisniku u widgetu nakon slanja upita.',
   'Post-inquiry message saved':            'Poruka nakon upita sačuvana',
 
+  // CharacteristicValuesEditor
+  'Failed to update translation':          'Ažuriranje prevoda nije uspelo',
+  'Language…':                             'Jezik…',
+  '+ language':                            '+ jezik',
+  '— editing':                             '— uređivanje',
+  'labels':                                'oznaka',
+
   // Relative timestamps
   'm ago':                                 'min pre',
   'h ago':                                 'h pre',
