@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams, Link } from 'react-router-dom'
-import { AlertCircle, ArrowLeft, CloudUpload, Download, Pencil, FileText } from 'lucide-react'
+import { AlertCircle, ArrowLeft, CloudUpload, Download, Pencil, FileText, Trash2 } from 'lucide-react'
 import {
   fetchQuotation, updateQuotation, uploadQuotationPdf,
-  fetchRejectionReasons, calcSubtotal, calcTotal,
+  fetchRejectionReasons, calcSubtotal, calcTotal, deleteQuotation,
 } from '@/lib/quotations'
 import { fetchProductTexts, fetchGlobalTexts } from '@/lib/products'
 import { buildQuotationPdfBytes, openPdfBlob, type TenantProfile } from '@/lib/quotationPdf'
@@ -30,6 +30,7 @@ import {
 } from '@/components/ui/dialog'
 import { useToast } from '@/hooks/useToast'
 import { Toaster } from '@/components/ui/toast'
+import { useCanEdit } from '@/hooks/usePermission'
 import { t } from '@/i18n'
 
 export function QuotationDetailPage() {
@@ -37,6 +38,7 @@ export function QuotationDetailPage() {
   const navigate = useNavigate()
   const { toasts, toast, dismiss } = useToast()
   const { tenant } = useAuthContext()
+  const canEdit = useCanEdit('quotations')
 
   const [quotation,      setQuotation]      = useState<Quotation | null>(null)
   const [loading,        setLoading]        = useState(true)
@@ -50,6 +52,9 @@ export function QuotationDetailPage() {
   const [pdfGlobalTexts,   setPdfGlobalTexts]   = useState<ProductText[]>([])
   const [productTextGroups, setProductTextGroups] = useState<ProductTextGroup[]>([])
   const [tenantProfile,    setTenantProfile]    = useState<TenantProfile | null>(null)
+
+  const [confirmDelete,  setConfirmDelete]  = useState(false)
+  const [deleting,       setDeleting]       = useState(false)
 
   // Rejection dialog state
   const [rejectionReasons,    setRejectionReasons]    = useState<QuotationRejectionReason[]>([])
@@ -115,6 +120,18 @@ export function QuotationDetailPage() {
       toast({ title: t('Failed to update status'), variant: 'destructive' })
     } finally {
       setConfirmingRejection(false)
+    }
+  }
+
+  async function handleDelete() {
+    if (!id) return
+    setDeleting(true)
+    try {
+      await deleteQuotation(id)
+      navigate('/quotations')
+    } catch {
+      toast({ title: t('Failed to delete quotation'), variant: 'destructive' })
+      setDeleting(false)
     }
   }
 
@@ -239,6 +256,17 @@ export function QuotationDetailPage() {
         }
         action={
           <div className="flex items-center gap-2">
+            {canEdit && quotation.status === 'in_preparation' && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                title={t('Delete quotation')}
+                onClick={() => setConfirmDelete(true)}
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            )}
             {quotation.pdf_url && (
               <Button variant="outline" asChild>
                 <a href={quotation.pdf_url} target="_blank" rel="noopener noreferrer">
@@ -272,7 +300,9 @@ export function QuotationDetailPage() {
             disabled={updatingStatus}
             className="w-52"
           >
-            {STATUS_OPTIONS.map(s => (
+            {STATUS_OPTIONS.filter(s =>
+              s !== 'in_preparation' || quotation.status === 'in_preparation'
+            ).map(s => (
               <option key={s} value={s}>{t(STATUS_LABELS[s])}</option>
             ))}
           </Select>
@@ -518,6 +548,17 @@ export function QuotationDetailPage() {
         loading={generatingPdf}
         quotation={quotation}
         tenant={tenantProfile ?? { name: tenant?.name ?? 'Your store' }}
+      />
+
+      {/* ── Delete confirm ─────────────────────────────────────────────────── */}
+      <ConfirmDialog
+        open={confirmDelete}
+        onOpenChange={open => { if (!open) setConfirmDelete(false) }}
+        title={t('Delete quotation?')}
+        description={t('This quotation will be permanently deleted. This cannot be undone.')}
+        confirmLabel={t('Delete')}
+        onConfirm={handleDelete}
+        loading={deleting}
       />
 
       {/* ── Save PDF confirm ───────────────────────────────────────────────── */}

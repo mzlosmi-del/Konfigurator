@@ -1030,6 +1030,13 @@ const sr: Record<string, string> = {
     'Prikazuje se korisniku u widgetu nakon slanja upita.',
   'Post-inquiry message saved':            'Poruka nakon upita sačuvana',
 
+  // Quotation deletion
+  'Delete quotation':                      'Obriši ponudu',
+  'Delete quotation?':                     'Obrisati ponudu?',
+  'This quotation will be permanently deleted. This cannot be undone.':
+    'Ova ponuda će biti trajno obrisana. Ova radnja se ne može poništiti.',
+  'Failed to delete quotation':            'Brisanje ponude nije uspelo',
+
   // CharacteristicValuesEditor
   'Failed to update translation':          'Ažuriranje prevoda nije uspelo',
   'Language…':                             'Jezik…',
