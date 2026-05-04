@@ -126,13 +126,17 @@ export async function loadProductConfig(config: WidgetConfig): Promise<FullProdu
     .filter(id => charById[id])
     .map(id => ({ ...charById[id], values: valuesByCharId[id] ?? [] }))
 
-  // Server-authoritative branding flag — not operator-controllable via data attributes
-  const { data: brandingData, error: brandingErr } = await sb.rpc('get_widget_branding', { p_product_id: config.productId })
-  if (brandingErr) {
+  // Load branding flag and tenant post-inquiry message in parallel
+  const [brandingResult, tenantResult] = await Promise.all([
+    sb.rpc('get_widget_branding', { p_product_id: config.productId }),
+    sb.from('tenants').select('post_inquiry_message').eq('id', config.tenantId).single(),
+  ])
+
+  if (brandingResult.error) {
     // Function not yet deployed — apply migration 039_plan_sync.sql to fix this
-    console.warn('[konfigurator] get_widget_branding unavailable, branding badge will be shown:', brandingErr.message)
+    console.warn('[konfigurator] get_widget_branding unavailable, branding badge will be shown:', brandingResult.error.message)
   }
-  const removeBranding = !brandingErr && brandingData === true
+  const removeBranding = !brandingResult.error && brandingResult.data === true
 
   return {
     product: product as ProductData,
@@ -141,6 +145,7 @@ export async function loadProductConfig(config: WidgetConfig): Promise<FullProdu
     rules:     (rulesData     ?? []) as ConfigurationRule[],
     formulas:  (formulasData  ?? []) as PricingFormula[],
     removeBranding,
+    postInquiryMessage: (tenantResult.data as { post_inquiry_message: string | null } | null)?.post_inquiry_message ?? null,
   }
 }
 

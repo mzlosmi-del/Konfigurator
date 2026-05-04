@@ -1024,6 +1024,12 @@ const sr: Record<string, string> = {
   'Value must be > 0':                     'Vrednost mora biti > 0',
   'e.g. Bulk discount':                    'npr. Grupni popust',
 
+  // Post-inquiry message
+  'Post-inquiry message':                  'Poruka nakon upita',
+  'Shown to the customer in the widget after they submit an inquiry.':
+    'Prikazuje se korisniku u widgetu nakon slanja upita.',
+  'Post-inquiry message saved':            'Poruka nakon upita sačuvana',
+
   // Authorizations
   'Authorizations':                        'Ovlašćenja',
   'Role Permissions':                      'Dozvole po ulozi',

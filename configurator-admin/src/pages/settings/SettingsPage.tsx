@@ -103,7 +103,11 @@ export function SettingsPage() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (tenant as any)?.notification_email ?? ''
   )
+  const [postInquiryMessage, setPostInquiryMessage] = useState(
+    tenant?.post_inquiry_message ?? ''
+  )
   const [saving, setSaving] = useState(false)
+  const [savingMessage, setSavingMessage] = useState(false)
 
   // Company profile state
   const [companyAddress, setCompanyAddress] = useState(tenant?.company_address ?? '')
@@ -135,6 +139,27 @@ export function SettingsPage() {
       })
     } finally {
       setSaving(false)
+    }
+  }
+
+  async function handleSavePostInquiryMessage() {
+    if (!tenant) return
+    setSavingMessage(true)
+    try {
+      const { error } = await supabase
+        .from('tenants')
+        .update({ post_inquiry_message: postInquiryMessage || null } as unknown as never)
+        .eq('id', tenant.id)
+      if (error) throw error
+      toast({ title: t('Post-inquiry message saved') })
+    } catch (e) {
+      toast({
+        title: t('Failed to save'),
+        description: e instanceof Error ? e.message : undefined,
+        variant: 'destructive',
+      })
+    } finally {
+      setSavingMessage(false)
     }
   }
 
@@ -779,6 +804,27 @@ export function SettingsPage() {
               />
             </FormField>
             <Button size="sm" onClick={handleSaveNotifyEmail} loading={saving}>
+              {t('Save')}
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">{t('Post-inquiry message')}</CardTitle>
+            <CardDescription>
+              {t('Shown to the customer in the widget after they submit an inquiry.')}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <Textarea
+              id="post-inquiry-message"
+              placeholder={t("Thank you. We'll get back to you as soon as possible.")}
+              value={postInquiryMessage}
+              onChange={e => setPostInquiryMessage(e.target.value)}
+              rows={3}
+            />
+            <Button size="sm" onClick={handleSavePostInquiryMessage} loading={savingMessage}>
               {t('Save')}
             </Button>
           </CardContent>

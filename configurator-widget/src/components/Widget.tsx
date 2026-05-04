@@ -204,7 +204,7 @@ export function Widget({ config, track }: Props) {
         <div class="cw-success">
           <div class="cw-success-icon">✓</div>
           <h3>{t('Inquiry sent!')}</h3>
-          <p>{t("Thank you. We'll get back to you as soon as possible.")}</p>
+          <p>{state.data.postInquiryMessage ?? t("Thank you. We'll get back to you as soon as possible.")}</p>
         </div>
         {!state.data.removeBranding && (
           <div class="cw-branding">
