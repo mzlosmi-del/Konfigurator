@@ -1,6 +1,6 @@
 import { h } from 'preact'
 import { useState, useEffect, useRef } from 'preact/hooks'
-import type { VisualizationAsset, Selection, NumericInputs, MeshRule } from '../types'
+import type { VisualizationAsset, Selection, NumericInputs, MeshRule, MeshTextureRule } from '../types'
 import { resolveImage, resolve3DAsset } from '../resolveImage'
 import { t } from '../i18n'
 
@@ -61,6 +61,49 @@ function applyVisibilityRules(
     const matching = rules.filter(r => r.type === 'visibility' && r.mesh_name === n.name)
     n.visible = matching.some(r => selectedValueIds.has(r.value_id))
   })
+}
+
+// Apply texture rules via model-viewer Materials API (async, best-effort).
+async function applyTextureRules(mv: HTMLElement, rules: MeshRule[], selection: Selection) {
+  const model = (mv as any).model
+  if (!model) return
+  const selectedValueIds = new Set(Object.values(selection))
+  const textureRules = rules.filter(r => r.type === 'texture') as MeshTextureRule[]
+  for (const rule of textureRules) {
+    if (!selectedValueIds.has(rule.value_id) || !rule.texture_url) continue
+    const mat = (model.materials as any[]).find((m: any) => m.name === rule.mesh_name)
+    if (!mat) continue
+    try {
+      const texture = await (mv as any).createTexture(rule.texture_url)
+      if (rule.channel === 'baseColor') {
+        mat.pbrMetallicRoughness.baseColorTexture.setTexture(texture)
+      } else if (rule.channel === 'normal') {
+        mat.normalTexture.setTexture(texture)
+      } else if (rule.channel === 'roughness') {
+        mat.pbrMetallicRoughness.metallicRoughnessTexture.setTexture(texture)
+      }
+    } catch { /* texture load failure is non-fatal */ }
+  }
+}
+
+// Shift camera target toward the centroid of newly selected visible meshes.
+function focusCameraOnNewMeshes(mv: HTMLElement, scene: ThreeScene, meshNames: Set<string>) {
+  let cx = 0, cy = 0, cz = 0, count = 0
+  scene.traverse((node: unknown) => {
+    const n = node as any
+    if (!n.isMesh || !n.visible || !meshNames.has(n.name)) return
+    if (n.geometry) {
+      n.geometry.computeBoundingSphere()
+      const sphere = n.geometry.boundingSphere
+      const m = n.matrixWorld.elements as number[]
+      cx += m[12] + sphere.center.x
+      cy += m[13] + sphere.center.y
+      cz += m[14] + sphere.center.z
+      count++
+    }
+  })
+  if (count === 0) return
+  ;(mv as any).cameraTarget = `${(cx / count).toFixed(3)}m ${(cy / count).toFixed(3)}m ${(cz / count).toFixed(3)}m`
 }
 
 // Full synchronous apply — used only on initial model load.
@@ -361,6 +404,7 @@ function ModelViewer3D({
       loadedRef.current = true
       prevSelectionRef.current = { ...selectionRef.current }
       applyMeshRules(mv, rules, selectionRef.current, numericInputsRef.current)
+      applyTextureRules(mv, rules, selectionRef.current)
       if (arEnabled && hintRef.current) hintRef.current.style.display = 'block'
     })
 
@@ -378,10 +422,11 @@ function ModelViewer3D({
     }
   }, [url, arEnabled, arPlacement])
 
-  // Visibility-only update on discrete selection change (instant)
+  // Visibility + texture update on discrete selection change (instant)
   useEffect(() => {
     if (!mvRef.current || !loadedRef.current) return
     applyVisibilityRules(mvRef.current, rules, selection)
+    applyTextureRules(mvRef.current, rules, selection)
   }, [rules, selection])
 
   // Smooth tween for dimension + translate rules on numeric input change
@@ -409,9 +454,46 @@ function ModelViewer3D({
     const scene = findScene(mvRef.current)
     if (!scene) return
     updateHighlights(scene, rules, removedValueIds, addedValueIds, highlightRef.current)
+
+    // Shift camera toward the newly visible mesh centroid
+    const addedMeshNames = new Set<string>()
+    for (const vid of addedValueIds)
+      for (const r of rules)
+        if (r.type === 'visibility' && r.value_id === vid) addedMeshNames.add(r.mesh_name)
+    if (addedMeshNames.size > 0) focusCameraOnNewMeshes(mvRef.current, scene, addedMeshNames)
   }, [selection]) // intentionally excludes numericInputs
 
-  return <div ref={containerRef} style="width:100%;height:100%" />
+  // Dimension overlay — derive characteristic IDs from dimension rules
+  const widthRule  = rules.find(r => r.type === 'dimension' && r.axis === 'x')
+  const heightRule = rules.find(r => r.type === 'dimension' && r.axis === 'y')
+  const wVal = widthRule  ? (numericInputs[widthRule.characteristic_id]  ?? 0) : 0
+  const hVal = heightRule ? (numericInputs[heightRule.characteristic_id] ?? 0) : 0
+
+  return (
+    <div style="position:relative;width:100%;height:100%">
+      <div ref={containerRef} style="width:100%;height:100%" />
+      {(wVal > 0 || hVal > 0) && (
+        <svg class="cw-dim-overlay" xmlns="http://www.w3.org/2000/svg">
+          {wVal > 0 && (
+            <g class="cw-dim-width">
+              <line x1="10%" y1="92%" x2="90%" y2="92%" />
+              <line x1="10%" y1="89%" x2="10%" y2="95%" />
+              <line x1="90%" y1="89%" x2="90%" y2="95%" />
+              <text x="50%" y="98%">{wVal} mm</text>
+            </g>
+          )}
+          {hVal > 0 && (
+            <g class="cw-dim-height">
+              <line x1="6%" y1="8%" x2="6%" y2="88%" />
+              <line x1="3%" y1="8%" x2="9%" y2="8%" />
+              <line x1="3%" y1="88%" x2="9%" y2="88%" />
+              <text x="14" y="50%" style="writing-mode:vertical-rl;transform:rotate(180deg);transform-box:fill-box;transform-origin:center">{hVal} mm</text>
+            </g>
+          )}
+        </svg>
+      )}
+    </div>
+  )
 }
 
 // ── Visualization wrapper ─────────────────────────────────────────────────────

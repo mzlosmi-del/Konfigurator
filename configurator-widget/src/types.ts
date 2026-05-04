@@ -76,7 +76,15 @@ export type MeshTranslateRule = {
   offset_max: number
 }
 
-export type MeshRule = MeshVisibilityRule | MeshDimensionRule | MeshTranslateRule
+export type MeshTextureRule = {
+  type: 'texture'
+  mesh_name: string
+  value_id: string
+  texture_url: string
+  channel: 'baseColor' | 'normal' | 'roughness'
+}
+
+export type MeshRule = MeshVisibilityRule | MeshDimensionRule | MeshTranslateRule | MeshTextureRule
 
 export interface VisualizationAsset {
   id: string
