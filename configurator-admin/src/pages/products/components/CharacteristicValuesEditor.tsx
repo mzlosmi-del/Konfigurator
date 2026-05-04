@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useToast } from '@/hooks/useToast'
 import { Toaster } from '@/components/ui/toast'
+import { t } from '@/i18n'
 
 const valueSchema = z.object({
   label: z.string().min(1, 'Label is required').max(300),
@@ -80,7 +81,7 @@ export function CharacteristicValuesEditor({
       reset({ label: '', price_modifier: 0 })
       setAdding(false)
     } catch {
-      toast({ title: 'Failed to add value', variant: 'destructive' })
+      toast({ title: t('Failed to add value'), variant: 'destructive' })
     }
   }
 
@@ -90,7 +91,7 @@ export function CharacteristicValuesEditor({
       await deleteCharacteristicValue(id)
       onChange(values.filter(v => v.id !== id))
     } catch {
-      toast({ title: 'Failed to delete value', variant: 'destructive' })
+      toast({ title: t('Failed to delete value'), variant: 'destructive' })
     } finally {
       setDeletingId(null)
     }
@@ -105,7 +106,7 @@ export function CharacteristicValuesEditor({
       } catch {
         const fresh = await fetchValuesForCharacteristic(characteristicId)
         onChange(fresh)
-        toast({ title: 'Failed to update value', variant: 'destructive' })
+        toast({ title: t('Failed to update value'), variant: 'destructive' })
       }
     } else {
       const existing = (value.label_i18n as Record<string, string> | null) ?? {}
@@ -118,7 +119,7 @@ export function CharacteristicValuesEditor({
       } catch {
         const fresh = await fetchValuesForCharacteristic(characteristicId)
         onChange(fresh)
-        toast({ title: 'Failed to update translation', variant: 'destructive' })
+        toast({ title: t('Failed to update translation'), variant: 'destructive' })
       }
     }
   }
@@ -145,7 +146,7 @@ export function CharacteristicValuesEditor({
   }
 
   const langLabel = (lang: string) =>
-    lang === 'primary' ? 'Default' : lang.toUpperCase()
+    lang === 'primary' ? t('Default') : lang.toUpperCase()
 
   return (
     <div className="space-y-2">
@@ -176,7 +177,7 @@ export function CharacteristicValuesEditor({
               autoFocus
               className="h-6 rounded border border-input bg-background px-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
             >
-              <option value="">Language…</option>
+              <option value="">{t('Language…')}</option>
               {unusedLangs.map(l => (
                 <option key={l.code} value={l.code}>{l.name} ({l.code})</option>
               ))}
@@ -187,7 +188,7 @@ export function CharacteristicValuesEditor({
               disabled={!pendingLang}
               className="text-xs text-primary disabled:text-muted-foreground hover:underline"
             >
-              Add
+              {t('Add')}
             </button>
             <button
               type="button"
@@ -203,13 +204,13 @@ export function CharacteristicValuesEditor({
             onClick={() => setAddingLang(true)}
             className="px-1.5 py-0.5 rounded text-xs font-medium border border-dashed border-border text-muted-foreground hover:border-primary hover:text-foreground transition-colors"
           >
-            + language
+            {t('+ language')}
           </button>
         )}
 
         {editLang !== 'primary' && (
           <span className="text-xs text-muted-foreground self-center ml-1">
-            — editing {CONTENT_LANGUAGES.find(l => l.code === editLang)?.name ?? editLang} labels
+            {t('— editing')} {CONTENT_LANGUAGES.find(l => l.code === editLang)?.name ?? editLang} {t('labels')}
           </span>
         )}
       </div>
@@ -262,13 +263,13 @@ export function CharacteristicValuesEditor({
             <div className="flex items-start gap-2">
               <div className="flex-1 space-y-1">
                 <Input
-                  placeholder="Value label (e.g. Oak)"
+                  placeholder={t('Value label (e.g. Oak)')}
                   className="h-8 text-sm"
                   autoFocus
                   {...register('label')}
                 />
                 {errors.label && (
-                  <p className="text-xs text-destructive">{errors.label.message}</p>
+                  <p className="text-xs text-destructive">{t(errors.label.message ?? '')}</p>
                 )}
               </div>
               <div className="w-20 shrink-0 space-y-1">
@@ -283,7 +284,7 @@ export function CharacteristicValuesEditor({
             </div>
             <div className="flex gap-2">
               <Button type="submit" size="sm" className="h-8" loading={isSubmitting}>
-                Add
+                {t('Add')}
               </Button>
               <Button
                 type="button"
@@ -292,7 +293,7 @@ export function CharacteristicValuesEditor({
                 className="h-8"
                 onClick={() => { setAdding(false); reset() }}
               >
-                Cancel
+                {t('Cancel')}
               </Button>
             </div>
           </form>
@@ -303,7 +304,7 @@ export function CharacteristicValuesEditor({
             className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors py-1"
           >
             <Plus className="h-3 w-3" />
-            Add value
+            {t('Add value')}
           </button>
         )
       )}
