@@ -284,27 +284,7 @@ export function Widget({ config, track }: Props) {
           )
         })()}
 
-        {/* Price */}
-        <div class="cw-price-bar">
-          <span class="cw-price-label">{t('Total price')}</span>
-          <span>
-            <span class="cw-price-value">{totalPrice.toFixed(2)}</span>
-            <span class="cw-price-currency">{product.currency}</span>
-          </span>
-        </div>
-
-        {/* CTA */}
-        {!showForm && (
-          <button
-            class="cw-form-toggle"
-            onClick={() => { track('inquiry_started', { price: totalPrice }); setShowForm(true) }}
-            disabled={!allSelected}
-          >
-            {allSelected ? t('Request a quote') : t('Select all options to continue')}
-          </button>
-        )}
-
-        {/* Inquiry form */}
+        {/* Inquiry form (replaces sticky CTA when shown) */}
         {showForm && (
           <InquiryForm
             config={config}
@@ -321,6 +301,38 @@ export function Widget({ config, track }: Props) {
           />
         )}
       </div>
+
+      {/* Sticky price bar with selection chips */}
+      {!showForm && (
+        <div class="cw-bar">
+          {lineItems.length > 0 && (
+            <div class="cw-bar-chips">
+              {lineItems.map((item, i) => (
+                <span class="cw-chip" key={i}>
+                  <span class="cw-chip-key">{item.characteristic_name}</span>
+                  <span class="cw-chip-val">{item.value_label}</span>
+                </span>
+              ))}
+            </div>
+          )}
+          <div class="cw-bar-row">
+            <div class="cw-bar-price">
+              <span class="cw-bar-price-label">{t('Total price')}</span>
+              <span>
+                <span class="cw-bar-price-value">{totalPrice.toFixed(2)}</span>
+                <span class="cw-bar-price-currency">{product.currency}</span>
+              </span>
+            </div>
+            <button
+              class="cw-bar-cta"
+              onClick={() => { track('inquiry_started', { price: totalPrice }); setShowForm(true) }}
+              disabled={!allSelected}
+            >
+              {allSelected ? t('Request a quote') : t('Select all options to continue')}
+            </button>
+          </div>
+        </div>
+      )}
 
       {!removeBranding && (
         <div class="cw-branding">

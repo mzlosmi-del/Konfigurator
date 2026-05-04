@@ -146,22 +146,11 @@ export function CharacteristicInput({
     )
   }
 
-  // ── Swatch ──────────────────────────────────────────────────────────────────
+  // ── Swatch (tile cards) ─────────────────────────────────────────────────────
   if (display_type === 'swatch') {
-    const selectedValue = visible.find(v => v.id === selectedValueId)
-    const selectedLabel = selectedValue
-      ? pickTranslation(selectedValue.label_i18n, lang, selectedValue.label)
-      : undefined
     return (
       <div>
-        <div class="cw-char-label">
-          {charName}
-          {selectedLabel && (
-            <span style={{ fontWeight: 400, marginLeft: 6, textTransform: 'none', letterSpacing: 0 }}>
-              — {selectedLabel}
-            </span>
-          )}
-        </div>
+        <div class="cw-char-label">{charName}</div>
         <div class="cw-swatch-group">
           {visible.map(v => {
             const disabled = ruleEffect.disabledValues.has(v.id)
@@ -176,7 +165,15 @@ export function CharacteristicInput({
                 title={label}
                 type="button"
               >
-                {initials}
+                <div class="cw-swatch-tile">{initials}</div>
+                <div class="cw-swatch-meta">
+                  <span class="cw-swatch-label">{label}</span>
+                  {v.price_modifier !== 0 && (
+                    <span class={`cw-swatch-mod${v.price_modifier > 0 ? ' positive' : ' negative'}`}>
+                      {formatModifier(v.price_modifier)}
+                    </span>
+                  )}
+                </div>
               </button>
             )
           })}
