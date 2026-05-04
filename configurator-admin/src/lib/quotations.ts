@@ -70,6 +70,20 @@ export async function deleteRejectionReason(id: string): Promise<void> {
   if (error) throw new Error(error.message)
 }
 
+export async function deleteQuotation(id: string): Promise<void> {
+  const { data: q, error: fetchErr } = await supabase
+    .from('quotations')
+    .select('status')
+    .eq('id', id)
+    .single()
+  if (fetchErr) throw new Error(fetchErr.message)
+  if ((q as { status: string }).status !== 'in_preparation') {
+    throw new Error('Only quotations in preparation can be deleted.')
+  }
+  const { error } = await supabase.from('quotations').delete().eq('id', id)
+  if (error) throw new Error(error.message)
+}
+
 export async function fetchQuotation(id: string): Promise<Quotation> {
   const { data, error } = await supabase
     .from('quotations')
