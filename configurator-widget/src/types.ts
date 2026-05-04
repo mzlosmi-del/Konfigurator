@@ -62,7 +62,21 @@ export type MeshDimensionRule = {
   scale_max: number
 }
 
-export type MeshRule = MeshVisibilityRule | MeshDimensionRule
+// Translate a node's position along one axis based on a numeric input.
+// offset_min/max are DELTA offsets applied to the node's local position
+// (useful when geometry bakes world-space positions and the node starts at origin).
+export type MeshTranslateRule = {
+  type: 'translate'
+  node_name: string
+  characteristic_id: string
+  axis: 'x' | 'y' | 'z'
+  value_min: number
+  value_max: number
+  offset_min: number
+  offset_max: number
+}
+
+export type MeshRule = MeshVisibilityRule | MeshDimensionRule | MeshTranslateRule
 
 export interface VisualizationAsset {
   id: string

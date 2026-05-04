@@ -5,21 +5,22 @@
  * Produces steel_door.glb in the current working directory (or the path
  * given as the first CLI argument).
  *
- * Mesh tree (matches mesh_rules in migration 052):
+ * Mesh tree (matches mesh_rules in migration 054):
  *
- *   Door_Assembly          root node; scaled by dimension rules for width/height
- *   ├── Door_Frame         surrounding steel frame (always visible)
- *   ├── Door_Leaf_Black    door panel — RAL 9005 (visible when colour = black)
- *   ├── Door_Leaf_Anthracite door panel — RAL 7016 (visible when colour = anthracite)
- *   ├── Door_Leaf_White    door panel — RAL 9010 (visible when colour = white)
- *   ├── Glass_Panel        upper glazed insert (always visible, semi-transparent)
- *   ├── Glass_Frame        thin metal surround for glass (always visible)
+ *   Door_Root              scene root (no transform)
+ *   ├── Door_Scalable      dimension rules scale this for width/height
+ *   │   ├── Door_Frame         surrounding steel frame (always visible)
+ *   │   ├── Door_Leaf_Black    door panel — RAL 9005 (visible when colour = black)
+ *   │   ├── Door_Leaf_Anthracite door panel — RAL 7016 (visible when colour = anthracite)
+ *   │   ├── Door_Leaf_White    door panel — RAL 9010 (visible when colour = white)
+ *   │   ├── Glass_Panel        upper glazed insert (always visible, semi-transparent)
+ *   │   └── Glass_Frame        thin metal surround for glass (always visible)
  *   ├── Lock_Cylinder      standard cylinder lock + handle (lock = cylinder)
  *   ├── Lock_Multipoint    multi-point locking bar (lock = multipoint)
  *   ├── Lock_Smart         electronic keypad panel (lock = smart)
- *   ├── Hinge_Standard_A/B/C  butt hinges (hinges = standard)
- *   ├── Hinge_Concealed_A/B/C flush-mount concealed hinges (hinges = concealed)
- *   └── Hinge_Heavy_A/B/C    heavy-duty reinforced hinges (hinges = heavy)
+ *   ├── Hinge_Standard_A/B/C  butt hinges; A has a translate rule for height
+ *   ├── Hinge_Concealed_A/B/C flush-mount concealed hinges; A has translate rule
+ *   └── Hinge_Heavy_A/B/C    heavy-duty reinforced hinges; A has translate rule
  *
  * Usage:
  *   node scripts/generate_steel_door_model.mjs [output.glb]
@@ -358,32 +359,49 @@ const mHingeHeavyB = b.addMesh('Hinge_Heavy_B', ...Object.values(heavyHinge(HING
 const mHingeHeavyC = b.addMesh('Hinge_Heavy_C', ...Object.values(heavyHinge(HINGE_Y[2])), MAT_CHROME)
 
 // ── Scene graph ────────────────────────────────────────────────────────────
+//
+// Door_Scalable: only the door body (frame + leaf + glass) that should stretch
+// when the user adjusts width/height. Hardware lives as siblings so dimension
+// rules don't deform hinges or locks.
+//
+//   Door_Root
+//   ├── Door_Scalable   ← dimension rules target this node
+//   │   ├── Door_Frame, Door_Leaf_*, Glass_Panel, Glass_Frame
+//   ├── Lock_Cylinder / Multipoint / Smart   (world-space geometry, not scaled)
+//   ├── Hinge_Standard_A / B / C             (A = top hinge; translate rule for Y)
+//   ├── Hinge_Concealed_A / B / C
+//   └── Hinge_Heavy_A / B / C
 
-const children = [
+const nScalable = b.addNode('Door_Scalable', null, [
   b.addNode('Door_Frame',          mDoorFrame),
   b.addNode('Door_Leaf_Black',     mLeafBlack),
   b.addNode('Door_Leaf_Anthracite',mLeafAnthr),
   b.addNode('Door_Leaf_White',     mLeafWhite),
   b.addNode('Glass_Panel',         mGlass),
   b.addNode('Glass_Frame',         mGlassFrame),
-  b.addNode('Lock_Cylinder',       mLockCyl),
-  b.addNode('Lock_Multipoint',     mLockMP),
-  b.addNode('Lock_Smart',          mLockSmart),
-  b.addNode('Hinge_Standard_A',    mHingeStdA),
-  b.addNode('Hinge_Standard_B',    mHingeStdB),
-  b.addNode('Hinge_Standard_C',    mHingeStdC),
-  b.addNode('Hinge_Concealed_A',   mHingeConcA),
-  b.addNode('Hinge_Concealed_B',   mHingeConcB),
-  b.addNode('Hinge_Concealed_C',   mHingeConcC),
-  b.addNode('Hinge_Heavy_A',       mHingeHeavyA),
-  b.addNode('Hinge_Heavy_B',       mHingeHeavyB),
-  b.addNode('Hinge_Heavy_C',       mHingeHeavyC),
-]
+])
 
-// Root node — dimension rules in mesh_rules will scale this node.
-// IMPORTANT: the scene must reference Door_Assembly (not a child mesh node),
-// otherwise Three.js only loads the first node and orphans everything else.
-const rootIdx = b.addNode('Door_Assembly', null, children)
+const nLockCyl    = b.addNode('Lock_Cylinder',    mLockCyl)
+const nLockMP     = b.addNode('Lock_Multipoint',  mLockMP)
+const nLockSmart  = b.addNode('Lock_Smart',       mLockSmart)
+
+const nHingeStdA   = b.addNode('Hinge_Standard_A',   mHingeStdA)
+const nHingeStdB   = b.addNode('Hinge_Standard_B',   mHingeStdB)
+const nHingeStdC   = b.addNode('Hinge_Standard_C',   mHingeStdC)
+const nHingeConcA  = b.addNode('Hinge_Concealed_A',  mHingeConcA)
+const nHingeConcB  = b.addNode('Hinge_Concealed_B',  mHingeConcB)
+const nHingeConcC  = b.addNode('Hinge_Concealed_C',  mHingeConcC)
+const nHingeHeavyA = b.addNode('Hinge_Heavy_A',      mHingeHeavyA)
+const nHingeHeavyB = b.addNode('Hinge_Heavy_B',      mHingeHeavyB)
+const nHingeHeavyC = b.addNode('Hinge_Heavy_C',      mHingeHeavyC)
+
+const rootIdx = b.addNode('Door_Root', null, [
+  nScalable,
+  nLockCyl, nLockMP, nLockSmart,
+  nHingeStdA, nHingeStdB, nHingeStdC,
+  nHingeConcA, nHingeConcB, nHingeConcC,
+  nHingeHeavyA, nHingeHeavyB, nHingeHeavyC,
+])
 b.scenes[0] = { nodes: [rootIdx] }
 
 // ── Write file ─────────────────────────────────────────────────────────────

@@ -22,7 +22,7 @@ function loadModelViewer() {
   document.head.appendChild(s)
 }
 
-type ThreeScene = { isScene: true; traverse: (cb: (node: unknown) => void) => void }
+type ThreeScene = { isScene?: boolean; isGroup?: boolean; traverse: (cb: (node: unknown) => void) => void }
 
 function findScene(mv: HTMLElement): ThreeScene | null {
   // Try the named getter first (works on unminified / some CDN builds)
@@ -55,7 +55,6 @@ function applyMeshRules(
 
   const selectedValueIds = new Set(Object.values(selection))
 
-  // Collect which mesh names have visibility rules (so we know to gate their visibility)
   const meshesWithRules = new Set(
     rules.filter(r => r.type === 'visibility').map(r => r.mesh_name),
   )
@@ -67,6 +66,7 @@ function applyMeshRules(
       isMesh?: boolean
       isGroup?: boolean
       scale?: { x: number; y: number; z: number }
+      position?: { x: number; y: number; z: number }
     }
     if (!n.name) return
 
@@ -75,11 +75,10 @@ function applyMeshRules(
       const matchingRules = rules.filter(
         r => r.type === 'visibility' && r.mesh_name === n.name,
       )
-      const shouldBeVisible = matchingRules.some(r => selectedValueIds.has(r.value_id))
-      n.visible = shouldBeVisible
+      n.visible = matchingRules.some(r => selectedValueIds.has(r.value_id))
     }
 
-    // Dimensions
+    // Dimensions (scale)
     const dimRules = rules.filter(r => r.type === 'dimension' && r.node_name === n.name)
     for (const rule of dimRules) {
       if (!n.scale) continue
@@ -92,6 +91,70 @@ function applyMeshRules(
       else if (rule.axis === 'y') n.scale.y = scale
       else n.scale.z = scale
     }
+
+    // Translations (hardware nodes outside the scalable group)
+    // offset_min/max are delta offsets applied to the node's local position
+    const translateRules = rules.filter(r => r.type === 'translate' && r.node_name === n.name)
+    for (const rule of translateRules) {
+      if (!n.position) continue
+      const rawVal = numericInputs[rule.characteristic_id]
+      if (rawVal === undefined) continue
+      const span = rule.value_max - rule.value_min
+      const t_ = span === 0 ? 0 : Math.max(0, Math.min(1, (rawVal - rule.value_min) / span))
+      const offset = rule.offset_min + t_ * (rule.offset_max - rule.offset_min)
+      if (rule.axis === 'x') n.position.x = offset
+      else if (rule.axis === 'y') n.position.y = offset
+      else n.position.z = offset
+    }
+  })
+}
+
+// Gold colour: #ffc34d
+const GLOW_R = 1.0
+const GLOW_G = 0.765
+const GLOW_B = 0.302
+const GLOW_INTENSITY = 0.6
+const GLOW_DURATION = 2000
+
+function triggerGlow(
+  scene: ThreeScene,
+  rules: MeshRule[],
+  newValueIds: string[],
+) {
+  const meshNamesToGlow = new Set<string>()
+  for (const valueId of newValueIds) {
+    for (const rule of rules) {
+      if (rule.type === 'visibility' && rule.value_id === valueId) {
+        meshNamesToGlow.add(rule.mesh_name)
+      }
+    }
+  }
+  if (meshNamesToGlow.size === 0) return
+
+  scene.traverse((node: unknown) => {
+    const n = node as any
+    if (!n.isMesh || !n.name || !meshNamesToGlow.has(n.name) || !n.visible) return
+
+    const orig = n.material
+    const clone = orig.clone()
+    n.material = clone
+    clone.emissive.r = GLOW_R
+    clone.emissive.g = GLOW_G
+    clone.emissive.b = GLOW_B
+    clone.emissiveIntensity = GLOW_INTENSITY
+
+    const start = performance.now()
+    function tick(now: number) {
+      const progress = Math.min(1, (now - start) / GLOW_DURATION)
+      clone.emissiveIntensity = GLOW_INTENSITY * (1 - progress)
+      if (progress < 1) {
+        requestAnimationFrame(tick)
+      } else {
+        clone.dispose()
+        if (n.material === clone) n.material = orig
+      }
+    }
+    requestAnimationFrame(tick)
   })
 }
 
@@ -110,17 +173,25 @@ function ModelViewer3D({
   arEnabled:    boolean
   arPlacement:  'floor' | 'wall'
 }) {
-  const containerRef = useRef<HTMLDivElement>(null)
-  const mvRef        = useRef<HTMLElement | null>(null)
-  const hintRef      = useRef<HTMLElement | null>(null)
-  const loadedRef    = useRef(false)
+  const containerRef    = useRef<HTMLDivElement>(null)
+  const mvRef           = useRef<HTMLElement | null>(null)
+  const hintRef         = useRef<HTMLElement | null>(null)
+  const loadedRef       = useRef(false)
+  const selectionRef    = useRef(selection)
+  const numericInputsRef = useRef(numericInputs)
+  const prevSelectionRef = useRef<Selection | null>(null)
+
+  // Keep refs current on every render (safe to do outside useEffect)
+  selectionRef.current     = selection
+  numericInputsRef.current = numericInputs
 
   // Mount the model-viewer element once when url changes
   useEffect(() => {
     const container = containerRef.current
     if (!container) return
     container.innerHTML = ''
-    loadedRef.current = false
+    loadedRef.current      = false
+    prevSelectionRef.current = null
 
     const mv = document.createElement('model-viewer')
     mv.setAttribute('src', url)
@@ -136,17 +207,14 @@ function ModelViewer3D({
       mv.setAttribute('ar', '')
       mv.setAttribute('ar-modes', 'webxr scene-viewer quick-look')
       mv.setAttribute('ar-placement', arPlacement)
-      // Keep the product at real-world scale — prevents accidental resizing in AR
       mv.setAttribute('ar-scale', 'fixed')
 
-      // Custom styled AR launch button (replaces model-viewer's default badge)
       const arBtn = document.createElement('button')
       arBtn.setAttribute('slot', 'ar-button')
       arBtn.className = 'cw-ar-btn'
       arBtn.textContent = t('View in AR')
       mv.appendChild(arBtn)
 
-      // Surface guidance hint — shown before placement, hidden once placed
       const hint = document.createElement('div')
       hint.className = 'cw-ar-hint'
       hint.textContent = arPlacement === 'wall'
@@ -164,8 +232,9 @@ function ModelViewer3D({
 
     mv.addEventListener('load', () => {
       loadedRef.current = true
-      applyMeshRules(mv, rules, selection, numericInputs)
-      // Show hint after model loads (only for AR-enabled products)
+      // Capture current selection as baseline so first user change triggers glow
+      prevSelectionRef.current = { ...selectionRef.current }
+      applyMeshRules(mv, rules, selectionRef.current, numericInputsRef.current)
       if (arEnabled && hintRef.current) hintRef.current.style.display = 'block'
     })
 
@@ -173,9 +242,10 @@ function ModelViewer3D({
     container.appendChild(mv)
     return () => {
       container.innerHTML = ''
-      mvRef.current = null
-      hintRef.current = null
-      loadedRef.current = false
+      mvRef.current        = null
+      hintRef.current      = null
+      loadedRef.current    = false
+      prevSelectionRef.current = null
     }
   }, [url, arEnabled, arPlacement])
 
@@ -184,6 +254,22 @@ function ModelViewer3D({
     if (!mvRef.current || !loadedRef.current) return
     applyMeshRules(mvRef.current, rules, selection, numericInputs)
   }, [rules, selection, numericInputs])
+
+  // Gold glow on discrete characteristic selection change (not on numeric inputs)
+  useEffect(() => {
+    if (!mvRef.current || !loadedRef.current || prevSelectionRef.current === null) return
+
+    const newValueIds: string[] = []
+    for (const [charId, valueId] of Object.entries(selection)) {
+      if (prevSelectionRef.current[charId] !== valueId) newValueIds.push(valueId)
+    }
+    prevSelectionRef.current = { ...selection }
+
+    if (newValueIds.length === 0) return
+    const scene = findScene(mvRef.current)
+    if (!scene) return
+    triggerGlow(scene, rules, newValueIds)
+  }, [selection]) // intentionally excludes numericInputs — glow only for discrete changes
 
   return <div ref={containerRef} style="width:100%;height:100%" />
 }
@@ -201,7 +287,6 @@ export function Visualization({ assets, selection, numericInputs = {}, arEnabled
 
   if (!url3d && (!urlImg || failed)) return null
 
-  // Find mesh rules for the active 3D asset
   const activeAsset = url3d ? assets.find(a => a.url === url3d) : null
   const meshRules: MeshRule[] = activeAsset?.mesh_rules ?? []
 
