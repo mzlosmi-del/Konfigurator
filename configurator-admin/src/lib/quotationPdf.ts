@@ -1,4 +1,5 @@
-import { PDFDocument, PDFPage, PDFFont, rgb, StandardFonts } from 'pdf-lib'
+import { PDFDocument, PDFPage, PDFFont, rgb } from 'pdf-lib'
+import fontkit from '@pdf-lib/fontkit'
 import type { Quotation, QuotationLineItem, QuotationAdjustment, ProductText } from '@/types/database'
 import type { PdfSection } from '@/pages/quotations/PdfLayoutDialog'
 import { calcLineTotal } from '@/lib/quotations'
@@ -144,8 +145,13 @@ export async function buildQuotationPdfBytes(
 ): Promise<Uint8Array> {
   const L = PDF_LABELS[lang]
   const pdfDoc = await PDFDocument.create()
-  const fontR  = await pdfDoc.embedFont(StandardFonts.Helvetica)
-  const fontB  = await pdfDoc.embedFont(StandardFonts.HelveticaBold)
+  pdfDoc.registerFontkit(fontkit)
+  const [fontRBytes, fontBBytes] = await Promise.all([
+    fetch('/fonts/NotoSans-Regular.ttf').then(r => r.arrayBuffer()),
+    fetch('/fonts/NotoSans-Bold.ttf').then(r => r.arrayBuffer()),
+  ])
+  const fontR = await pdfDoc.embedFont(fontRBytes)
+  const fontB = await pdfDoc.embedFont(fontBBytes)
 
   // ── Page geometry ──────────────────────────────────────────────────────────
   const W = 595, H = 842
