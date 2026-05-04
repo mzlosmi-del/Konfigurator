@@ -10,7 +10,6 @@ export type DisplayType = 'select' | 'radio' | 'swatch' | 'toggle' | 'number'
 export type AssetType = 'image' | 'render' | '3d_model'
 export type RuleType = 'hide_value' | 'disable_value' | 'price_override' | 'set_value_default' | 'set_value_locked'
 export type InquiryStatus = 'new' | 'read' | 'replied' | 'closed'
-export type QuoteStatus = 'sent' | 'expired'
 export type QuotationStatus =
   | 'in_preparation'
   | 'confirmed_sent'
@@ -299,21 +298,6 @@ export interface Database {
         Insert: Omit<Database['public']['Tables']['pricing_formulas']['Row'], 'id' | 'created_at' | 'updated_at'> & { id?: string }
         Update: Partial<Database['public']['Tables']['pricing_formulas']['Insert']>
       }
-      quotes: {
-        Row: {
-          id: string
-          inquiry_id: string
-          tenant_id: string
-          pdf_url: string | null
-          expires_at: string | null
-          status: QuoteStatus
-          sent_at: string
-          created_at: string
-          updated_at: string
-        }
-        Insert: Omit<Database['public']['Tables']['quotes']['Row'], 'created_at' | 'updated_at' | 'sent_at'> & { id?: string; sent_at?: string }
-        Update: Partial<Database['public']['Tables']['quotes']['Insert']>
-      }
       quotation_rejection_reasons: {
         Row: {
           id:         string
@@ -493,7 +477,6 @@ export type ConfigurationRule = Omit<
   'condition' | 'effect'
 > & { condition: RuleCondition; effect: RuleEffect }
 export type Inquiry            = Database['public']['Tables']['inquiries']['Row']
-export type Quote              = Database['public']['Tables']['quotes']['Row']
 export type CharacteristicClass  = Database['public']['Tables']['characteristic_classes']['Row']
 export type ClassMember          = Database['public']['Tables']['characteristic_class_members']['Row']
 export type ProductClass         = Database['public']['Tables']['product_classes']['Row']
