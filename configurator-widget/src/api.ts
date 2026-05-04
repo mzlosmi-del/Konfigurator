@@ -81,7 +81,7 @@ export async function loadProductConfig(config: WidgetConfig): Promise<FullProdu
       : Promise.resolve({ data: [], error: null }),
     characteristicIds.length > 0
       ? sb.from('characteristic_values')
-          .select('id, characteristic_id, label, label_i18n, price_modifier, sort_order')
+          .select('id, characteristic_id, label, label_i18n, price_modifier, sort_order, hex_color')
           .in('characteristic_id', characteristicIds)
           .order('sort_order', { ascending: true })
       : Promise.resolve({ data: [], error: null }),

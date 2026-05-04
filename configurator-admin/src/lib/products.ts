@@ -310,7 +310,7 @@ export async function createCharacteristicValue(
 
 export async function updateCharacteristicValue(
   id: string,
-  input: Partial<Pick<CharacteristicValue, 'label' | 'price_modifier' | 'sort_order'>> & { label_i18n?: Record<string,string> }
+  input: Partial<Pick<CharacteristicValue, 'label' | 'price_modifier' | 'sort_order' | 'hex_color'>> & { label_i18n?: Record<string,string> }
 ): Promise<CharacteristicValue> {
   const { data, error } = await supabase
     .from('characteristic_values')

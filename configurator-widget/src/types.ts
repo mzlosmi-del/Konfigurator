@@ -33,6 +33,7 @@ export interface CharacteristicValue {
   label_i18n?: Record<string, string>
   price_modifier: number
   sort_order: number
+  hex_color?: string | null
 }
 
 export interface Characteristic {

@@ -20,6 +20,7 @@ import { t } from '@/i18n'
 const valueSchema = z.object({
   label: z.string().min(1, 'Label is required').max(300),
   price_modifier: z.coerce.number(),
+  hex_color: z.string().optional(),
 })
 type ValueForm = z.infer<typeof valueSchema>
 
@@ -60,7 +61,7 @@ export function CharacteristicValuesEditor({
   const unusedLangs = CONTENT_LANGUAGES.filter(l => !displayLangs.includes(l.code))
 
   const { register, handleSubmit, reset, formState: { errors, isSubmitting } } =
-    useForm<ValueForm>({ resolver: zodResolver(valueSchema), defaultValues: { price_modifier: 0 } })
+    useForm<ValueForm>({ resolver: zodResolver(valueSchema), defaultValues: { price_modifier: 0, hex_color: '' } })
 
   function getLabelForLang(value: CharacteristicValue): string {
     if (editLang === 'primary') return value.label
@@ -76,12 +77,26 @@ export function CharacteristicValuesEditor({
         label: data.label,
         price_modifier: data.price_modifier,
         sort_order: values.length,
-      })
+        hex_color: data.hex_color?.trim() || null,
+      } as any)
       onChange([...values, created])
-      reset({ label: '', price_modifier: 0 })
+      reset({ label: '', price_modifier: 0, hex_color: '' })
       setAdding(false)
     } catch {
       toast({ title: t('Failed to add value'), variant: 'destructive' })
+    }
+  }
+
+  async function handleColorEdit(value: CharacteristicValue, hex: string) {
+    const hex_color = hex.trim() || null
+    if ((hex_color ?? '') === (value.hex_color ?? '')) return
+    try {
+      const result = await updateCharacteristicValue(value.id, { hex_color })
+      onChange(values.map(v => (v.id === value.id ? result : v)))
+    } catch {
+      const fresh = await fetchValuesForCharacteristic(characteristicId)
+      onChange(fresh)
+      toast({ title: t('Failed to update colour'), variant: 'destructive' })
     }
   }
 
@@ -232,7 +247,20 @@ export function CharacteristicValuesEditor({
           />
 
           {editLang === 'primary' && (
-            <div className="flex items-center gap-1 shrink-0">
+            <div className="flex items-center gap-2 shrink-0">
+              <label
+                className="relative h-6 w-6 rounded-full border border-border cursor-pointer overflow-hidden shrink-0"
+                title={t('Colour')}
+                style={{ background: value.hex_color ?? '#e5e7eb' }}
+              >
+                <input
+                  type="color"
+                  className="absolute opacity-0 inset-0 w-full h-full cursor-pointer"
+                  defaultValue={value.hex_color ?? '#e5e7eb'}
+                  onBlur={e => handleColorEdit(value, e.target.value)}
+                  onChange={e => handleColorEdit(value, e.target.value)}
+                />
+              </label>
               <span className="text-muted-foreground text-xs">±</span>
               <input
                 className="w-16 bg-transparent text-right outline-none focus:ring-0 tabular-nums text-xs"
@@ -271,6 +299,18 @@ export function CharacteristicValuesEditor({
                 {errors.label && (
                   <p className="text-xs text-destructive">{t(errors.label.message ?? '')}</p>
                 )}
+              </div>
+              <div className="shrink-0 flex items-center" title={t('Colour (optional)')}>
+                <label className="relative h-8 w-8 rounded border border-input cursor-pointer overflow-hidden">
+                  <input
+                    type="color"
+                    className="absolute opacity-0 inset-0 w-full h-full cursor-pointer"
+                    {...register('hex_color')}
+                  />
+                  <span className="flex h-full w-full items-center justify-center text-muted-foreground text-xs pointer-events-none">
+                    🎨
+                  </span>
+                </label>
               </div>
               <div className="w-20 shrink-0 space-y-1">
                 <Input

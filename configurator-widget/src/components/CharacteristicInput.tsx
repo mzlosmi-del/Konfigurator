@@ -165,7 +165,10 @@ export function CharacteristicInput({
                 title={label}
                 type="button"
               >
-                <div class="cw-swatch-tile">{initials}</div>
+                {v.hex_color
+                  ? <div class="cw-swatch-tile cw-swatch-color" style={`background:${v.hex_color}`} />
+                  : <div class="cw-swatch-tile">{initials}</div>
+                }
                 <div class="cw-swatch-meta">
                   <span class="cw-swatch-label">{label}</span>
                   {v.price_modifier !== 0 && (

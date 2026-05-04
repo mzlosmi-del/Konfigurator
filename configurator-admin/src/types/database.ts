@@ -206,6 +206,7 @@ export interface Database {
           label_i18n: Json
           price_modifier: number
           sort_order: number
+          hex_color: string | null
           created_at: string
           updated_at: string
         }

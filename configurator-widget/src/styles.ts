@@ -185,6 +185,9 @@ export const WIDGET_STYLES = `
     transition: border-color 0.15s, background 0.15s, color 0.15s;
     user-select: none;
     line-height: 1.4;
+    white-space: normal;
+    word-break: break-word;
+    text-align: left;
   }
   .cw-radio-btn:hover:not(.disabled),
   .cw-toggle-btn:hover:not(.disabled) { border-color: var(--cw-text-heading); }
@@ -249,9 +252,19 @@ export const WIDGET_STYLES = `
     font-size: 12px;
     color: var(--cw-text);
     line-height: 1.3;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    word-break: break-word;
+    overflow-wrap: break-word;
+  }
+  .cw-swatch-color {
+    background-size: cover;
+    position: relative;
+  }
+  .cw-swatch-color::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(255,255,255,0.12) 0%, transparent 60%);
+    pointer-events: none;
   }
   .cw-swatch-mod {
     font-size: 10px;
