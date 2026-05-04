@@ -638,4 +638,18 @@ export const WIDGET_STYLES = `
     color: var(--cw-lang-active-text);
     border-color: var(--cw-lang-active-bg);
   }
+
+  /* Dimension lines overlay for 3D model viewer */
+  .cw-dim-overlay {
+    position: absolute; inset: 0;
+    pointer-events: none; overflow: visible;
+  }
+  .cw-dim-overlay line {
+    stroke: rgba(0,0,0,0.40); stroke-width: 1.5px;
+  }
+  .cw-dim-overlay text {
+    fill: rgba(0,0,0,0.55);
+    font-size: 11px; font-family: var(--cw-font);
+    text-anchor: middle; dominant-baseline: auto;
+  }
 `
