@@ -112,11 +112,48 @@ export async function loadProductConfig(config: WidgetConfig): Promise<FullProdu
   const rulesData    = rulesResult.data
   const formulasData = formulasResult.data
 
+  // Fetch active scheduled price and modifier overrides for today
+  const today    = new Date().toISOString().slice(0, 10)
+  const valueIds = (valuesData ?? []).map((v: any) => v.id as string)
+
+  const [priceScheduleResult, modScheduleResult] = await Promise.all([
+    sb.from('product_price_schedules')
+      .select('price, valid_from')
+      .eq('product_id', config.productId)
+      .lte('valid_from', today)
+      .or(`valid_to.is.null,valid_to.gte.${today}`)
+      .order('valid_from', { ascending: false })
+      .limit(1),
+    valueIds.length > 0
+      ? sb.from('characteristic_modifier_schedules')
+          .select('characteristic_value_id, price_modifier, valid_from')
+          .in('characteristic_value_id', valueIds)
+          .lte('valid_from', today)
+          .or(`valid_to.is.null,valid_to.gte.${today}`)
+          .order('valid_from', { ascending: false })
+      : Promise.resolve({ data: [], error: null }),
+  ])
+
+  const scheduledBase     = (priceScheduleResult.data?.[0] as { price: number } | undefined)?.price
+  const effectiveBasePrice = scheduledBase !== undefined
+    ? Number(scheduledBase)
+    : Number((product as any).base_price)
+
+  const modByValueId: Record<string, number> = {}
+  for (const r of (modScheduleResult.data ?? []) as Array<{ characteristic_value_id: string; price_modifier: number }>) {
+    if (!(r.characteristic_value_id in modByValueId)) {
+      modByValueId[r.characteristic_value_id] = Number(r.price_modifier)
+    }
+  }
+
   // Assemble characteristics with their values, in class-then-member order
   const valuesByCharId: Record<string, CharacteristicValue[]> = {}
   for (const v of (valuesData ?? []) as (CharacteristicValue & { characteristic_id: string })[]) {
     if (!valuesByCharId[v.characteristic_id]) valuesByCharId[v.characteristic_id] = []
-    valuesByCharId[v.characteristic_id].push(v)
+    const sched = modByValueId[v.id]
+    valuesByCharId[v.characteristic_id].push(
+      sched !== undefined ? { ...v, price_modifier: sched } : v
+    )
   }
 
   const charById: Record<string, Characteristic> = {}
@@ -139,7 +176,7 @@ export async function loadProductConfig(config: WidgetConfig): Promise<FullProdu
   const removeBranding = !brandingResult.error && brandingResult.data === true
 
   return {
-    product: product as ProductData,
+    product: { ...(product as ProductData), base_price: effectiveBasePrice },
     characteristics,
     assets:    (assetsData    ?? []) as VisualizationAsset[],
     rules:     (rulesData     ?? []) as ConfigurationRule[],

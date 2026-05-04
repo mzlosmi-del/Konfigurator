@@ -13,9 +13,10 @@ export type ProductAdjustmentPresetInsert = Database['public']['Tables']['produc
 
 // Active pricing snapshot used by QuotationFormPage
 export interface ActivePricing {
-  scheduledPrice:     number | null
-  taxPresets:         { label: string; rate: number }[]
-  adjustmentPresets:  { id: string; label: string; adjustment_type: 'surcharge' | 'discount'; mode: 'percent' | 'fixed'; value: number }[]
+  scheduledPrice:    number | null
+  modifierByValueId: Record<string, number>
+  taxPresets:        { label: string; rate: number }[]
+  adjustmentPresets: { id: string; label: string; adjustment_type: 'surcharge' | 'discount'; mode: 'percent' | 'fixed'; value: number }[]
 }
 
 // ── Product price schedules ───────────────────────────────────────────────────
@@ -146,7 +147,7 @@ export async function deleteAdjustmentPreset(id: string): Promise<void> {
 // ── Active pricing snapshot ───────────────────────────────────────────────────
 
 export async function fetchActivePricing(productId: string, today: string): Promise<ActivePricing> {
-  const [schedules, taxPresets, adjustmentPresets] = await Promise.all([
+  const [schedules, taxPresets, adjustmentPresets, charValues] = await Promise.all([
     supabase
       .from('product_price_schedules')
       .select('price, valid_from, valid_to')
@@ -167,11 +168,34 @@ export async function fetchActivePricing(productId: string, today: string): Prom
       .eq('product_id', productId)
       .lte('valid_from', today)
       .or(`valid_to.is.null,valid_to.gte.${today}`),
+    // Fetch value IDs belonging to this product's characteristics (for modifier schedule lookup)
+    supabase
+      .from('characteristic_values')
+      .select('id, characteristics!inner(product_id)')
+      .eq('characteristics.product_id', productId),
   ])
 
   if (schedules.error) throw new Error(schedules.error.message)
   if (taxPresets.error) throw new Error(taxPresets.error.message)
   if (adjustmentPresets.error) throw new Error(adjustmentPresets.error.message)
+
+  const valueIds = ((charValues.data ?? []) as { id: string }[]).map(v => v.id)
+  const modResult = valueIds.length > 0
+    ? await supabase
+        .from('characteristic_modifier_schedules')
+        .select('characteristic_value_id, price_modifier, valid_from')
+        .in('characteristic_value_id', valueIds)
+        .lte('valid_from', today)
+        .or(`valid_to.is.null,valid_to.gte.${today}`)
+        .order('valid_from', { ascending: false })
+    : { data: [], error: null }
+
+  const modifierByValueId: Record<string, number> = {}
+  for (const r of (modResult.data ?? []) as Array<{ characteristic_value_id: string; price_modifier: number }>) {
+    if (!(r.characteristic_value_id in modifierByValueId)) {
+      modifierByValueId[r.characteristic_value_id] = Number(r.price_modifier)
+    }
+  }
 
   const schedData = schedules.data as { price: number }[] | null
   const taxData   = taxPresets.data as { label: string; rate: number }[] | null
@@ -181,6 +205,7 @@ export async function fetchActivePricing(productId: string, today: string): Prom
 
   return {
     scheduledPrice: schedData?.[0]?.price !== undefined ? Number(schedData[0].price) : null,
+    modifierByValueId,
     taxPresets: (taxData ?? []).map(t => ({ label: t.label, rate: Number(t.rate) })),
     adjustmentPresets: (adjData ?? []).map(a => ({
       id:              a.id,

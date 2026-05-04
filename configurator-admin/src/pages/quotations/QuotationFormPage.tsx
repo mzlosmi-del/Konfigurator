@@ -322,6 +322,7 @@ export function QuotationFormPage() {
         let   unitPrice = (li.price_override !== null && li.price_override !== undefined)
           ? Number(li.price_override)
           : Number(product?.base_price ?? 0)
+        const modOverrides = pricingCache[li.product_id]?.modifierByValueId ?? {}
 
         for (const char of chars) {
           if (char.display_type === 'number') {
@@ -340,7 +341,7 @@ export function QuotationFormPage() {
           if (!valueId) continue
           const value = char.characteristic_values.find(v => v.id === valueId)
           if (!value) continue
-          const effective = ruleEffect.priceOverrides[value.id] ?? Number(value.price_modifier)
+          const effective = ruleEffect.priceOverrides[value.id] ?? modOverrides[value.id] ?? Number(value.price_modifier)
           config.push({
             characteristic_id:   char.id,
             characteristic_name: char.name,
