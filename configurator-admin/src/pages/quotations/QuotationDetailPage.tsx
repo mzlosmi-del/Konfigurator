@@ -264,7 +264,7 @@ export function QuotationDetailPage() {
         {/* ── Status + meta ──────────────────────────────────────────────── */}
         <div className="flex items-center gap-4 flex-wrap">
           <Badge variant={statusVariant[quotation.status as QuotationStatus] ?? 'secondary'} className="text-sm px-3 py-1">
-            {STATUS_LABELS[quotation.status as QuotationStatus] ?? quotation.status}
+            {t(STATUS_LABELS[quotation.status as QuotationStatus] ?? quotation.status)}
           </Badge>
           <Select
             value={quotation.status}

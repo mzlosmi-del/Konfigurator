@@ -11,6 +11,7 @@ import { fetchProducts } from '@/lib/products'
 import { fetchInquiries } from '@/lib/inquiries'
 import type { Product, Inquiry, InquiryStatus } from '@/types/database'
 import { OnboardingChecklist } from '@/components/OnboardingChecklist'
+import { t } from '@/i18n'
 
 const statusVariant: Record<InquiryStatus, 'destructive' | 'warning' | 'success' | 'secondary'> = {
   new: 'destructive',
@@ -22,11 +23,11 @@ const statusVariant: Record<InquiryStatus, 'destructive' | 'warning' | 'success'
 function timeAgo(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime()
   const mins = Math.floor(diff / 60000)
-  if (mins < 1) return 'just now'
-  if (mins < 60) return `${mins}m ago`
+  if (mins < 1) return t('just now')
+  if (mins < 60) return `${mins}${t('m ago')}`
   const hours = Math.floor(mins / 60)
-  if (hours < 24) return `${hours}h ago`
-  return `${Math.floor(hours / 24)}d ago`
+  if (hours < 24) return `${hours}${t('h ago')}`
+  return `${Math.floor(hours / 24)}${t('d ago')}`
 }
 
 export function DashboardPage() {
@@ -54,7 +55,7 @@ export function DashboardPage() {
     <div className="animate-fade-in">
       <PageHeader
         title={`Welcome${tenant?.name ? `, ${tenant.name}` : ''}`}
-        description="Overview of your configurator activity."
+        description={t('Overview of your configurator activity.')}
       />
 
       <div className="p-6 space-y-6">
@@ -70,24 +71,24 @@ export function DashboardPage() {
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <StatCard
                 icon={Package}
-                label="Published products"
+                label={t('Published products')}
                 value={publishedCount}
-                hint={`${products.length} total`}
+                hint={`${products.length} ${t('total')}`}
                 onClick={() => navigate('/products')}
               />
               <StatCard
                 icon={Inbox}
-                label="New inquiries"
+                label={t('New inquiries')}
                 value={newInquiries}
-                hint="Awaiting review"
+                hint={t('Awaiting review')}
                 alert={newInquiries > 0}
                 onClick={() => navigate('/inquiries')}
               />
               <StatCard
                 icon={TrendingUp}
-                label="Total inquiries"
+                label={t('Total inquiries')}
                 value={inquiries.length}
-                hint="All time"
+                hint={t('All time')}
                 onClick={() => navigate('/inquiries')}
               />
             </div>
@@ -95,7 +96,7 @@ export function DashboardPage() {
             {/* Recent inquiries */}
             <div>
               <div className="flex items-center justify-between mb-3">
-                <h2 className="text-sm font-semibold">Recent inquiries</h2>
+                <h2 className="text-sm font-semibold">{t('Recent inquiries')}</h2>
                 <Button
                   variant="ghost"
                   size="sm"

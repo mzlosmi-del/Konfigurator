@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Plus, X } from 'lucide-react'
 import { CONTENT_LANGUAGES } from '@/lib/languages'
+import { t } from '@/i18n'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 
@@ -132,7 +133,7 @@ export function I18nEditor({ value, onChange, multiline = false, placeholder }: 
             onClick={() => setAdding(true)}
           >
             <Plus className="h-3 w-3" />
-            Add translation
+            {t('Add translation')}
           </button>
         )
       )}

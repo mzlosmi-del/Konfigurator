@@ -1030,6 +1030,25 @@ const sr: Record<string, string> = {
     'Prikazuje se korisniku u widgetu nakon slanja upita.',
   'Post-inquiry message saved':            'Poruka nakon upita sačuvana',
 
+  // Relative timestamps
+  'm ago':                                 'min pre',
+  'h ago':                                 'h pre',
+  'd ago':                                 'd pre',
+
+  // Analytics
+  'quotes':                                'ponuda',
+
+  // Library / i18n editor
+  'Add translation':                       'Dodaj prevod',
+
+  // Text type descriptions (labels already exist above)
+  'Printed under the product row in PDF line items': 'Štampa se ispod reda proizvoda u PDF stavkama',
+  'Printed in line items as specs':        'Štampa se u stavkama kao specifikacija',
+  'Appears as a separate section in the PDF (global or per-product)':
+    'Prikazuje se kao posebna sekcija u PDF-u (globalno ili po proizvodu)',
+  'Appears as terms & conditions section in the PDF':
+    'Prikazuje se kao sekcija sa uslovima u PDF-u',
+
   // Authorizations
   'Authorizations':                        'Ovlašćenja',
   'Role Permissions':                      'Dozvole po ulozi',
