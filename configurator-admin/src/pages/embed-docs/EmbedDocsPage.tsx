@@ -211,7 +211,7 @@ export function EmbedDocsPage() {
               <CardHeader className="pb-3">
                 <CardTitle className="text-base">{t('iFrame embed')}</CardTitle>
                 <CardDescription>
-                  {t('Fully isolated embed served from the Konfigurator CDN. Suitable for strict Content Security Policy environments. Requires the product to be published with a public share link.')}
+                  {t('Fully isolated embed served from the Configureout CDN. Suitable for strict Content Security Policy environments. Requires the product to be published with a public share link.')}
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -251,7 +251,7 @@ export function EmbedDocsPage() {
           <CardHeader className="pb-3">
             <CardTitle className="text-base">{t('Webhook payload (v2)')}</CardTitle>
             <CardDescription>
-              {t('When a customer submits an inquiry, Konfigurator fires an')} <code className="text-xs bg-muted px-1 rounded">inquiry.created</code> {t('webhook with the payload below. Configure webhook endpoints in Settings → Webhooks.')}
+              {t('When a customer submits an inquiry, Configureout fires an')} <code className="text-xs bg-muted px-1 rounded">inquiry.created</code> {t('webhook with the payload below. Configure webhook endpoints in Settings → Webhooks.')}
             </CardDescription>
           </CardHeader>
           <CardContent>

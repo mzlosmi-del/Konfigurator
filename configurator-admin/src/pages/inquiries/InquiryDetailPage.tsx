@@ -14,6 +14,7 @@ import { Separator } from '@/components/ui/separator'
 import { Spinner } from '@/components/ui/spinner'
 import { useToast } from '@/hooks/useToast'
 import { Toaster } from '@/components/ui/toast'
+import { useCanEdit } from '@/hooks/usePermission'
 import { t } from '@/i18n'
 
 type InquiryWithProduct = Inquiry & { product: { name: string } | null }
@@ -48,6 +49,7 @@ export function InquiryDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const { toasts, toast, dismiss } = useToast()
+  const canEdit = useCanEdit('inquiries')
 
   const [inquiry, setInquiry] = useState<InquiryWithProduct | null>(null)
   const [loading, setLoading] = useState(true)
@@ -295,25 +297,27 @@ export function InquiryDetailPage() {
           </Card>
 
           {/* Status control */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">{t('Status')}</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <Select
-                value={inquiry.status}
-                onChange={e => handleStatusChange(e.target.value as InquiryStatus)}
-                disabled={updatingStatus}
-              >
-                {STATUS_OPTIONS.map(s => (
-                  <option key={s} value={s} className="capitalize">{t(s)}</option>
-                ))}
-              </Select>
-              <p className="text-xs text-muted-foreground">
-                {t('Changing status here does not send any email. Use "Reply by email" to contact the customer.')}
-              </p>
-            </CardContent>
-          </Card>
+          {canEdit && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">{t('Status')}</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <Select
+                  value={inquiry.status}
+                  onChange={e => handleStatusChange(e.target.value as InquiryStatus)}
+                  disabled={updatingStatus}
+                >
+                  {STATUS_OPTIONS.map(s => (
+                    <option key={s} value={s} className="capitalize">{t(s)}</option>
+                  ))}
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  {t('Changing status here does not send any email. Use "Reply by email" to contact the customer.')}
+                </p>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Quote generator */}
           <Card>

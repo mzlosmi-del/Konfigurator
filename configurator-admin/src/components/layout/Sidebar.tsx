@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils'
 import { useAuthContext } from '@/components/auth/AuthContext'
 import { Separator } from '@/components/ui/separator'
 import { useInquiryCounts } from '@/hooks/useInquiryCounts'
+import { useCanView } from '@/hooks/usePermission'
 import { t, getLang, setLang, LANGS, type Lang } from '@/i18n'
 
 interface SidebarProps {
@@ -18,22 +19,33 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
   const { newCount } = useInquiryCounts()
   const [lang, setLangState] = useState<Lang>(getLang())
 
+  const canViewDashboard  = useCanView('dashboard')
+  const canViewProducts   = useCanView('products')
+  const canViewPricing    = useCanView('pricing')
+  const canViewLibrary    = useCanView('library')
+  const canViewTexts      = useCanView('texts')
+  const canViewInquiries  = useCanView('inquiries')
+  const canViewQuotations = useCanView('quotations')
+  const canViewAnalytics  = useCanView('analytics')
+  const canViewEmbed      = useCanView('embed')
+  const canViewSettings   = useCanView('settings')
+
   function handleLang(l: Lang) {
     setLang(l)
     setLangState(l)
   }
 
   const navItems = [
-    { to: '/dashboard',  icon: LayoutDashboard, label: 'Dashboard',   badge: 0 },
-    { to: '/products',   icon: Package,         label: 'Products',    badge: 0 },
-    { to: '/pricing',    icon: DollarSign,      label: 'Pricing',     badge: 0 },
-    { to: '/library',    icon: Layers,          label: 'Library',     badge: 0 },
-    { to: '/texts',      icon: AlignLeft,       label: 'Texts',       badge: 0 },
-    { to: '/inquiries',  icon: Inbox,            label: 'Inquiries',   badge: newCount },
-    { to: '/quotations', icon: FileText,        label: 'Quotations',  badge: 0 },
-    { to: '/analytics',  icon: BarChart2,       label: 'Analytics',   badge: 0 },
-    { to: '/embed-docs', icon: Code2,           label: 'Embed',       badge: 0 },
-    { to: '/settings',   icon: Settings,        label: 'Settings',    badge: 0 },
+    { to: '/dashboard',  icon: LayoutDashboard, label: 'Dashboard',   badge: 0,        visible: canViewDashboard },
+    { to: '/products',   icon: Package,         label: 'Products',    badge: 0,        visible: canViewProducts },
+    { to: '/pricing',    icon: DollarSign,      label: 'Pricing',     badge: 0,        visible: canViewPricing },
+    { to: '/library',    icon: Layers,          label: 'Library',     badge: 0,        visible: canViewLibrary },
+    { to: '/texts',      icon: AlignLeft,       label: 'Texts',       badge: 0,        visible: canViewTexts },
+    { to: '/inquiries',  icon: Inbox,           label: 'Inquiries',   badge: newCount, visible: canViewInquiries },
+    { to: '/quotations', icon: FileText,        label: 'Quotations',  badge: 0,        visible: canViewQuotations },
+    { to: '/analytics',  icon: BarChart2,       label: 'Analytics',   badge: 0,        visible: canViewAnalytics },
+    { to: '/embed-docs', icon: Code2,           label: 'Embed',       badge: 0,        visible: canViewEmbed },
+    { to: '/settings',   icon: Settings,        label: 'Settings',    badge: 0,        visible: canViewSettings },
   ]
 
   return (
@@ -64,7 +76,7 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
 
       {/* Nav */}
       <nav className="flex-1 space-y-0.5 p-2 pt-3 overflow-y-auto">
-        {navItems.map(({ to, icon: Icon, label, badge }) => (
+        {navItems.filter(item => item.visible).map(({ to, icon: Icon, label, badge }) => (
           <NavLink
             key={to}
             to={to}

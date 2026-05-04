@@ -10,11 +10,13 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Spinner } from '@/components/ui/spinner'
 import { useToast } from '@/hooks/useToast'
 import { Toaster } from '@/components/ui/toast'
+import { useCanEdit } from '@/hooks/usePermission'
 import { t } from '@/i18n'
 import { STATUS_LABELS, statusVariant } from './quotationStatusConfig'
 
 export function QuotationsPage() {
   const navigate = useNavigate()
+  const canEdit = useCanEdit('quotations')
   const { toasts, toast, dismiss } = useToast()
   const [quotations, setQuotations] = useState<Quotation[]>([])
   const [loading, setLoading] = useState(true)
@@ -43,10 +45,12 @@ export function QuotationsPage() {
               <BarChart2 className="h-4 w-4 mr-1.5" />
               {t('Report')}
             </Button>
-            <Button onClick={() => navigate('/quotations/new')}>
-              <Plus className="h-4 w-4 mr-1.5" />
-              {t('New Quotation')}
-            </Button>
+            {canEdit && (
+              <Button onClick={() => navigate('/quotations/new')}>
+                <Plus className="h-4 w-4 mr-1.5" />
+                {t('New Quotation')}
+              </Button>
+            )}
           </div>
         }
       />
@@ -62,10 +66,12 @@ export function QuotationsPage() {
               <p className="text-sm text-muted-foreground mt-1">
                 {t('Create your first quotation to get started.')}
               </p>
-              <Button className="mt-4" onClick={() => navigate('/quotations/new')}>
-                <Plus className="h-4 w-4 mr-1.5" />
-                {t('New Quotation')}
-              </Button>
+              {canEdit && (
+                <Button className="mt-4" onClick={() => navigate('/quotations/new')}>
+                  <Plus className="h-4 w-4 mr-1.5" />
+                  {t('New Quotation')}
+                </Button>
+              )}
             </CardContent>
           </Card>
         ) : (

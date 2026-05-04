@@ -1,7 +1,7 @@
 // Serbian (Latin) translations for the admin
 const sr: Record<string, string> = {
   // App / branding
-  'Configurator':                          'Konfigurator',
+  'Configurator':                          'Configureout',
 
   // Auth – Login
   'Sign in':                               'Prijava',
@@ -664,8 +664,8 @@ const sr: Record<string, string> = {
   'Strict CSP, no-JS sites':              'Strogi CSP, sajtovi bez JS',
   'Full isolation; requires a published public slug':
     'Potpuna izolacija; zahteva objavljeni javni identifikator',
-  'Fully isolated embed served from the Konfigurator CDN. Suitable for strict Content Security Policy environments. Requires the product to be published with a public share link.':
-    'Potpuno izolovana ugradnja servirana sa Konfigurator CDN-a. Pogodno za stroga CSP okruženja. Zahteva da je proizvod objavljen sa javnim linkom za deljenje.',
+  'Fully isolated embed served from the Configureout CDN. Suitable for strict Content Security Policy environments. Requires the product to be published with a public share link.':
+    'Potpuno izolovana ugradnja servirana sa Configureout CDN-a. Pogodno za stroga CSP okruženja. Zahteva da je proizvod objavljen sa javnim linkom za deljenje.',
   'Paste one snippet, widget mounts automatically': 'Nalepite jedan isečak, widget se montira automatski',
   'Custom element — place anywhere in JSX/templates': 'Prilagođeni element — postavite bilo gde u JSX/predloške',
   'Add the snippet below to any HTML page. The widget mounts automatically on elements that have a':
@@ -710,9 +710,9 @@ const sr: Record<string, string> = {
   'Choose a colour palette and font that matches your site.': 'Izaberite paletu boja i font koji odgovaraju vašem sajtu.',
   'Branding':                              'Brendiranje',
   'Remove branding':                       'Ukloni brendiranje',
-  'Remove "Powered by Konfigurator" badge': 'Ukloni oznaku "Powered by Konfigurator"',
-  'The "Powered by Konfigurator" badge is shown on all widgets. Upgrade to Growth or Scale to remove it.':
-    'Oznaka "Powered by Konfigurator" prikazuje se na svim widgetima. Nadogradite na Growth ili Scale da je uklonite.',
+  'Remove "Powered by Configureout" badge': 'Ukloni oznaku "Powered by Configureout"',
+  'The "Powered by Configureout" badge is shown on all widgets. Upgrade to Growth or Scale to remove it.':
+    'Oznaka "Powered by Configureout" prikazuje se na svim widgetima. Nadogradite na Growth ili Scale da je uklonite.',
   'The widget will only load data for published products. Set status to Published in the product editor.':
     'Widget će učitati podatke samo za objavljene proizvode. Postavite status na Objavljeno u uređivaču proizvoda.',
 
@@ -835,8 +835,8 @@ const sr: Record<string, string> = {
   'Method':                                'Metod',
   'Subject / Title':                       'Predmet / naslov',
   'Webhook payload (v2)':                  'Vebhuk payload (v2)',
-  'When a customer submits an inquiry, Konfigurator fires an':
-    'Kada kupac podnese upit, Konfigurator šalje',
+  'When a customer submits an inquiry, Configureout fires an':
+    'Kada kupac podnese upit, Configureout šalje',
   'Receive HTTP POST events when inquiries or quotations change.': 'Primajte HTTP POST događaje kada se upiti ili ponude promene.',
   'Recent deliveries':                     'Nedavne isporuke',
   'No deliveries yet.':                    'Nema još isporuka.',
@@ -1023,6 +1023,17 @@ const sr: Record<string, string> = {
   'Remove this preset adjustment?':        'Ukloniti ovo prilagođenje?',
   'Value must be > 0':                     'Vrednost mora biti > 0',
   'e.g. Bulk discount':                    'npr. Grupni popust',
+
+  // Authorizations
+  'Authorizations':                        'Ovlašćenja',
+  'Role Permissions':                      'Dozvole po ulozi',
+  'Configure what each role can access. Admin always has full access.':
+    'Podesite šta svaka uloga može da pristupa. Admin uvek ima pun pristup.',
+  'Functionality':                         'Funkcionalnost',
+  'Full access':                           'Pun pristup',
+  'No access':                             'Bez pristupa',
+  'View':                                  'Pregled',
+  'Failed to save permission':             'Nije uspelo čuvanje dozvole',
 }
 
 export const LANGS = ['en', 'sr'] as const

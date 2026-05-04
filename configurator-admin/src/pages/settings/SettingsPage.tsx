@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Check, Copy, CreditCard, Globe, Pencil, Plus, RefreshCw, Trash2, Upload, UserMinus, UserPlus, X, Zap } from 'lucide-react'
+import { Check, Copy, CreditCard, Globe, Pencil, Plus, RefreshCw, Shield, Trash2, Upload, UserMinus, UserPlus, X, Zap } from 'lucide-react'
 import { useAuthContext } from '@/components/auth/AuthContext'
 import { supabase } from '@/lib/supabase'
 import {
@@ -11,7 +11,7 @@ import {
 } from '@/lib/quotations'
 import { fetchPublishedProductCount } from '@/lib/products'
 import { planLabel } from '@/lib/planLimits'
-import type { MonthlyUsageRow, QuotationRejectionReason } from '@/types/database'
+import type { MonthlyUsageRow, PermLevel, QuotationRejectionReason, RolePermission } from '@/types/database'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -80,8 +80,21 @@ function FeatureRow({ label, enabled, note }: { label: string; enabled: boolean;
   )
 }
 
+const FUNCTIONALITIES: { key: string; label: string }[] = [
+  { key: 'dashboard',  label: 'Dashboard' },
+  { key: 'products',   label: 'Products' },
+  { key: 'pricing',    label: 'Pricing' },
+  { key: 'library',    label: 'Library' },
+  { key: 'texts',      label: 'Texts' },
+  { key: 'inquiries',  label: 'Inquiries' },
+  { key: 'quotations', label: 'Quotations' },
+  { key: 'analytics',  label: 'Analytics' },
+  { key: 'embed',      label: 'Embed' },
+  { key: 'settings',   label: 'Settings' },
+]
+
 export function SettingsPage() {
-  const { tenant, user, planLimits, refreshTenant } = useAuthContext()
+  const { tenant, user, profile, planLimits, refreshTenant } = useAuthContext()
   const { toasts, toast, dismiss } = useToast()
   const navigate     = useNavigate()
   const logoInputRef = useRef<HTMLInputElement>(null)
@@ -359,6 +372,41 @@ export function SettingsPage() {
     }
   }
 
+  // ── Authorizations ──────────────────────────────────────────────────────────
+  const [rolePerms, setRolePerms] = useState<RolePermission[]>([])
+
+  useEffect(() => {
+    if (profile?.role !== 'admin' || !tenant) return
+    supabase.from('role_permissions').select('*').eq('tenant_id', tenant.id)
+      .then(({ data }) => { if (data) setRolePerms(data as RolePermission[]) })
+  }, [tenant?.id, profile?.role])
+
+  async function handlePermChange(role: 'member' | 'viewer', functionality: string, level: PermLevel) {
+    if (!tenant) return
+    const { data, error } = await supabase
+      .from('role_permissions')
+      .upsert(
+        { tenant_id: tenant.id, role, functionality, level } as never,
+        { onConflict: 'tenant_id,role,functionality' }
+      )
+      .select()
+      .single()
+    if (error) {
+      toast({ title: t('Failed to save permission'), variant: 'destructive' })
+      return
+    }
+    if (data) {
+      setRolePerms(prev => {
+        const filtered = prev.filter(p => !(p.role === role && p.functionality === functionality))
+        return [...filtered, data as RolePermission]
+      })
+    }
+  }
+
+  function getLevel(role: 'member' | 'viewer', functionality: string): PermLevel {
+    return (rolePerms.find(p => p.role === role && p.functionality === functionality)?.level ?? 'none') as PermLevel
+  }
+
   // ── Danger zone ─────────────────────────────────────────────────────────────
   const [deleteConfirmInput, setDeleteConfirmInput] = useState('')
   const [deletingAccount,    setDeletingAccount]    = useState(false)
@@ -460,6 +508,12 @@ export function SettingsPage() {
               <CreditCard className="h-3.5 w-3.5 mr-1.5" />
               {t('Billing')}
             </TabsTrigger>
+            {profile?.role === 'admin' && (
+              <TabsTrigger value="authorizations">
+                <Shield className="h-3.5 w-3.5 mr-1.5" />
+                {t('Authorizations')}
+              </TabsTrigger>
+            )}
           </TabsList>
 
           <TabsContent value="general" className="mt-4 max-w-xl space-y-4">
@@ -1063,6 +1117,61 @@ export function SettingsPage() {
               })}
             </div>
           </TabsContent>
+
+          {/* ── Authorizations tab ──────────────────────────────────────── */}
+          {profile?.role === 'admin' && (
+            <TabsContent value="authorizations" className="mt-4 max-w-2xl space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">{t('Role Permissions')}</CardTitle>
+                  <CardDescription>
+                    {t('Configure what each role can access. Admin always has full access.')}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b">
+                          <th className="py-2 pr-4 text-left font-medium text-muted-foreground">{t('Functionality')}</th>
+                          <th className="py-2 px-4 text-center font-medium w-36">
+                            <span className="text-muted-foreground">{t('Admin')}</span>
+                          </th>
+                          <th className="py-2 px-4 text-center font-medium w-36">{t('Member')}</th>
+                          <th className="py-2 px-4 text-center font-medium w-36">{t('Viewer')}</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y">
+                        {FUNCTIONALITIES.map(({ key, label }) => (
+                          <tr key={key}>
+                            <td className="py-2 pr-4 text-sm">{t(label)}</td>
+                            <td className="py-2 px-4 text-center">
+                              <span className="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+                                {t('Full access')}
+                              </span>
+                            </td>
+                            {(['member', 'viewer'] as const).map(role => (
+                              <td key={role} className="py-2 px-4 text-center">
+                                <Select
+                                  value={getLevel(role, key)}
+                                  onChange={e => handlePermChange(role, key, e.target.value as PermLevel)}
+                                  className="h-7 text-xs w-28 mx-auto"
+                                >
+                                  <option value="none">{t('No access')}</option>
+                                  <option value="view">{t('View')}</option>
+                                  <option value="edit">{t('Edit')}</option>
+                                </Select>
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          )}
         </Tabs>
       </div>
 

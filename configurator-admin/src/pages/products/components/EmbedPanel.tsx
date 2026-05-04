@@ -330,11 +330,11 @@ export function EmbedPanel({ product }: Props) {
                 removeBranding ? 'translate-x-4' : 'translate-x-0',
               ].join(' ')} />
             </button>
-            <span className="text-sm">{t('Remove "Powered by Konfigurator" badge')}</span>
+            <span className="text-sm">{t('Remove "Powered by Configureout" badge')}</span>
           </label>
         ) : (
           <p className="text-xs text-muted-foreground">
-            {t('The "Powered by Konfigurator" badge is shown on all widgets. Upgrade to Growth or Scale to remove it.')}
+            {t('The "Powered by Configureout" badge is shown on all widgets. Upgrade to Growth or Scale to remove it.')}
           </p>
         )}
       </div>
