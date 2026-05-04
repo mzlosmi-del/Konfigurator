@@ -119,6 +119,7 @@ export interface FullProductConfig {
   rules: ConfigurationRule[]
   formulas: PricingFormula[]
   removeBranding: boolean
+  postInquiryMessage: string | null
 }
 
 // Selected state: charId → valueId (for select/radio/swatch/toggle types)

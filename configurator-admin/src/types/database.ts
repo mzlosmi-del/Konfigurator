@@ -79,6 +79,7 @@ export interface Database {
           logo_url:            string | null
           vat_number:          string | null
           company_reg_number:  string | null
+          post_inquiry_message: string | null
           created_at: string
           updated_at: string
         }
