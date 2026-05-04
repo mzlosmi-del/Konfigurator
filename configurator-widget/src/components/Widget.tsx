@@ -179,7 +179,7 @@ export function Widget({ config, track }: Props) {
 
   if (state.phase === 'loading') {
     return (
-      <div class="cw-root" key={lang}>
+      <div class="cw-root">
         <div class="cw-loading">
           <div class="cw-spinner" />
           {t('Loading configurator\u2026')}
@@ -190,7 +190,7 @@ export function Widget({ config, track }: Props) {
 
   if (state.phase === 'error') {
     return (
-      <div class="cw-root" key={lang}>
+      <div class="cw-root">
         <div class="cw-error">
           ⚠ {state.message}
         </div>
@@ -200,7 +200,7 @@ export function Widget({ config, track }: Props) {
 
   if (state.phase === 'success') {
     return (
-      <div class="cw-root" key={lang}>
+      <div class="cw-root">
         <div class="cw-success">
           <div class="cw-success-icon">✓</div>
           <h3>{t('Inquiry sent!')}</h3>
@@ -221,7 +221,7 @@ export function Widget({ config, track }: Props) {
   const { product, characteristics, assets, removeBranding } = state.data
 
   return (
-    <div class="cw-root" key={lang}>
+    <div class="cw-root">
       {/* Product image */}
       <Visualization assets={assets} selection={selection} numericInputs={numericInputs} arEnabled={product.ar_enabled} arPlacement={product.ar_placement ?? 'floor'} />
 
