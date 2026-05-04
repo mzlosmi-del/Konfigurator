@@ -2,9 +2,8 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, Mail, ExternalLink, FileText, ArrowRight } from 'lucide-react'
 import { fetchInquiry, updateInquiryStatus } from '@/lib/inquiries'
-import { fetchQuotesForInquiry, generateAndSendQuote } from '@/lib/quotes'
 import { supabase } from '@/lib/supabase'
-import type { Inquiry, InquiryStatus, Quote } from '@/types/database'
+import type { Inquiry, InquiryStatus } from '@/types/database'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -55,15 +54,7 @@ export function InquiryDetailPage() {
   const [loading, setLoading] = useState(true)
   const [updatingStatus, setUpdatingStatus] = useState(false)
 
-  const [quotes, setQuotes] = useState<Quote[]>([])
-  const [generatingQuote, setGeneratingQuote] = useState(false)
   const [linkedQuotationId, setLinkedQuotationId] = useState<string | null>(null)
-  const defaultExpiry = () => {
-    const d = new Date()
-    d.setDate(d.getDate() + 30)
-    return d.toISOString().slice(0, 10)
-  }
-  const [quoteExpiry, setQuoteExpiry] = useState(defaultExpiry)
 
   useEffect(() => {
     if (!id) return
@@ -73,9 +64,8 @@ export function InquiryDetailPage() {
   async function load(inquiryId: string) {
     setLoading(true)
     try {
-      const [data, quotesData, linkedQ] = await Promise.all([
+      const [data, linkedQ] = await Promise.all([
         fetchInquiry(inquiryId),
-        fetchQuotesForInquiry(inquiryId),
         supabase
           .from('quotations')
           .select('id')
@@ -83,7 +73,6 @@ export function InquiryDetailPage() {
           .maybeSingle(),
       ])
       setInquiry(data as InquiryWithProduct)
-      setQuotes(quotesData)
       setLinkedQuotationId((linkedQ.data as { id: string } | null)?.id ?? null)
 
       // Auto-mark as read when opened
@@ -95,24 +84,6 @@ export function InquiryDetailPage() {
       toast({ title: t('Inquiry not found'), variant: 'destructive' })
     } finally {
       setLoading(false)
-    }
-  }
-
-  async function handleGenerateQuote() {
-    if (!inquiry) return
-    setGeneratingQuote(true)
-    try {
-      const quote = await generateAndSendQuote(inquiry.id, quoteExpiry || null)
-      setQuotes(prev => [quote, ...prev])
-      toast({ title: `${t('Quote sent to')} ${inquiry.customer_email}` })
-    } catch (e) {
-      toast({
-        title: t('Failed to generate quote'),
-        description: e instanceof Error ? e.message : undefined,
-        variant: 'destructive',
-      })
-    } finally {
-      setGeneratingQuote(false)
     }
   }
 
@@ -318,65 +289,6 @@ export function InquiryDetailPage() {
               </CardContent>
             </Card>
           )}
-
-          {/* Quote generator */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">{t('Quote')}</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div>
-                <label className="text-xs text-muted-foreground block mb-1">{t('Valid until')}</label>
-                <input
-                  type="date"
-                  value={quoteExpiry}
-                  min={new Date().toISOString().slice(0, 10)}
-                  onChange={e => setQuoteExpiry(e.target.value)}
-                  className="w-full text-sm rounded-md border border-input bg-background px-3 py-1.5 shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
-                />
-              </div>
-              <Button
-                size="sm"
-                className="w-full"
-                onClick={handleGenerateQuote}
-                disabled={generatingQuote}
-                loading={generatingQuote}
-              >
-                <FileText className="h-4 w-4" />
-                {t('Generate & Send Quote')}
-              </Button>
-
-              {quotes.length > 0 && (
-                <div className="space-y-2 pt-1">
-                  <p className="text-xs text-muted-foreground font-medium">{t('Sent quotes')}</p>
-                  {quotes.map(q => (
-                    <div key={q.id} className="rounded-md border bg-muted/20 px-3 py-2 text-xs space-y-1">
-                      <div className="flex items-center justify-between">
-                        <span className="text-muted-foreground">
-                          {new Date(q.sent_at).toLocaleDateString('en-GB', { dateStyle: 'medium' })}
-                        </span>
-                        {q.pdf_url && (
-                          <a
-                            href={q.pdf_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex items-center gap-1 text-primary hover:underline"
-                          >
-                            {t('PDF')} <ExternalLink className="h-3 w-3" />
-                          </a>
-                        )}
-                      </div>
-                      {q.expires_at && (
-                        <p className="text-muted-foreground">
-                          {t('Expires')} {new Date(q.expires_at).toLocaleDateString('en-GB', { dateStyle: 'medium' })}
-                        </p>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
 
           {/* Customer details */}
           <Card>
