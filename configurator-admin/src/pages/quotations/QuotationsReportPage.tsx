@@ -189,7 +189,7 @@ export function QuotationsReportPage() {
                     </td>
                     <td className="px-4 py-3">
                       <Badge variant={statusVariant[q.status as QuotationStatus] ?? 'secondary'}>
-                        {STATUS_LABELS[q.status as QuotationStatus] ?? q.status}
+                        {t(STATUS_LABELS[q.status as QuotationStatus] ?? q.status)}
                       </Badge>
                     </td>
                     <td className="px-4 py-3 text-muted-foreground text-xs">
