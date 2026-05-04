@@ -53,7 +53,7 @@ class GlbBuilder {
     const padLen = (4 - (buf.byteLength % 4)) % 4
     const padded = padLen > 0 ? Buffer.concat([buf, Buffer.alloc(padLen, 0)]) : buf
     this._chunks.push(padded)
-    this.bufferViews.push({ byteOffset: this._bvOffset, byteLength: buf.byteLength, ...(target ? { target } : {}) })
+    this.bufferViews.push({ buffer: 0, byteOffset: this._bvOffset, byteLength: buf.byteLength, ...(target ? { target } : {}) })
     this._bvOffset += padded.byteLength
     return this.bufferViews.length - 1
   }
