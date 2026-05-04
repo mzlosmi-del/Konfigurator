@@ -39,6 +39,7 @@ import {
 } from '@/components/ui/dialog'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { t } from '@/i18n'
+import { useAuthContext } from '@/components/auth/AuthContext'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -68,7 +69,7 @@ function ActiveBadge({ active }: { active: boolean }) {
 
 // ── Base Prices tab ───────────────────────────────────────────────────────────
 
-function BasePricesTab({ products }: { products: Product[] }) {
+function BasePricesTab({ products, tenantId }: { products: Product[], tenantId: string }) {
   const { toasts, toast, dismiss } = useToast()
   const [schedules, setSchedules] = useState<ProductPriceSchedule[]>([])
   const [loading, setLoading] = useState(false)
@@ -108,6 +109,7 @@ function BasePricesTab({ products }: { products: Product[] }) {
     try {
       const row = {
         ...(editing ? { id: editing.id } : {}),
+        tenant_id: tenantId,
         product_id: selectedProduct,
         price,
         valid_from: form.valid_from,
@@ -233,7 +235,7 @@ function BasePricesTab({ products }: { products: Product[] }) {
 
 interface CharValueOption { id: string; label: string; charName: string }
 
-function ModifiersTab(_: { products: Product[] }) {
+function ModifiersTab({ tenantId }: { products: Product[], tenantId: string }) {
   const { toasts, toast, dismiss } = useToast()
   const [allSchedules, setAllSchedules] = useState<CharModifierSchedule[]>([])
   const [charValues, setCharValues] = useState<CharValueOption[]>([])
@@ -288,6 +290,7 @@ function ModifiersTab(_: { products: Product[] }) {
     try {
       const row = {
         ...(editing ? { id: editing.id } : {}),
+        tenant_id: tenantId,
         characteristic_value_id: form.characteristic_value_id,
         price_modifier: mod,
         valid_from: form.valid_from,
@@ -418,7 +421,7 @@ function ModifiersTab(_: { products: Product[] }) {
 
 // ── Tax Rates tab ─────────────────────────────────────────────────────────────
 
-function TaxRatesTab({ products }: { products: Product[] }) {
+function TaxRatesTab({ products, tenantId }: { products: Product[], tenantId: string }) {
   const { toasts, toast, dismiss } = useToast()
   const [presets, setPresets] = useState<ProductTaxPreset[]>([])
   const [loading, setLoading] = useState(false)
@@ -458,6 +461,7 @@ function TaxRatesTab({ products }: { products: Product[] }) {
     try {
       const row = {
         ...(editing ? { id: editing.id } : {}),
+        tenant_id: tenantId,
         product_id: selectedProduct,
         label: form.label.trim(),
         rate,
@@ -573,7 +577,7 @@ function TaxRatesTab({ products }: { products: Product[] }) {
 
 // ── Preset Adjustments tab ────────────────────────────────────────────────────
 
-function AdjustmentPresetsTab({ products }: { products: Product[] }) {
+function AdjustmentPresetsTab({ products, tenantId }: { products: Product[], tenantId: string }) {
   const { toasts, toast, dismiss } = useToast()
   const [presets, setPresets] = useState<ProductAdjustmentPreset[]>([])
   const [loading, setLoading] = useState(false)
@@ -613,6 +617,7 @@ function AdjustmentPresetsTab({ products }: { products: Product[] }) {
     try {
       const row = {
         ...(editing ? { id: editing.id } : {}),
+        tenant_id: tenantId,
         product_id: selectedProduct,
         label: form.label.trim(),
         adjustment_type: form.adjustment_type,
@@ -754,6 +759,7 @@ function AdjustmentPresetsTab({ products }: { products: Product[] }) {
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export function PricingCenterPage() {
+  const { tenant } = useAuthContext()
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('base-prices')
@@ -806,16 +812,16 @@ export function PricingCenterPage() {
         </TabsList>
 
         <TabsContent value="base-prices" className="mt-4">
-          <BasePricesTab products={products} />
+          <BasePricesTab products={products} tenantId={tenant?.id ?? ''} />
         </TabsContent>
         <TabsContent value="modifiers" className="mt-4">
-          <ModifiersTab products={products} />
+          <ModifiersTab products={products} tenantId={tenant?.id ?? ''} />
         </TabsContent>
         <TabsContent value="tax-rates" className="mt-4">
-          <TaxRatesTab products={products} />
+          <TaxRatesTab products={products} tenantId={tenant?.id ?? ''} />
         </TabsContent>
         <TabsContent value="adjustments" className="mt-4">
-          <AdjustmentPresetsTab products={products} />
+          <AdjustmentPresetsTab products={products} tenantId={tenant?.id ?? ''} />
         </TabsContent>
       </Tabs>
     </div>
