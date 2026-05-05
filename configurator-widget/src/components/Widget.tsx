@@ -10,8 +10,9 @@ import { CharacteristicInput } from './CharacteristicInput'
 import { InquiryForm } from './InquiryForm'
 
 interface Props {
-  config: WidgetConfig
-  track:  (type: string, payload?: Record<string, unknown>) => void
+  config:       WidgetConfig
+  track:        (type: string, payload?: Record<string, unknown>) => void
+  onThemeLoad?: (theme: string) => void
 }
 
 type State =
@@ -20,7 +21,7 @@ type State =
   | { phase: 'ready'; data: FullProductConfig }
   | { phase: 'success'; data: FullProductConfig }
 
-export function Widget({ config, track }: Props) {
+export function Widget({ config, track, onThemeLoad }: Props) {
   const [state, setState] = useState<State>({ phase: 'loading' })
   const [selection, setSelection] = useState<Selection>({})
   const [numericInputs, setNumericInputs] = useState<NumericInputs>({})
@@ -50,6 +51,7 @@ export function Widget({ config, track }: Props) {
         prevNumericDefaultsRef.current  = initialEffect.defaultNumericValues
         setSelection(sanitized)
         setNumericInputs(numericDefaults)
+        if (data.product.widget_theme) onThemeLoad?.(data.product.widget_theme)
       })
       .catch(err => {
         setState({ phase: 'error', message: err.message })

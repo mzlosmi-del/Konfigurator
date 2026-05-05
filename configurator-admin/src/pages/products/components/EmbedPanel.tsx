@@ -29,7 +29,7 @@ export function EmbedPanel({ product }: Props) {
   const [removeBranding, setRemoveBranding] = useState(false)
   const [brandingToggling, setBrandingToggling] = useState(false)
   const [qrDataUrl, setQrDataUrl]         = useState<string>('')
-  const [selectedStyle, setSelectedStyle] = useState<ThemeId>('cloud')
+  const [selectedStyle, setSelectedStyle] = useState<ThemeId>((product.widget_theme as ThemeId) ?? 'cloud')
 
   const isPublished = product.status === 'published'
   const publicSlug  = product.public_slug
@@ -65,6 +65,11 @@ export function EmbedPanel({ product }: Props) {
     '></div>',
     `<script src="${WIDGET_CDN_URL}" async></script>`,
   ].join('\n')
+
+  async function handleStyleChange(style: ThemeId) {
+    setSelectedStyle(style)
+    await supabase.from('products').update({ widget_theme: style } as unknown as never).eq('id', product.id)
+  }
 
   async function handleToggleBranding() {
     setBrandingToggling(true)
@@ -251,7 +256,7 @@ export function EmbedPanel({ product }: Props) {
               <button
                 key={id}
                 type="button"
-                onClick={() => { setSelectedStyle(id); setPreviewKey(k => k + 1) }}
+                onClick={() => { handleStyleChange(id); setPreviewKey(k => k + 1) }}
                 className={[
                   'flex flex-col items-start gap-2 rounded-lg border p-3 text-left transition-all',
                   active

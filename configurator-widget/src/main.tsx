@@ -38,13 +38,19 @@ function mountWidget(el: HTMLElement) {
   shadow.appendChild(styleEl)
 
   const themeEl = document.createElement('style')
-  themeEl.textContent = themeToStyleBlock(el.getAttribute('data-style') ?? 'cloud')
+  const explicitStyle = el.getAttribute('data-style')
+  themeEl.textContent = themeToStyleBlock(explicitStyle ?? 'cloud')
   shadow.appendChild(themeEl)
 
   const mountPoint = document.createElement('div')
   shadow.appendChild(mountPoint)
 
-  render(h(Widget, { config, track }), mountPoint)
+  // If no data-style was set by the embedder, apply the theme saved on the product
+  function onThemeLoad(theme: string) {
+    if (!explicitStyle) themeEl.textContent = themeToStyleBlock(theme)
+  }
+
+  render(h(Widget, { config, track, onThemeLoad }), mountPoint)
 
   // View event fires once per mount
   track('view')
