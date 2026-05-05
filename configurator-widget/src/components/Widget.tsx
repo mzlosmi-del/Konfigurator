@@ -138,20 +138,21 @@ export function Widget({ config, track, onThemeLoad }: Props) {
     const items: ConfigLineItem[] = []
 
     for (const char of state.data.characteristics) {
+      const charName = pickTranslation(char.name_i18n, lang, char.name)
       if (char.display_type === 'number') {
         const val = numericInputs[char.id]
         if (val !== undefined && val !== 0) {
-          items.push({ characteristic_name: char.name, value_label: String(val), price_modifier: 0 })
+          items.push({ characteristic_name: charName, value_label: String(val), price_modifier: 0 })
         }
         continue
       }
       if (!selection[char.id]) continue
       const v = char.values.find(val => val.id === selection[char.id])
-      if (v) items.push({ characteristic_name: char.name, value_label: v.label, price_modifier: v.price_modifier })
+      if (v) items.push({ characteristic_name: charName, value_label: pickTranslation(v.label_i18n, lang, v.label), price_modifier: v.price_modifier })
     }
 
     return items
-  }, [state, selection, numericInputs])
+  }, [state, selection, numericInputs, lang])
 
   const allSelected = useMemo(() => {
     if (state.phase !== 'ready') return false
