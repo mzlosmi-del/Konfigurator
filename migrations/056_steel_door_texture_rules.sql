@@ -32,7 +32,7 @@ BEGIN
 
   SELECT id INTO c_colour
   FROM public.characteristics
-  WHERE tenant_id = sys_tid AND name = 'Boja (RAL)'
+  WHERE tenant_id = sys_tid AND name = 'Boja'
   LIMIT 1;
 
   IF c_colour IS NULL THEN
