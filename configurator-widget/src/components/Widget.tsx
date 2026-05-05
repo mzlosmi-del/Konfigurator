@@ -156,10 +156,11 @@ export function Widget({ config, track, onThemeLoad }: Props) {
 
   const allSelected = useMemo(() => {
     if (state.phase !== 'ready') return false
-    return state.data.characteristics.every(c =>
-      c.display_type === 'number' || !!selection[c.id]
-    )
-  }, [state, selection])
+    return state.data.characteristics.every(c => {
+      if (c.display_type === 'number') return numericInputs[c.id] !== undefined
+      return !!selection[c.id]
+    })
+  }, [state, selection, numericInputs])
 
   // ── Renders ─────────────────────────────────────────────────────────────────
 
