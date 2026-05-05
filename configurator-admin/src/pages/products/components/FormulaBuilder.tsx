@@ -1,6 +1,7 @@
+import { useEffect, useState } from 'react'
 import type { FormulaNode, PricingFormula } from '@/types/database'
 import type { Characteristic, CharacteristicValue } from '@/types/database'
-import { t } from '@/i18n'
+import { t, getLang, pickTranslation, type Lang } from '@/i18n'
 
 // ── Node type helpers ─────────────────────────────────────────────────────────
 
@@ -66,12 +67,13 @@ function formulaToString(
   node: FormulaNode,
   chars: Characteristic[],
   valuesMap: Record<string, CharacteristicValue[]>,
-  formulas: Pick<PricingFormula, 'id' | 'name'>[] = []
+  formulas: Pick<PricingFormula, 'id' | 'name'>[] = [],
+  lang = 'sr'
 ): string {
-  const charName    = (id: string) => chars.find(c => c.id === id)?.name ?? '?'
-  const valueName   = (cId: string, vId: string) => valuesMap[cId]?.find(v => v.id === vId)?.label ?? '?'
+  const charName    = (id: string) => { const c = chars.find(c => c.id === id); return c ? pickTranslation(c.name_i18n as Record<string,string> | null, lang, c.name) : '?' }
+  const valueName   = (cId: string, vId: string) => { const v = valuesMap[cId]?.find(v => v.id === vId); return v ? pickTranslation(v.label_i18n as Record<string,string> | null, lang, v.label) : '?' }
   const formulaName = (id: string) => formulas.find(f => f.id === id)?.name ?? '?'
-  const s = (n: FormulaNode): string => formulaToString(n, chars, valuesMap, formulas)
+  const s = (n: FormulaNode): string => formulaToString(n, chars, valuesMap, formulas, lang)
 
   switch (node.type) {
     case 'number':      return String(node.value)
@@ -220,10 +222,11 @@ const TEMPLATE_GROUPS: TemplateGroup[] = [
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
-function CharPicker({ value, chars, onChange }: {
+function CharPicker({ value, chars, onChange, lang }: {
   value: string
   chars: Characteristic[]
   onChange: (id: string) => void
+  lang: string
 }) {
   if (chars.length === 0) {
     return <span className="text-xs text-muted-foreground italic">{t('No characteristics available')}</span>
@@ -242,18 +245,19 @@ function CharPicker({ value, chars, onChange }: {
               : 'bg-background border-input hover:bg-muted',
           ].join(' ')}
         >
-          {c.name}
+          {pickTranslation(c.name_i18n as Record<string,string> | null, lang, c.name)}
         </button>
       ))}
     </div>
   )
 }
 
-function ValuePicker({ charId, value, valuesMap, onChange }: {
+function ValuePicker({ charId, value, valuesMap, onChange, lang }: {
   charId: string
   value: string
   valuesMap: Record<string, CharacteristicValue[]>
   onChange: (id: string) => void
+  lang: string
 }) {
   const vals = valuesMap[charId] ?? []
   if (vals.length === 0) {
@@ -273,7 +277,7 @@ function ValuePicker({ charId, value, valuesMap, onChange }: {
               : 'bg-background border-input hover:bg-muted',
           ].join(' ')}
         >
-          {v.label}
+          {pickTranslation(v.label_i18n as Record<string,string> | null, lang, v.label)}
         </button>
       ))}
     </div>
@@ -313,6 +317,13 @@ interface FormulaBuilderProps {
 // ── Main recursive component ──────────────────────────────────────────────────
 
 export function FormulaBuilder({ node, onChange, characteristics, valuesMap, otherFormulas = [], isRoot = false }: FormulaBuilderProps) {
+  const [lang, setLangState] = useState(getLang())
+  useEffect(() => {
+    const handler = (e: Event) => setLangState((e as CustomEvent<Lang>).detail)
+    window.addEventListener('langchange', handler)
+    return () => window.removeEventListener('langchange', handler)
+  }, [])
+
   const selectChars  = characteristics.filter(c => c.display_type !== 'number')
   const numberChars  = characteristics.filter(c => c.display_type === 'number')
   const firstCharId  = selectChars[0]?.id ?? characteristics[0]?.id ?? ''
@@ -346,7 +357,7 @@ export function FormulaBuilder({ node, onChange, characteristics, valuesMap, oth
       <div className="space-y-4">
         {/* Preview */}
         <div className="rounded bg-muted/40 px-3 py-2 font-mono text-xs text-foreground break-all">
-          {formulaToString(node, characteristics, valuesMap, otherFormulas)}
+          {formulaToString(node, characteristics, valuesMap, otherFormulas, lang)}
         </div>
 
         {/* Templates */}
@@ -432,6 +443,7 @@ export function FormulaBuilder({ node, onChange, characteristics, valuesMap, oth
               value={node.char_id}
               chars={selectChars}
               onChange={v => onChange({ type: 'modifier', char_id: v })}
+              lang={lang}
             />
           </div>
         </div>
@@ -449,6 +461,7 @@ export function FormulaBuilder({ node, onChange, characteristics, valuesMap, oth
               value={node.char_id}
               chars={numberChars}
               onChange={v => onChange({ type: 'input', char_id: v })}
+              lang={lang}
             />
           </div>
         </div>
@@ -466,6 +479,7 @@ export function FormulaBuilder({ node, onChange, characteristics, valuesMap, oth
               value={node.char_id}
               chars={selectChars}
               onChange={v => onChange({ type: 'is_selected', char_id: v, value_id: '' })}
+              lang={lang}
             />
             {node.char_id && (
               <>
@@ -475,6 +489,7 @@ export function FormulaBuilder({ node, onChange, characteristics, valuesMap, oth
                   value={node.value_id}
                   valuesMap={valuesMap}
                   onChange={v => onChange({ ...node, value_id: v })}
+                  lang={lang}
                 />
               </>
             )}

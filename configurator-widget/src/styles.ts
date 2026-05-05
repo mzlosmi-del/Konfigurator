@@ -482,6 +482,10 @@ export const WIDGET_STYLES = `
   .cw-bar-cta:hover:not(:disabled) { background: var(--cw-cta-hover); }
   .cw-bar-cta:active:not(:disabled) { transform: translateY(1px); }
   .cw-bar-cta:disabled { background: var(--cw-surface-alt); color: var(--cw-text-placeholder); cursor: not-allowed; }
+  @media (max-width: 480px) {
+    .cw-bar-row { flex-direction: column; align-items: stretch; gap: 10px; }
+    .cw-bar-cta { text-align: center; }
+  }
 
   /* ── Inquiry form ───────────────────────────────── */
   .cw-inquiry-form {

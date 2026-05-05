@@ -25,6 +25,7 @@ export interface ProductData {
   ar_enabled: boolean
   ar_placement: 'floor' | 'wall'
   form_config: FormConfig
+  widget_theme: string
 }
 
 export interface CharacteristicValue {

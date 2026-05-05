@@ -136,15 +136,16 @@ function applyMeshRules(
     }
 
     for (const rule of rules) {
-      if (rule.type === 'dimension' && rule.node_name === n.name && n.scale) {
-        const raw = numericInputs[rule.characteristic_id]
-        if (raw === undefined) continue
-        const t_ = Math.max(0, Math.min(1, (raw - rule.value_min) / (rule.value_max - rule.value_min)))
-        const s = rule.scale_min + t_ * (rule.scale_max - rule.scale_min)
-        if (rule.axis === 'x') n.scale.x = s
-        else if (rule.axis === 'y') n.scale.y = s
-        else n.scale.z = s
-      }
+      // Dimension scaling disabled
+      // if (rule.type === 'dimension' && rule.node_name === n.name && n.scale) {
+      //   const raw = numericInputs[rule.characteristic_id]
+      //   if (raw === undefined) continue
+      //   const t_ = Math.max(0, Math.min(1, (raw - rule.value_min) / (rule.value_max - rule.value_min)))
+      //   const s = rule.scale_min + t_ * (rule.scale_max - rule.scale_min)
+      //   if (rule.axis === 'x') n.scale.x = s
+      //   else if (rule.axis === 'y') n.scale.y = s
+      //   else n.scale.z = s
+      // }
       if (rule.type === 'translate' && rule.node_name === n.name && n.position) {
         const raw = numericInputs[rule.characteristic_id]
         if (raw === undefined) continue
@@ -429,11 +430,11 @@ function ModelViewer3D({
     applyTextureRules(mvRef.current, rules, selection)
   }, [rules, selection])
 
-  // Smooth tween for dimension + translate rules on numeric input change
-  useEffect(() => {
-    if (!mvRef.current || !loadedRef.current) return
-    tweenDimensions(mvRef.current, rules, numericInputs, 250, dimRafRef)
-  }, [rules, numericInputs])
+  // Smooth tween for dimension + translate rules — disabled
+  // useEffect(() => {
+  //   if (!mvRef.current || !loadedRef.current) return
+  //   tweenDimensions(mvRef.current, rules, numericInputs, 250, dimRafRef)
+  // }, [rules, numericInputs])
 
   // Glow → persistent highlight on discrete selection change
   useEffect(() => {
@@ -456,22 +457,23 @@ function ModelViewer3D({
     updateHighlights(scene, rules, removedValueIds, addedValueIds, highlightRef.current)
 
     // Shift camera toward the newly visible mesh centroid
-    const addedMeshNames = new Set<string>()
-    for (const vid of addedValueIds)
-      for (const r of rules)
-        if (r.type === 'visibility' && r.value_id === vid) addedMeshNames.add(r.mesh_name)
-    if (addedMeshNames.size > 0) focusCameraOnNewMeshes(mvRef.current, scene, addedMeshNames)
+    // const addedMeshNames = new Set<string>()
+    // for (const vid of addedValueIds)
+    //   for (const r of rules)
+    //     if (r.type === 'visibility' && r.value_id === vid) addedMeshNames.add(r.mesh_name)
+    // if (addedMeshNames.size > 0) focusCameraOnNewMeshes(mvRef.current, scene, addedMeshNames)
   }, [selection]) // intentionally excludes numericInputs
 
-  // Dimension overlay — derive characteristic IDs from dimension rules
-  const widthRule  = rules.find(r => r.type === 'dimension' && r.axis === 'x')
-  const heightRule = rules.find(r => r.type === 'dimension' && r.axis === 'y')
-  const wVal = widthRule  ? (numericInputs[widthRule.characteristic_id]  ?? 0) : 0
-  const hVal = heightRule ? (numericInputs[heightRule.characteristic_id] ?? 0) : 0
+  // Dimension overlay — disabled until layout is finalised
+  // const widthRule  = rules.find(r => r.type === 'dimension' && r.axis === 'x')
+  // const heightRule = rules.find(r => r.type === 'dimension' && r.axis === 'y')
+  // const wVal = widthRule  ? (numericInputs[widthRule.characteristic_id]  ?? 0) : 0
+  // const hVal = heightRule ? (numericInputs[heightRule.characteristic_id] ?? 0) : 0
 
   return (
     <div style="position:relative;width:100%;height:100%">
       <div ref={containerRef} style="width:100%;height:100%" />
+      {/* Dimension overlay — disabled
       {(wVal > 0 || hVal > 0) && (
         <svg class="cw-dim-overlay" xmlns="http://www.w3.org/2000/svg">
           {wVal > 0 && (
@@ -492,6 +494,7 @@ function ModelViewer3D({
           )}
         </svg>
       )}
+      */}
     </div>
   )
 }

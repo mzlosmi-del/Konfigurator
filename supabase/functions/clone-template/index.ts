@@ -110,7 +110,7 @@ Deno.serve(async (req: Request) => {
     // 3. Clone each characteristic
     const { data: newChar } = await supabase
       .from('characteristics')
-      .insert({ tenant_id: tenantId, name: oldChar.name, display_type: oldChar.display_type, sort_order: oldChar.sort_order })
+      .insert({ tenant_id: tenantId, name: oldChar.name, name_i18n: (oldChar as any).name_i18n ?? null, display_type: oldChar.display_type, sort_order: oldChar.sort_order })
       .select().single()
 
     if (!newChar) continue
@@ -131,8 +131,10 @@ Deno.serve(async (req: Request) => {
           characteristic_id: newCharId,
           tenant_id:         tenantId,
           label:             val.label,
+          label_i18n:        val.label_i18n ?? null,
           price_modifier:    val.price_modifier,
           sort_order:        val.sort_order,
+          hex_color:         val.hex_color ?? null,
         })
         .select().single()
 

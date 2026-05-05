@@ -10,8 +10,9 @@ import { CharacteristicInput } from './CharacteristicInput'
 import { InquiryForm } from './InquiryForm'
 
 interface Props {
-  config: WidgetConfig
-  track:  (type: string, payload?: Record<string, unknown>) => void
+  config:       WidgetConfig
+  track:        (type: string, payload?: Record<string, unknown>) => void
+  onThemeLoad?: (theme: string) => void
 }
 
 type State =
@@ -20,7 +21,7 @@ type State =
   | { phase: 'ready'; data: FullProductConfig }
   | { phase: 'success'; data: FullProductConfig }
 
-export function Widget({ config, track }: Props) {
+export function Widget({ config, track, onThemeLoad }: Props) {
   const [state, setState] = useState<State>({ phase: 'loading' })
   const [selection, setSelection] = useState<Selection>({})
   const [numericInputs, setNumericInputs] = useState<NumericInputs>({})
@@ -50,6 +51,7 @@ export function Widget({ config, track }: Props) {
         prevNumericDefaultsRef.current  = initialEffect.defaultNumericValues
         setSelection(sanitized)
         setNumericInputs(numericDefaults)
+        if (data.product.widget_theme) onThemeLoad?.(data.product.widget_theme)
       })
       .catch(err => {
         setState({ phase: 'error', message: err.message })
@@ -136,27 +138,29 @@ export function Widget({ config, track }: Props) {
     const items: ConfigLineItem[] = []
 
     for (const char of state.data.characteristics) {
+      const charName = pickTranslation(char.name_i18n, lang, char.name)
       if (char.display_type === 'number') {
         const val = numericInputs[char.id]
         if (val !== undefined && val !== 0) {
-          items.push({ characteristic_name: char.name, value_label: String(val), price_modifier: 0 })
+          items.push({ characteristic_name: charName, value_label: String(val), price_modifier: 0 })
         }
         continue
       }
       if (!selection[char.id]) continue
       const v = char.values.find(val => val.id === selection[char.id])
-      if (v) items.push({ characteristic_name: char.name, value_label: v.label, price_modifier: v.price_modifier })
+      if (v) items.push({ characteristic_name: charName, value_label: pickTranslation(v.label_i18n, lang, v.label), price_modifier: v.price_modifier })
     }
 
     return items
-  }, [state, selection, numericInputs])
+  }, [state, selection, numericInputs, lang])
 
   const allSelected = useMemo(() => {
     if (state.phase !== 'ready') return false
-    return state.data.characteristics.every(c =>
-      c.display_type === 'number' || !!selection[c.id]
-    )
-  }, [state, selection])
+    return state.data.characteristics.every(c => {
+      if (c.display_type === 'number') return numericInputs[c.id] !== undefined
+      return !!selection[c.id]
+    })
+  }, [state, selection, numericInputs])
 
   // ── Renders ─────────────────────────────────────────────────────────────────
 

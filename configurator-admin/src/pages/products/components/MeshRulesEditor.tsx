@@ -142,9 +142,9 @@ export function MeshRulesEditor({ assetId: _assetId, assetUrl, initialRules, ini
         </div>
       )}
 
-      {/* Tab switcher */}
+      {/* Tab switcher — Dimensions tab hidden until dimension rules are re-enabled */}
       <div className="flex gap-1 border-b pb-0">
-        {(['visibility', 'dimension'] as const).map(tab_ => (
+        {(['visibility'] as const).map(tab_ => (
           <button
             key={tab_}
             type="button"
@@ -156,7 +156,7 @@ export function MeshRulesEditor({ assetId: _assetId, assetUrl, initialRules, ini
                 : 'border-transparent text-muted-foreground hover:text-foreground',
             ].join(' ')}
           >
-            {tab_ === 'visibility' ? t('Visibility') : t('Dimensions')}
+            {t('Visibility')}
           </button>
         ))}
       </div>

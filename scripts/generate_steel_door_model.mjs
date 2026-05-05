@@ -20,8 +20,7 @@
  *   ├── Lock_Smart         electronic keypad panel (lock = smart)
  *   ├── Hinge_Standard_A/B/C  butt hinges; A has a translate rule for height
  *   ├── Hinge_Concealed_A/B/C flush-mount concealed hinges; A has translate rule
- *   ├── Hinge_Heavy_A/B/C    heavy-duty reinforced hinges; A has translate rule
- *   └── Floor_Plane        neutral ground plane for contact shadow / spatial grounding
+ *   └── Hinge_Heavy_A/B/C    heavy-duty reinforced hinges; A has translate rule
  *
  * Usage:
  *   node scripts/generate_steel_door_model.mjs [output.glb]
@@ -350,7 +349,6 @@ const MAT_GLASS  = b.addMaterial('Glass_Clear',      0.680, 0.800, 0.920, 0.35, 
 const MAT_GFRAME = b.addMaterial('Steel_GlassFrame', 0.420, 0.435, 0.450, 1, 0.82, 0.28)
 const MAT_CHROME = b.addMaterial('Chrome',           0.860, 0.880, 0.900, 1, 1.00, 0.08)
 const MAT_ELEC   = b.addMaterial('Electronics',      0.080, 0.090, 0.100, 1, 0.20, 0.75)
-const MAT_FLOOR  = b.addMaterial('Concrete_Floor',   0.620, 0.600, 0.580, 1, 0.00, 0.90)
 
 // ── Mesh definitions ────────────────────────────────────────────────────────
 
@@ -457,15 +455,10 @@ const mHingeHeavyA = b.addMesh('Hinge_Heavy_A',      ...Object.values(heavyHinge
 const mHingeHeavyB = b.addMesh('Hinge_Heavy_B',      ...Object.values(heavyHinge(HINGE_Y[1])), MAT_CHROME)
 const mHingeHeavyC = b.addMesh('Hinge_Heavy_C',      ...Object.values(heavyHinge(HINGE_Y[2])), MAT_CHROME)
 
-// ── Floor plane (neutral ground, provides contact shadow + spatial grounding) ─
-// Positioned just below the frame threshold (threshold bottom at Y = -FP = -0.060).
-const floorGeom = box(0, -FP - 0.010, 0, 1.500, 0.010, 0.700)
-const mFloor = b.addMesh('Floor_Plane', ...Object.values(floorGeom), MAT_FLOOR)
-
 // ── Scene graph ────────────────────────────────────────────────────────────
 //
 // Door_Scalable: only the door body (frame + leaf + glass) scales with
-// dimension rules. Hardware and floor are siblings at Door_Root level.
+// dimension rules. Hardware is a sibling at Door_Root level.
 
 const nScalable = b.addNode('Door_Scalable', null, [
   b.addNode('Door_Frame',          mDoorFrame),
@@ -490,15 +483,12 @@ const nHingeHeavyA = b.addNode('Hinge_Heavy_A',      mHingeHeavyA)
 const nHingeHeavyB = b.addNode('Hinge_Heavy_B',      mHingeHeavyB)
 const nHingeHeavyC = b.addNode('Hinge_Heavy_C',      mHingeHeavyC)
 
-const nFloor = b.addNode('Floor_Plane', mFloor)
-
 const rootIdx = b.addNode('Door_Root', null, [
   nScalable,
   nLockCyl, nLockMP, nLockSmart,
   nHingeStdA, nHingeStdB, nHingeStdC,
   nHingeConcA, nHingeConcB, nHingeConcC,
   nHingeHeavyA, nHingeHeavyB, nHingeHeavyC,
-  nFloor,
 ])
 b.scenes[0] = { nodes: [rootIdx] }
 

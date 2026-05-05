@@ -137,6 +137,7 @@ export interface Database {
           ar_enabled: boolean
           ar_placement: 'floor' | 'wall'
           form_config: Json
+          widget_theme: string
           name_i18n: Json
           description_i18n: Json
           created_at: string

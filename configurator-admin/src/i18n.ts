@@ -1094,3 +1094,11 @@ export function t(key: string): string {
   if (_lang === 'en') return key
   return sr[key] ?? key
 }
+
+export function pickTranslation(
+  i18n: Record<string, string> | null | undefined,
+  lang: string,
+  fallback: string,
+): string {
+  return (i18n && i18n[lang]) ? i18n[lang] : fallback
+}
