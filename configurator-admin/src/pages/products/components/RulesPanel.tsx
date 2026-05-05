@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
 import { useToast } from '@/hooks/useToast'
 import { Toaster } from '@/components/ui/toast'
-import { t } from '@/i18n'
+import { t, getLang, pickTranslation, type Lang } from '@/i18n'
 
 interface Props {
   productId: string
@@ -41,10 +41,11 @@ function requiresSelectTarget(ruleType: RuleType) {
 
 // ── Pill pickers ──────────────────────────────────────────────────────────────
 
-function CharPicker({ value, chars, onChange }: {
+function CharPicker({ value, chars, onChange, lang }: {
   value: string
   chars: Characteristic[]
   onChange: (id: string) => void
+  lang: string
 }) {
   if (chars.length === 0) {
     return <span className="text-xs text-muted-foreground italic">{t('No characteristics available')}</span>
@@ -63,18 +64,19 @@ function CharPicker({ value, chars, onChange }: {
               : 'bg-background border-input hover:bg-muted',
           ].join(' ')}
         >
-          {c.name}
+          {pickTranslation(c.name_i18n as Record<string,string> | null, lang, c.name)}
         </button>
       ))}
     </div>
   )
 }
 
-function ValuePicker({ charId, value, valuesMap, onChange }: {
+function ValuePicker({ charId, value, valuesMap, onChange, lang }: {
   charId: string
   value: string
   valuesMap: ValuesMap
   onChange: (id: string) => void
+  lang: string
 }) {
   const vals = valuesMap[charId] ?? []
   if (vals.length === 0) {
@@ -94,7 +96,7 @@ function ValuePicker({ charId, value, valuesMap, onChange }: {
               : 'bg-background border-input hover:bg-muted',
           ].join(' ')}
         >
-          {v.label}
+          {pickTranslation(v.label_i18n as Record<string,string> | null, lang, v.label)}
         </button>
       ))}
     </div>
@@ -111,6 +113,13 @@ function isNumeric(charId: string, chars: Characteristic[]) {
 
 export function RulesPanel({ productId }: Props) {
   const { toasts, toast, dismiss } = useToast()
+  const [lang, setLangState] = useState(getLang())
+
+  useEffect(() => {
+    const handler = (e: Event) => setLangState((e as CustomEvent<Lang>).detail)
+    window.addEventListener('langchange', handler)
+    return () => window.removeEventListener('langchange', handler)
+  }, [])
 
   const [loading, setLoading]               = useState(true)
   const [rules, setRules]                   = useState<ConfigurationRule[]>([])
@@ -225,11 +234,13 @@ export function RulesPanel({ productId }: Props) {
   }
 
   function charName(id: string) {
-    return characteristics.find(c => c.id === id)?.name ?? id
+    const c = characteristics.find(c => c.id === id)
+    return c ? pickTranslation(c.name_i18n as Record<string,string> | null, lang, c.name) : id
   }
 
   function valueName(charId: string, valueId: string) {
-    return valuesMap[charId]?.find(v => v.id === valueId)?.label ?? valueId
+    const v = valuesMap[charId]?.find(v => v.id === valueId)
+    return v ? pickTranslation(v.label_i18n as Record<string,string> | null, lang, v.label) : valueId
   }
 
   function ruleConditionLabel(rule: ConfigurationRule) {
@@ -328,7 +339,7 @@ export function RulesPanel({ productId }: Props) {
         <div className="space-y-2">
           <div className="flex items-start gap-3">
             <span className="text-xs font-bold text-primary pt-1 w-10 shrink-0">{t('IF')}</span>
-            <CharPicker value={condCharId} chars={characteristics} onChange={handleCondCharChange} />
+            <CharPicker value={condCharId} chars={characteristics} onChange={handleCondCharChange} lang={lang} />
           </div>
 
           {/* Select-type condition: value picker */}
@@ -340,6 +351,7 @@ export function RulesPanel({ productId }: Props) {
                 value={condValueId}
                 valuesMap={valuesMap}
                 onChange={setCondValueId}
+                lang={lang}
               />
             </div>
           )}
@@ -401,7 +413,7 @@ export function RulesPanel({ productId }: Props) {
         <div className="space-y-2">
           <div className="flex items-start gap-3">
             <span className="text-xs font-bold text-primary pt-1 w-10 shrink-0">{t('ON')}</span>
-            <CharPicker value={effCharId} chars={effectChars} onChange={handleEffCharChange} />
+            <CharPicker value={effCharId} chars={effectChars} onChange={handleEffCharChange} lang={lang} />
           </div>
 
           {/* Select-type target: value picker */}
@@ -413,6 +425,7 @@ export function RulesPanel({ productId }: Props) {
                 value={effValueId}
                 valuesMap={valuesMap}
                 onChange={setEffValueId}
+                lang={lang}
               />
             </div>
           )}
