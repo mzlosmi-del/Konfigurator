@@ -456,22 +456,23 @@ function ModelViewer3D({
     updateHighlights(scene, rules, removedValueIds, addedValueIds, highlightRef.current)
 
     // Shift camera toward the newly visible mesh centroid
-    const addedMeshNames = new Set<string>()
-    for (const vid of addedValueIds)
-      for (const r of rules)
-        if (r.type === 'visibility' && r.value_id === vid) addedMeshNames.add(r.mesh_name)
-    if (addedMeshNames.size > 0) focusCameraOnNewMeshes(mvRef.current, scene, addedMeshNames)
+    // const addedMeshNames = new Set<string>()
+    // for (const vid of addedValueIds)
+    //   for (const r of rules)
+    //     if (r.type === 'visibility' && r.value_id === vid) addedMeshNames.add(r.mesh_name)
+    // if (addedMeshNames.size > 0) focusCameraOnNewMeshes(mvRef.current, scene, addedMeshNames)
   }, [selection]) // intentionally excludes numericInputs
 
-  // Dimension overlay — derive characteristic IDs from dimension rules
-  const widthRule  = rules.find(r => r.type === 'dimension' && r.axis === 'x')
-  const heightRule = rules.find(r => r.type === 'dimension' && r.axis === 'y')
-  const wVal = widthRule  ? (numericInputs[widthRule.characteristic_id]  ?? 0) : 0
-  const hVal = heightRule ? (numericInputs[heightRule.characteristic_id] ?? 0) : 0
+  // Dimension overlay — disabled until layout is finalised
+  // const widthRule  = rules.find(r => r.type === 'dimension' && r.axis === 'x')
+  // const heightRule = rules.find(r => r.type === 'dimension' && r.axis === 'y')
+  // const wVal = widthRule  ? (numericInputs[widthRule.characteristic_id]  ?? 0) : 0
+  // const hVal = heightRule ? (numericInputs[heightRule.characteristic_id] ?? 0) : 0
 
   return (
     <div style="position:relative;width:100%;height:100%">
       <div ref={containerRef} style="width:100%;height:100%" />
+      {/* Dimension overlay — disabled
       {(wVal > 0 || hVal > 0) && (
         <svg class="cw-dim-overlay" xmlns="http://www.w3.org/2000/svg">
           {wVal > 0 && (
@@ -492,6 +493,7 @@ function ModelViewer3D({
           )}
         </svg>
       )}
+      */}
     </div>
   )
 }
