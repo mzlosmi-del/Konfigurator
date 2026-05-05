@@ -136,15 +136,16 @@ function applyMeshRules(
     }
 
     for (const rule of rules) {
-      if (rule.type === 'dimension' && rule.node_name === n.name && n.scale) {
-        const raw = numericInputs[rule.characteristic_id]
-        if (raw === undefined) continue
-        const t_ = Math.max(0, Math.min(1, (raw - rule.value_min) / (rule.value_max - rule.value_min)))
-        const s = rule.scale_min + t_ * (rule.scale_max - rule.scale_min)
-        if (rule.axis === 'x') n.scale.x = s
-        else if (rule.axis === 'y') n.scale.y = s
-        else n.scale.z = s
-      }
+      // Dimension scaling disabled
+      // if (rule.type === 'dimension' && rule.node_name === n.name && n.scale) {
+      //   const raw = numericInputs[rule.characteristic_id]
+      //   if (raw === undefined) continue
+      //   const t_ = Math.max(0, Math.min(1, (raw - rule.value_min) / (rule.value_max - rule.value_min)))
+      //   const s = rule.scale_min + t_ * (rule.scale_max - rule.scale_min)
+      //   if (rule.axis === 'x') n.scale.x = s
+      //   else if (rule.axis === 'y') n.scale.y = s
+      //   else n.scale.z = s
+      // }
       if (rule.type === 'translate' && rule.node_name === n.name && n.position) {
         const raw = numericInputs[rule.characteristic_id]
         if (raw === undefined) continue
@@ -429,11 +430,11 @@ function ModelViewer3D({
     applyTextureRules(mvRef.current, rules, selection)
   }, [rules, selection])
 
-  // Smooth tween for dimension + translate rules on numeric input change
-  useEffect(() => {
-    if (!mvRef.current || !loadedRef.current) return
-    tweenDimensions(mvRef.current, rules, numericInputs, 250, dimRafRef)
-  }, [rules, numericInputs])
+  // Smooth tween for dimension + translate rules — disabled
+  // useEffect(() => {
+  //   if (!mvRef.current || !loadedRef.current) return
+  //   tweenDimensions(mvRef.current, rules, numericInputs, 250, dimRafRef)
+  // }, [rules, numericInputs])
 
   // Glow → persistent highlight on discrete selection change
   useEffect(() => {
