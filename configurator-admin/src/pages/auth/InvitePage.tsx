@@ -154,6 +154,45 @@ export function InvitePage() {
 
   // Logged-in user accepting
   if (session) {
+    const sessionEmail = (session.user.email ?? '').toLowerCase()
+    const inviteEmail  = invite.email.toLowerCase()
+
+    if (sessionEmail !== inviteEmail) {
+      return (
+        <div className="flex min-h-screen items-center justify-center bg-background p-4">
+          <div className="w-full max-w-sm space-y-6">
+            {logo}
+            <Card>
+              <CardHeader>
+                <div className="flex justify-center mb-2">
+                  <XCircle className="h-10 w-10 text-destructive" />
+                </div>
+                <CardTitle className="text-center">{t('Wrong account')}</CardTitle>
+                <CardDescription className="text-center">
+                  {t("You're signed in as")} <strong>{session.user.email}</strong>,{' '}
+                  {t('but this invite is for')} <strong>{invite.email}</strong>.
+                </CardDescription>
+              </CardHeader>
+              <CardFooter className="flex flex-col gap-2">
+                <Button
+                  className="w-full"
+                  onClick={async () => {
+                    await supabase.auth.signOut()
+                    window.location.reload()
+                  }}
+                >
+                  {t('Sign out and continue')}
+                </Button>
+                <Button variant="ghost" className="w-full" onClick={() => navigate('/dashboard')}>
+                  {t('Cancel')}
+                </Button>
+              </CardFooter>
+            </Card>
+          </div>
+        </div>
+      )
+    }
+
     return (
       <div className="flex min-h-screen items-center justify-center bg-background p-4">
         <div className="w-full max-w-sm space-y-6">
