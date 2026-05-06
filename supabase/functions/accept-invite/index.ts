@@ -57,12 +57,6 @@ Deno.serve(async (req: Request) => {
     })
   }
 
-  if (invite.accepted_at) {
-    return new Response(JSON.stringify({ error: 'already_accepted' }), {
-      status: 409, headers: { ...CORS, 'Content-Type': 'application/json' },
-    })
-  }
-
   if (new Date(invite.expires_at) < new Date()) {
     return new Response(JSON.stringify({ error: 'expired' }), {
       status: 410, headers: { ...CORS, 'Content-Type': 'application/json' },
@@ -76,7 +70,8 @@ Deno.serve(async (req: Request) => {
     })
   }
 
-  // Upsert profile: assign to invited tenant + role, overriding any prior state
+  // Upsert profile: assign to invited tenant + role, overriding any prior state.
+  // Idempotent — safe to call even if the DB trigger already ran during signUp.
   const { error: upsertErr } = await sb
     .from('profiles')
     .upsert({
@@ -91,11 +86,13 @@ Deno.serve(async (req: Request) => {
     return new Response('Server error', { status: 500, headers: CORS })
   }
 
-  // Mark invitation as accepted
-  await sb
-    .from('invitations')
-    .update({ accepted_at: new Date().toISOString() })
-    .eq('id', invite.id)
+  // Mark invitation as accepted (skip if the DB trigger already did this)
+  if (!invite.accepted_at) {
+    await sb
+      .from('invitations')
+      .update({ accepted_at: new Date().toISOString() })
+      .eq('id', invite.id)
+  }
 
   return new Response(JSON.stringify({ ok: true }), {
     headers: { ...CORS, 'Content-Type': 'application/json' },

@@ -41,12 +41,14 @@ export function InvitePage() {
   const [inviteError, setInviteError] = useState<string | null>(null)
   const [serverError, setServerError] = useState<string | null>(null)
   const [accepting, setAccepting] = useState(false)
+  const [emailConfirmSent, setEmailConfirmSent] = useState(false)
 
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<FormValues>({
     resolver: zodResolver(schema),
   })
 
-  // Validate invite token on mount
+  // Validate invite token on mount, and re-check when the user's identity changes
+  // (e.g. landing back here after clicking the Supabase email-confirmation link)
   useEffect(() => {
     if (!token) { setInviteError(t('Invalid invite link.')); return }
     supabase
@@ -57,11 +59,20 @@ export function InvitePage() {
       .then(({ data }) => {
         if (!data) { setInviteError(t('Invite not found or already used.')); return }
         const rec = data as unknown as InviteRecord
-        if (rec.accepted_at) { setInviteError(t('This invite has already been accepted.')); return }
+        if (rec.accepted_at) {
+          // If the confirmed user is the one who was invited, send them straight to the app
+          if (session?.user?.email?.toLowerCase() === rec.email.toLowerCase()) {
+            navigate('/dashboard', { replace: true })
+            return
+          }
+          setInviteError(t('This invite has already been accepted.'))
+          return
+        }
         if (new Date(rec.expires_at) < new Date()) { setInviteError(t('This invite has expired.')); return }
         setInvite(rec)
       })
-  }, [token])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, session?.user?.id])
 
   async function callAcceptInvite(accessToken: string): Promise<string | null> {
     const res = await supabase.functions.invoke('accept-invite', {
@@ -97,12 +108,17 @@ export function InvitePage() {
       email:    invite.email,
       password,
       // Keep invite_token in metadata as a fallback for the DB trigger
-      options: { data: { invite_token: token } },
+      options: {
+        data: { invite_token: token },
+        emailRedirectTo: `${window.location.origin}/invite/${token}`,
+      },
     })
     if (error) { setServerError(error.message); return }
     if (!data.session) {
-      // Email confirmation required — the DB trigger handled profile assignment
-      navigate('/login', { replace: true })
+      // Email confirmation required — show "check your email" card.
+      // emailRedirectTo brings the user back to this page after confirmation,
+      // where the useEffect above will detect their session and redirect to /dashboard.
+      setEmailConfirmSent(true)
       return
     }
     // Override whatever the trigger did to guarantee correct tenant + role
@@ -150,10 +166,68 @@ export function InvitePage() {
     )
   }
 
+  if (emailConfirmSent) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background p-4">
+        <div className="w-full max-w-sm space-y-6">
+          {logo}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-center">{t('Check your email')}</CardTitle>
+              <CardDescription className="text-center">
+                {t("We've sent a confirmation link to")} <strong>{invite.email}</strong>.{' '}
+                {t('Click the link to verify your address and complete joining the workspace.')}
+              </CardDescription>
+            </CardHeader>
+          </Card>
+        </div>
+      </div>
+    )
+  }
+
   const tenantName = (invite.tenant as { name: string } | null)?.name ?? t('a workspace')
 
   // Logged-in user accepting
   if (session) {
+    const sessionEmail = (session.user.email ?? '').toLowerCase()
+    const inviteEmail  = invite.email.toLowerCase()
+
+    if (sessionEmail !== inviteEmail) {
+      return (
+        <div className="flex min-h-screen items-center justify-center bg-background p-4">
+          <div className="w-full max-w-sm space-y-6">
+            {logo}
+            <Card>
+              <CardHeader>
+                <div className="flex justify-center mb-2">
+                  <XCircle className="h-10 w-10 text-destructive" />
+                </div>
+                <CardTitle className="text-center">{t('Wrong account')}</CardTitle>
+                <CardDescription className="text-center">
+                  {t("You're signed in as")} <strong>{session.user.email}</strong>,{' '}
+                  {t('but this invite is for')} <strong>{invite.email}</strong>.
+                </CardDescription>
+              </CardHeader>
+              <CardFooter className="flex flex-col gap-2">
+                <Button
+                  className="w-full"
+                  onClick={async () => {
+                    await supabase.auth.signOut()
+                    window.location.reload()
+                  }}
+                >
+                  {t('Sign out and continue')}
+                </Button>
+                <Button variant="ghost" className="w-full" onClick={() => navigate('/dashboard')}>
+                  {t('Cancel')}
+                </Button>
+              </CardFooter>
+            </Card>
+          </div>
+        </div>
+      )
+    }
+
     return (
       <div className="flex min-h-screen items-center justify-center bg-background p-4">
         <div className="w-full max-w-sm space-y-6">

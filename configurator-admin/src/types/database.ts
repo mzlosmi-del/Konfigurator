@@ -27,6 +27,12 @@ export interface QuotationConfigItem {
   price_modifier:      number
 }
 
+export interface QuotationFormulaItem {
+  formula_id:   string
+  formula_name: string
+  amount:       number
+}
+
 export interface QuotationLineItem {
   product_id:      string
   product_name:    string
@@ -35,6 +41,7 @@ export interface QuotationLineItem {
   quantity:        number
   unit_price:      number
   configuration:   QuotationConfigItem[]
+  formulas?:       QuotationFormulaItem[]
   adjustments?:    QuotationAdjustment[]
 }
 

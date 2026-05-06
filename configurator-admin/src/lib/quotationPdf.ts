@@ -79,10 +79,13 @@ const PDF_LABELS = {
     notes:        'NOTES',
     termsHeader:  'TERMS & CONDITIONS',
     termsLines: [
-      '• Payment: 50% deposit on order confirmation, balance prior to delivery.',
-      '• Prices are exclusive of VAT and applicable taxes unless otherwise stated.',
-      '• This quotation is valid for 30 days unless a specific validity date is noted above.',
-      '• Delivery timelines will be confirmed upon order placement.',
+      '• Payment: 50% deposit on order confirmation, remaining balance due prior to delivery.',
+      '• Prices are exclusive of VAT and all applicable taxes unless otherwise stated.',
+      '• This quotation is valid for 30 days from the date of issue unless a specific expiry date is noted above.',
+      '• Goods remain the property of the seller until full payment has been received.',
+      '• Delivery timelines are indicative and will be confirmed in writing upon order placement.',
+      '• Any modifications to the agreed order must be requested and confirmed in writing.',
+      '• The seller shall not be liable for delays caused by circumstances beyond its reasonable control.',
       '• Thank you for your business. We look forward to working with you.',
     ],
     validityText: (date: string) => `Valid until ${date}`,
@@ -118,10 +121,13 @@ const PDF_LABELS = {
     notes:        'NAPOMENE',
     termsHeader:  'USLOVI I PLAĆANJE',
     termsLines: [
-      '• Plaćanje: 50% avans pri potvrdi porudžbine, ostatak pre isporuke.',
-      '• Cene ne uključuju PDV i poreze, osim ako nije drugačije naznačeno.',
-      '• Ova ponuda važi 30 dana, osim ako je naznačen konkretan datum.',
-      '• Rokovi isporuke biće potvrđeni pri porudžbini.',
+      '• Plaćanje: 50% avansa pri potvrdi porudžbine, preostali iznos dospeva pre isporuke.',
+      '• Cene ne uključuju PDV i sve primenjive poreze, osim ako nije drugačije naznačeno.',
+      '• Ova ponuda važi 30 dana od datuma izdavanja, osim ako je naznačen konkretan datum važenja.',
+      '• Roba ostaje vlasništvo prodavca sve do trenutka potpune naplate.',
+      '• Rokovi isporuke su okvirni i biće potvrđeni u pisanoj formi pri prihvatanju porudžbine.',
+      '• Svaka izmena dogovorene porudžbine mora biti zatražena i potvrđena u pisanoj formi.',
+      '• Prodavac ne snosi odgovornost za kašnjenja nastala usled okolnosti van njegove razumne kontrole.',
       '• Hvala na interesovanju. Radujemo se saradnji.',
     ],
     validityText: (date: string) => `Važi do ${date}`,
@@ -415,16 +421,18 @@ export async function buildQuotationPdfBytes(
       const itemAdjs     = Array.isArray(item.adjustments) ? item.adjustments : []
       const lineTotal    = calcLineTotal(item)
       const cfg          = Array.isArray(item.configuration) ? item.configuration : []
+      const formulas     = Array.isArray(item.formulas) ? item.formulas : []
       const ptexts       = (productTexts?.[item.product_id] ?? []).filter(pt => pt.language === lang)
       const modifierSum  = cfg.reduce((s, c) => s + (Number(c.price_modifier) || 0), 0)
-      const derivedBase  = item.unit_price - modifierSum
-      const showBreakdown = cfg.length > 0
+      const formulaSum   = formulas.reduce((s, f) => s + (Number(f.amount) || 0), 0)
+      const derivedBase  = item.unit_price - modifierSum - formulaSum
+      const showBreakdown = cfg.length > 0 || formulas.length > 0
 
       // Compute row height for ensureSpace / page-break
       const nameLines = wrapText(item.product_name, fontB, 10, PROD_W)
       let rh = nameLines.length * 13
       if (item.product_sku)    rh += 11
-      if (showBreakdown)       rh += 11 + cfg.length * 11
+      if (showBreakdown)       rh += 11 + (cfg.length + formulas.length) * 11
       for (const pt of ptexts) rh += 11 + wrapText(pt.content, fontR, 8, PROD_W - 4).length * 11
       if (itemAdjs.length > 0) rh += 4 + 11 + itemAdjs.length * 11
       rh += 14
@@ -460,6 +468,14 @@ export async function buildQuotationPdfBytes(
           const modStr   = mod === 0 ? '—' : `${mod >= 0 ? '+' : ''}${mod.toFixed(2)}`
           const modColor = mod > 0 ? C.positive : mod < 0 ? C.negative : C.muted
           rText(modStr, C_TR, y, 8, fontR, modColor)
+          y -= 11
+        }
+        for (const f of formulas) {
+          text(`ƒ ${f.formula_name}`, C_PROD + 4, y, 8, fontR, C.muted)
+          const amt      = Number(f.amount) || 0
+          const amtStr   = amt === 0 ? '—' : `${amt >= 0 ? '+' : ''}${amt.toFixed(2)}`
+          const amtColor = amt > 0 ? C.positive : amt < 0 ? C.negative : C.muted
+          rText(amtStr, C_TR, y, 8, fontR, amtColor)
           y -= 11
         }
       }

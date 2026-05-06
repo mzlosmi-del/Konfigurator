@@ -878,6 +878,13 @@ const sr: Record<string, string> = {
   'Join':                                  'Pridruži se',
   'Team member limit reached for your plan. Upgrade to add more members.':
     'Dostignut limit članova tima za vaš plan. Nadogradite da dodate više članova.',
+  'Wrong account':                         'Pogrešan nalog',
+  "You're signed in as":                   'Prijavljeni ste kao',
+  'but this invite is for':                'ali je ova pozivnica za',
+  'Sign out and continue':                 'Odjavi se i nastavi',
+  "We've sent a confirmation link to":     'Poslali smo link za potvrdu na',
+  'Click the link to verify your address and complete joining the workspace.':
+    'Kliknite na link da potvrdite adresu i završite pridruživanje radnom prostoru.',
 
   // Password reset
   'Forgot password?':                      'Zaboravili ste lozinku?',
