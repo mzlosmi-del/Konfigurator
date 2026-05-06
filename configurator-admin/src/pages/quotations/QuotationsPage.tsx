@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { BarChart2, FileText, Plus } from 'lucide-react'
-import { fetchQuotations } from '@/lib/quotations'
+import { BarChart2, FileText, Plus, Copy } from 'lucide-react'
+import { fetchQuotations, duplicateQuotation } from '@/lib/quotations'
 import type { Quotation, QuotationStatus } from '@/types/database'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Badge } from '@/components/ui/badge'
@@ -20,6 +20,21 @@ export function QuotationsPage() {
   const { toasts, toast, dismiss } = useToast()
   const [quotations, setQuotations] = useState<Quotation[]>([])
   const [loading, setLoading] = useState(true)
+  const [duplicatingId, setDuplicatingId] = useState<string | null>(null)
+
+  async function handleDuplicate(e: React.MouseEvent, sourceId: string) {
+    e.stopPropagation()
+    if (duplicatingId) return
+    setDuplicatingId(sourceId)
+    try {
+      const copy = await duplicateQuotation(sourceId)
+      navigate(`/quotations/${copy.id}/edit`)
+    } catch (err) {
+      toast({ title: t('Failed to copy quotation'), description: String(err), variant: 'destructive' })
+    } finally {
+      setDuplicatingId(null)
+    }
+  }
 
   useEffect(() => { load() }, [])
 
@@ -86,6 +101,7 @@ export function QuotationsPage() {
                     <th className="px-4 py-3 text-right font-medium text-muted-foreground">{t('Total')}</th>
                     <th className="px-4 py-3 text-left font-medium text-muted-foreground">{t('Status')}</th>
                     <th className="px-4 py-3 text-right font-medium text-muted-foreground hidden sm:table-cell">{t('Created')}</th>
+                    <th className="px-4 py-3 w-10"></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y">
@@ -117,6 +133,19 @@ export function QuotationsPage() {
                         </td>
                         <td className="px-4 py-3 text-right text-xs text-muted-foreground hidden sm:table-cell">
                           {new Date(q.created_at).toLocaleDateString()}
+                        </td>
+                        <td className="px-2 py-3 text-right">
+                          {canEdit && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              title={t('Copy quotation')}
+                              loading={duplicatingId === q.id}
+                              onClick={e => handleDuplicate(e, q.id)}
+                            >
+                              <Copy className="h-4 w-4" />
+                            </Button>
+                          )}
                         </td>
                       </tr>
                     )

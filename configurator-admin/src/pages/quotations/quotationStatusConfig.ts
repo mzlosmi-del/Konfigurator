@@ -26,3 +26,15 @@ export const statusVariant: Record<QuotationStatus, 'secondary' | 'warning' | 's
   rejected:              'destructive',
   expired:               'outline',
 }
+
+// Allowed forward-only status transitions from a given current state.
+// `confirmed_sent` is reached only via the explicit Confirm-and-Generate-PDF action,
+// not via the status dropdown. Terminal states have no transitions.
+export const STATUS_TRANSITIONS: Record<QuotationStatus, QuotationStatus[]> = {
+  in_preparation:        ['rejected'],
+  confirmed_sent:        ['accepted_no_changes', 'accepted_with_changes', 'rejected', 'expired'],
+  accepted_no_changes:   [],
+  accepted_with_changes: [],
+  rejected:              [],
+  expired:               [],
+}

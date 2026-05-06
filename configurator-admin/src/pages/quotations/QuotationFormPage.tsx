@@ -1,11 +1,10 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useNavigate, useParams, useSearchParams, Link } from 'react-router-dom'
-import { Plus, Trash2, ArrowLeft, FileText, Settings2, Inbox, CalendarRange } from 'lucide-react'
+import { Plus, Trash2, ArrowLeft, Settings2, Inbox, CalendarRange } from 'lucide-react'
 import {
   fetchQuotation,
   createQuotation,
   updateQuotation,
-  uploadQuotationPdf,
   calcSubtotal,
   calcTotal,
   calcLineTotal,
@@ -15,15 +14,12 @@ import {
   fetchProducts,
   fetchProductCharacteristicsWithValues,
   fetchProductTexts,
-  fetchGlobalTexts,
 } from '@/lib/products'
 import { fetchInquiry } from '@/lib/inquiries'
 import { fetchActivePricing, type ActivePricing } from '@/lib/pricing'
 import { inquiryToQuotationDraft } from '@/lib/inquiryConversion'
 import { evaluateRules } from '@/lib/configurationRules'
 import { calculateFormulaBreakdown, calculateFormulaTotal, type FormulaContext } from '@/lib/formulaEngine'
-import { buildQuotationPdfBytes, openPdfBlob, type TenantProfile } from '@/lib/quotationPdf'
-import { useAuthContext } from '@/components/auth/AuthContext'
 import { supabase } from '@/lib/supabase'
 import type {
   Product,
@@ -38,9 +34,7 @@ import type {
 } from '@/types/database'
 import type { CharacteristicWithValues } from '@/lib/products'
 import { ConfigureProductDialog } from './ConfigureProductDialog'
-import { PdfLayoutDialog, type PdfSection, type ProductTextGroup } from './PdfLayoutDialog'
 import { AdjustmentEditor, buildAdjustmentData, adjustmentToDraft, type AdjustmentDraft } from './AdjustmentEditor'
-import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -80,7 +74,6 @@ export function QuotationFormPage() {
   const [searchParams] = useSearchParams()
   const inquiryIdParam = searchParams.get('inquiry_id')
   const { toasts, toast, dismiss } = useToast()
-  const { tenant } = useAuthContext()
 
   // ── Data ───────────────────────────────────────────────────────────────────
   const [pageLoading, setPageLoading] = useState(isEdit)
@@ -90,14 +83,6 @@ export function QuotationFormPage() {
   const [formulasCache,     setFormulasCache]     = useState<Record<string, PricingFormula[]>>({})
   const [productTextsCache, setProductTextsCache] = useState<Record<string, ProductText[]>>({})
   const [pricingCache,      setPricingCache]      = useState<Record<string, ActivePricing>>({})
-  const [globalTexts,       setGlobalTexts]       = useState<ProductText[]>([])
-  const [layoutDialogOpen,  setLayoutDialogOpen]  = useState(false)
-  const [pendingPdfData,    setPendingPdfData]    = useState<{
-    savedId: string
-    savedQuotation: Awaited<ReturnType<typeof fetchQuotation>>
-    tenantProfile: TenantProfile
-  } | null>(null)
-
   // ── Customer fields ────────────────────────────────────────────────────────
   const [customerName,       setCustomerName]       = useState('')
   const [customerEmail,      setCustomerEmail]      = useState('')
@@ -124,18 +109,12 @@ export function QuotationFormPage() {
 
   // ── Saving state ───────────────────────────────────────────────────────────
   const [saving,        setSaving]        = useState(false)
-  const [generatingPdf, setGeneratingPdf] = useState(false)
-  const [savingPdf,     setSavingPdf]     = useState(false)
-  const [pendingSave,   setPendingSave]   = useState<{ bytes: Uint8Array; quotationId: string; tenantId: string } | null>(null)
 
   // ── Load products + (in edit mode) existing quotation ─────────────────────
   useEffect(() => {
     fetchProducts()
       .then(ps => setProducts(ps.filter(p => p.status === 'published')))
       .catch(() => toast({ title: t('Failed to load products'), variant: 'destructive' }))
-    fetchGlobalTexts()
-      .then(setGlobalTexts)
-      .catch(() => {/* non-critical */})
   }, [])
 
   useEffect(() => {
@@ -143,6 +122,13 @@ export function QuotationFormPage() {
     setPageLoading(true)
     fetchQuotation(id)
       .then(async q => {
+        // Once a quotation is confirmed (or beyond), no further editing is allowed —
+        // bounce back to the detail page.
+        if (q.status !== 'in_preparation') {
+          toast({ title: t('This quotation is confirmed and cannot be edited.') })
+          navigate(`/quotations/${id}`, { replace: true })
+          return
+        }
         setCustomerName(q.customer_name)
         setCustomerEmail(q.customer_email)
         setCustomerCompany(q.customer_company ?? '')
@@ -465,73 +451,6 @@ export function QuotationFormPage() {
     if (savedId) navigate(`/quotations/${savedId}`)
   }
 
-  async function handleSaveAndPdf() {
-    const savedId = await doSave('confirmed_sent')
-    if (!savedId) return
-    setGeneratingPdf(true)
-    try {
-      const savedQuotation = await fetchQuotation(savedId)
-      const tenantProfile: TenantProfile = {
-        name:                tenant?.name                ?? 'Your store',
-        logo_url:            (tenant as any)?.logo_url,
-        company_address:     (tenant as any)?.company_address,
-        company_phone:       (tenant as any)?.company_phone,
-        company_email:       (tenant as any)?.company_email,
-        company_website:     (tenant as any)?.company_website,
-        contact_person:      (tenant as any)?.contact_person,
-        vat_number:          (tenant as any)?.vat_number,
-        company_reg_number:  (tenant as any)?.company_reg_number,
-      }
-      setPendingPdfData({ savedId, savedQuotation, tenantProfile })
-      setLayoutDialogOpen(true)
-    } catch (err) {
-      toast({ title: t('Failed to save quotation'), description: String(err), variant: 'destructive' })
-    } finally {
-      setGeneratingPdf(false)
-    }
-  }
-
-  async function handleLayoutConfirm(sections: PdfSection[], lang: 'en' | 'sr') {
-    if (!pendingPdfData) return
-    const { savedId, savedQuotation, tenantProfile } = pendingPdfData
-    setGeneratingPdf(true)
-    try {
-      const enabledPtIds = new Set(
-        sections.filter(s => s.productTextId && s.visible).map(s => s.productTextId!)
-      )
-      const hasPtSections = sections.some(s => s.productTextId !== undefined)
-      const pdfProductTexts: Record<string, ProductText[]> = {}
-      for (const [pid, texts] of Object.entries(productTextsCache)) {
-        const kept = hasPtSections ? texts.filter(pt => enabledPtIds.has(pt.id)) : texts
-        if (kept.length) pdfProductTexts[pid] = kept
-      }
-      const bytes = await buildQuotationPdfBytes(tenantProfile, savedQuotation, pdfProductTexts, globalTexts, sections, lang)
-      setLayoutDialogOpen(false)
-      openPdfBlob(bytes)
-      setPendingSave({ bytes, quotationId: savedId, tenantId: savedQuotation.tenant_id })
-    } catch (err) {
-      toast({ title: t('Failed to generate PDF'), description: String(err), variant: 'destructive' })
-      navigate(`/quotations/${savedId}`)
-    } finally {
-      setGeneratingPdf(false)
-    }
-  }
-
-  async function handleConfirmSavePdf() {
-    if (!pendingSave) return
-    setSavingPdf(true)
-    try {
-      await uploadQuotationPdf(pendingSave.quotationId, pendingSave.tenantId, pendingSave.bytes)
-      toast({ title: t('PDF saved to cloud') })
-    } catch (err) {
-      toast({ title: t('Failed to save PDF'), description: String(err), variant: 'destructive' })
-    } finally {
-      setSavingPdf(false)
-      navigate(`/quotations/${pendingSave.quotationId}`)
-      setPendingSave(null)
-    }
-  }
-
   // ── Render ─────────────────────────────────────────────────────────────────
   if (pageLoading) {
     return (
@@ -542,7 +461,7 @@ export function QuotationFormPage() {
     )
   }
 
-  const isBusy = saving || generatingPdf
+  const isBusy = saving
 
   return (
     <div className="animate-fade-in">
@@ -748,51 +667,11 @@ export function QuotationFormPage() {
           <Button variant="outline" onClick={() => navigate('/quotations')} disabled={isBusy}>
             {t('Cancel')}
           </Button>
-          <Button variant="secondary" onClick={handleSaveDraft} disabled={isBusy} loading={saving && !generatingPdf}>
-            {t('Save Draft')}
-          </Button>
-          <Button onClick={handleSaveAndPdf} disabled={isBusy} loading={generatingPdf}>
-            <FileText className="h-4 w-4 mr-1.5" />
-            {t('Save & Generate PDF')}
+          <Button onClick={handleSaveDraft} disabled={isBusy} loading={saving}>
+            {t('Save')}
           </Button>
         </div>
       </div>
-
-      <PdfLayoutDialog
-        open={layoutDialogOpen}
-        onOpenChange={open => {
-          setLayoutDialogOpen(open)
-          if (!open && pendingPdfData) navigate(`/quotations/${pendingPdfData.savedId}`)
-        }}
-        globalTexts={globalTexts}
-        productTexts={lineItems
-          .filter(li => li.product_id && productTextsCache[li.product_id]?.length)
-          .reduce<ProductTextGroup[]>((acc, li) => {
-            if (acc.some(g => g.productId === li.product_id)) return acc
-            const prod = products.find(p => p.id === li.product_id)
-            acc.push({
-              productId:   li.product_id,
-              productName: prod?.name ?? li.product_id,
-              texts:       productTextsCache[li.product_id],
-            })
-            return acc
-          }, [])}
-        quotationHasNotes={!!notes.trim()}
-        onConfirm={handleLayoutConfirm}
-        loading={generatingPdf}
-        quotation={pendingPdfData?.savedQuotation ?? ({ customer_name: customerName, customer_email: customerEmail, line_items: [], adjustments: [], currency } as unknown as import('@/types/database').Quotation)}
-        tenant={pendingPdfData?.tenantProfile ?? { name: tenant?.name ?? 'Your store' }}
-      />
-
-      <ConfirmDialog
-        open={!!pendingSave}
-        onOpenChange={open => { if (!open) { navigate(`/quotations/${pendingSave?.quotationId}`); setPendingSave(null) } }}
-        title={t('Save PDF to cloud?')}
-        description={t('The PDF will be stored in Supabase storage and a permanent download link will be attached to this quotation.')}
-        confirmLabel={t('Save PDF')}
-        onConfirm={handleConfirmSavePdf}
-        loading={savingPdf}
-      />
 
       <Toaster toasts={toasts} onDismiss={dismiss} />
     </div>

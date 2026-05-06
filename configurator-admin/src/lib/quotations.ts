@@ -172,3 +172,42 @@ export function generateReferenceNumber(): string {
   const suffix = Math.random().toString(36).slice(2, 6).toUpperCase()
   return `QT-${date}-${suffix}`
 }
+
+/**
+ * Clone a quotation as a new draft. Customer + line items + adjustments + texts
+ * are carried over; the new row gets a fresh reference number, status
+ * `in_preparation`, no PDF, and no link to the source inquiry.
+ */
+export async function duplicateQuotation(sourceId: string): Promise<Quotation> {
+  const src = await fetchQuotation(sourceId)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const draft: any = {
+    reference_number:    generateReferenceNumber(),
+    customer_name:       src.customer_name,
+    customer_email:      src.customer_email,
+    customer_phone:      src.customer_phone ?? null,
+    customer_company:    src.customer_company ?? null,
+    customer_address:    src.customer_address ?? null,
+    line_items:          src.line_items,
+    adjustments:         src.adjustments,
+    notes:               src.notes ?? null,
+    valid_until:         null,
+    currency:            src.currency,
+    total_price:         src.total_price,
+    status:              'in_preparation',
+    pdf_url:             null,
+    source_inquiry_id:   null,
+    rejection_reason_id: null,
+    rejection_note:      null,
+  }
+  // Carry over optional fields that may exist on the row but aren't in the strict
+  // Quotation type (title, payment_terms, customer_vat_number, delivery_address).
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const anySrc = src as any
+  if (anySrc.title)               draft.title               = anySrc.title
+  if (anySrc.payment_terms)       draft.payment_terms       = anySrc.payment_terms
+  if (anySrc.customer_vat_number) draft.customer_vat_number = anySrc.customer_vat_number
+  if (anySrc.delivery_address)    draft.delivery_address    = anySrc.delivery_address
+
+  return createQuotation(draft)
+}
