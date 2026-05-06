@@ -1,4 +1,4 @@
-import { PDFDocument, PDFPage, PDFFont, rgb } from 'pdf-lib'
+import { PDFDocument, PDFPage, PDFFont, rgb, degrees } from 'pdf-lib'
 import fontkit from '@pdf-lib/fontkit'
 import type { Quotation, QuotationLineItem, QuotationAdjustment, ProductText } from '@/types/database'
 import type { PdfSection } from '@/pages/quotations/PdfLayoutDialog'
@@ -94,6 +94,7 @@ const PDF_LABELS = {
     page:         'Page',
     of:           'of',
     dateLocale:   'en-GB' as const,
+    previewWatermark: 'PREVIEW — Not an official quotation',
   },
   sr: {
     quotation:    'PONUDA',
@@ -136,6 +137,7 @@ const PDF_LABELS = {
     page:         'Strana',
     of:           'od',
     dateLocale:   'sr-Latn-RS' as const,
+    previewWatermark: 'PREGLED — Nije zvanična ponuda',
   },
 }
 
@@ -148,6 +150,7 @@ export async function buildQuotationPdfBytes(
   globalTexts?: ProductText[],
   layoutSections?: PdfSection[],
   lang: 'en' | 'sr' = 'en',
+  watermark?: boolean,
 ): Promise<Uint8Array> {
   const L = PDF_LABELS[lang]
   const pdfDoc = await PDFDocument.create()
@@ -650,6 +653,27 @@ export async function buildQuotationPdfBytes(
     const label = `${L.page} ${i + 1} ${L.of} ${N}`
     const lw    = fontR.widthOfTextAtSize(label, 7.5)
     pg.drawText(label, { x: W / 2 - lw / 2, y: MB - 14, size: 7.5, font: fontR, color: C.muted })
+  }
+
+  // Diagonal "preview" watermark across every page (drawn last so it overlays content).
+  if (watermark) {
+    const wmText  = L.previewWatermark
+    const wmSize  = 36
+    const wmColor = rgb(0.86, 0.86, 0.88)
+    const tw      = fontB.widthOfTextAtSize(wmText, wmSize)
+    const angle   = Math.PI / 4   // 45° — must match degrees(45) below
+    // Center of rotated text block at the page centre:
+    //   start.x = cx - (tw/2) * cos − (-th/2) * sin
+    //   start.y = cy - (tw/2) * sin − (-th/2) * cos
+    const cx = W / 2, cy = H / 2
+    const startX = cx - (tw / 2) * Math.cos(angle) - (wmSize / 2) * Math.sin(angle)
+    const startY = cy - (tw / 2) * Math.sin(angle) + (wmSize / 2) * Math.cos(angle) - wmSize
+    for (const pg of pages) {
+      pg.drawText(wmText, {
+        x: startX, y: startY, size: wmSize, font: fontB, color: wmColor,
+        rotate: degrees(45),
+      })
+    }
   }
 
   return pdfDoc.save()

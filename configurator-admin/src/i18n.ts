@@ -523,6 +523,13 @@ const sr: Record<string, string> = {
   'Failed to save quotation':              'Čuvanje ponude nije uspelo',
   'Save Draft':                            'Sačuvaj nacrt',
   'Save & Generate PDF':                   'Sačuvaj i generiši PDF',
+  'Preview PDF':                           'Pregled PDF-a',
+  'Confirm & Generate PDF':                'Potvrdi i generiši PDF',
+  'Quotation confirmed':                   'Ponuda potvrđena',
+  'Copy quotation':                        'Kopiraj ponudu',
+  'Failed to copy quotation':              'Kopiranje ponude nije uspelo',
+  'This quotation is confirmed and cannot be edited.':
+    'Ova ponuda je potvrđena i ne može se izmeniti.',
   'Failed to load product details':        'Učitavanje detalja proizvoda nije uspelo',
 
   // Configure product dialog

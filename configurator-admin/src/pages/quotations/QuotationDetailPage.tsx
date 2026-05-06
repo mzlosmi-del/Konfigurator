@@ -11,7 +11,7 @@ import { useAuthContext } from '@/components/auth/AuthContext'
 import { supabase } from '@/lib/supabase'
 import type { Quotation, QuotationStatus, QuotationLineItem, QuotationAdjustment, QuotationRejectionReason, ProductText } from '@/types/database'
 import { PdfLayoutDialog, type PdfSection, type ProductTextGroup } from './PdfLayoutDialog'
-import { STATUS_OPTIONS, STATUS_LABELS, statusVariant } from './quotationStatusConfig'
+import { STATUS_LABELS, statusVariant, STATUS_TRANSITIONS } from './quotationStatusConfig'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -44,9 +44,7 @@ export function QuotationDetailPage() {
   const [loading,        setLoading]        = useState(true)
   const [updatingStatus, setUpdatingStatus] = useState(false)
   const [generatingPdf,    setGeneratingPdf]    = useState(false)
-  const [savingPdf,        setSavingPdf]        = useState(false)
-  const [pendingBytes,     setPendingBytes]     = useState<Uint8Array | null>(null)
-  const [confirmSave,      setConfirmSave]      = useState(false)
+  const [pdfMode,          setPdfMode]          = useState<'preview' | 'confirm'>('preview')
   const [layoutOpen,       setLayoutOpen]       = useState(false)
   const [pdfProductTexts,  setPdfProductTexts]  = useState<Record<string, ProductText[]>>({})
   const [pdfGlobalTexts,   setPdfGlobalTexts]   = useState<ProductText[]>([])
@@ -135,8 +133,9 @@ export function QuotationDetailPage() {
     }
   }
 
-  async function handleGeneratePdf() {
+  async function handleOpenPdfDialog(mode: 'preview' | 'confirm') {
     if (!quotation) return
+    setPdfMode(mode)
     setGeneratingPdf(true)
     try {
       const lineItems = (Array.isArray(quotation.line_items) ? quotation.line_items : []) as unknown as QuotationLineItem[]
@@ -171,7 +170,7 @@ export function QuotationDetailPage() {
   }
 
   async function handleLayoutConfirm(sections: PdfSection[], lang: 'en' | 'sr') {
-    if (!quotation) return
+    if (!id || !quotation) return
     setGeneratingPdf(true)
     try {
       const enabledPtIds = new Set(
@@ -183,31 +182,27 @@ export function QuotationDetailPage() {
         const kept = hasPtSections ? texts.filter(pt => enabledPtIds.has(pt.id)) : texts
         if (kept.length) filtered[pid] = kept
       }
-      const bytes = await buildQuotationPdfBytes(tenantProfile ?? { name: tenant?.name ?? 'Your store' }, quotation, filtered, pdfGlobalTexts, sections, lang)
+      const isPreview = pdfMode === 'preview'
+      const bytes = await buildQuotationPdfBytes(
+        tenantProfile ?? { name: tenant?.name ?? 'Your store' },
+        quotation, filtered, pdfGlobalTexts, sections, lang,
+        isPreview,
+      )
       setLayoutOpen(false)
       openPdfBlob(bytes)
-      setPendingBytes(bytes)
-      setConfirmSave(true)
+
+      if (!isPreview) {
+        // Confirm path: upload PDF AND flip status atomically. From here the
+        // quotation is locked — the saved PDF is the only one that can be reprinted.
+        const url     = await uploadQuotationPdf(id, quotation.tenant_id, bytes)
+        const updated = await updateQuotation(id, { pdf_url: url, status: 'confirmed_sent' })
+        setQuotation(updated)
+        toast({ title: t('Quotation confirmed') })
+      }
     } catch (err) {
       toast({ title: t('Failed to generate PDF'), description: String(err), variant: 'destructive' })
     } finally {
       setGeneratingPdf(false)
-    }
-  }
-
-  async function handleSavePdf() {
-    if (!id || !quotation || !pendingBytes) return
-    setSavingPdf(true)
-    try {
-      const url = await uploadQuotationPdf(id, quotation.tenant_id, pendingBytes)
-      setQuotation(prev => prev ? { ...prev, pdf_url: url } : prev)
-      setPendingBytes(null)
-      toast({ title: t('PDF saved to cloud') })
-    } catch (err) {
-      toast({ title: t('Failed to save PDF'), description: String(err), variant: 'destructive' })
-    } finally {
-      setSavingPdf(false)
-      setConfirmSave(false)
     }
   }
 
@@ -275,14 +270,22 @@ export function QuotationDetailPage() {
                 </a>
               </Button>
             )}
-            <Button variant="outline" onClick={() => navigate(`/quotations/${id}/edit`)}>
-              <Pencil className="h-4 w-4 mr-1.5" />
-              {t('Edit')}
-            </Button>
-            <Button onClick={handleGeneratePdf} loading={generatingPdf}>
-              <FileText className="h-4 w-4 mr-1.5" />
-              {t('Generate PDF')}
-            </Button>
+            {canEdit && quotation.status === 'in_preparation' && (
+              <>
+                <Button variant="outline" onClick={() => navigate(`/quotations/${id}/edit`)}>
+                  <Pencil className="h-4 w-4 mr-1.5" />
+                  {t('Edit')}
+                </Button>
+                <Button variant="outline" onClick={() => handleOpenPdfDialog('preview')} loading={generatingPdf && pdfMode === 'preview'}>
+                  <FileText className="h-4 w-4 mr-1.5" />
+                  {t('Preview PDF')}
+                </Button>
+                <Button onClick={() => handleOpenPdfDialog('confirm')} loading={generatingPdf && pdfMode === 'confirm'}>
+                  <FileText className="h-4 w-4 mr-1.5" />
+                  {t('Confirm & Generate PDF')}
+                </Button>
+              </>
+            )}
           </div>
         }
       />
@@ -294,18 +297,19 @@ export function QuotationDetailPage() {
           <Badge variant={statusVariant[quotation.status as QuotationStatus] ?? 'secondary'} className="text-sm px-3 py-1">
             {t(STATUS_LABELS[quotation.status as QuotationStatus] ?? quotation.status)}
           </Badge>
-          <Select
-            value={quotation.status}
-            onChange={e => handleStatusChange(e.target.value as QuotationStatus)}
-            disabled={updatingStatus}
-            className="w-52"
-          >
-            {STATUS_OPTIONS.filter(s =>
-              s !== 'in_preparation' || quotation.status === 'in_preparation'
-            ).map(s => (
-              <option key={s} value={s}>{t(STATUS_LABELS[s])}</option>
-            ))}
-          </Select>
+          {STATUS_TRANSITIONS[quotation.status as QuotationStatus]?.length > 0 && (
+            <Select
+              value={quotation.status}
+              onChange={e => handleStatusChange(e.target.value as QuotationStatus)}
+              disabled={updatingStatus}
+              className="w-52"
+            >
+              <option value={quotation.status}>{t(STATUS_LABELS[quotation.status as QuotationStatus])}</option>
+              {STATUS_TRANSITIONS[quotation.status as QuotationStatus].map(s => (
+                <option key={s} value={s}>{t(STATUS_LABELS[s])}</option>
+              ))}
+            </Select>
+          )}
           <span className="text-sm text-muted-foreground">
             {t('Created')}: {new Date(quotation.created_at).toLocaleDateString()}
           </span>
@@ -559,17 +563,6 @@ export function QuotationDetailPage() {
         confirmLabel={t('Delete')}
         onConfirm={handleDelete}
         loading={deleting}
-      />
-
-      {/* ── Save PDF confirm ───────────────────────────────────────────────── */}
-      <ConfirmDialog
-        open={confirmSave}
-        onOpenChange={open => { if (!open) setConfirmSave(false) }}
-        title={t('Save PDF to cloud?')}
-        description={t('The PDF will be stored in Supabase storage and a permanent download link will be attached to this quotation.')}
-        confirmLabel={t('Save PDF')}
-        onConfirm={handleSavePdf}
-        loading={savingPdf}
       />
 
       <Toaster toasts={toasts} onDismiss={dismiss} />
