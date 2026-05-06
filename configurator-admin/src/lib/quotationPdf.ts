@@ -421,16 +421,18 @@ export async function buildQuotationPdfBytes(
       const itemAdjs     = Array.isArray(item.adjustments) ? item.adjustments : []
       const lineTotal    = calcLineTotal(item)
       const cfg          = Array.isArray(item.configuration) ? item.configuration : []
+      const formulas     = Array.isArray(item.formulas) ? item.formulas : []
       const ptexts       = (productTexts?.[item.product_id] ?? []).filter(pt => pt.language === lang)
       const modifierSum  = cfg.reduce((s, c) => s + (Number(c.price_modifier) || 0), 0)
-      const derivedBase  = item.unit_price - modifierSum
-      const showBreakdown = cfg.length > 0
+      const formulaSum   = formulas.reduce((s, f) => s + (Number(f.amount) || 0), 0)
+      const derivedBase  = item.unit_price - modifierSum - formulaSum
+      const showBreakdown = cfg.length > 0 || formulas.length > 0
 
       // Compute row height for ensureSpace / page-break
       const nameLines = wrapText(item.product_name, fontB, 10, PROD_W)
       let rh = nameLines.length * 13
       if (item.product_sku)    rh += 11
-      if (showBreakdown)       rh += 11 + cfg.length * 11
+      if (showBreakdown)       rh += 11 + (cfg.length + formulas.length) * 11
       for (const pt of ptexts) rh += 11 + wrapText(pt.content, fontR, 8, PROD_W - 4).length * 11
       if (itemAdjs.length > 0) rh += 4 + 11 + itemAdjs.length * 11
       rh += 14
@@ -466,6 +468,14 @@ export async function buildQuotationPdfBytes(
           const modStr   = mod === 0 ? '—' : `${mod >= 0 ? '+' : ''}${mod.toFixed(2)}`
           const modColor = mod > 0 ? C.positive : mod < 0 ? C.negative : C.muted
           rText(modStr, C_TR, y, 8, fontR, modColor)
+          y -= 11
+        }
+        for (const f of formulas) {
+          text(`ƒ ${f.formula_name}`, C_PROD + 4, y, 8, fontR, C.muted)
+          const amt      = Number(f.amount) || 0
+          const amtStr   = amt === 0 ? '—' : `${amt >= 0 ? '+' : ''}${amt.toFixed(2)}`
+          const amtColor = amt > 0 ? C.positive : amt < 0 ? C.negative : C.muted
+          rText(amtStr, C_TR, y, 8, fontR, amtColor)
           y -= 11
         }
       }

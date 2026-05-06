@@ -21,7 +21,7 @@ import { fetchInquiry } from '@/lib/inquiries'
 import { fetchActivePricing, type ActivePricing } from '@/lib/pricing'
 import { inquiryToQuotationDraft } from '@/lib/inquiryConversion'
 import { evaluateRules } from '@/lib/configurationRules'
-import { calculateFormulaTotal, type FormulaContext } from '@/lib/formulaEngine'
+import { calculateFormulaBreakdown, calculateFormulaTotal, type FormulaContext } from '@/lib/formulaEngine'
 import { buildQuotationPdfBytes, openPdfBlob, type TenantProfile } from '@/lib/quotationPdf'
 import { useAuthContext } from '@/components/auth/AuthContext'
 import { supabase } from '@/lib/supabase'
@@ -352,7 +352,8 @@ export function QuotationFormPage() {
           unitPrice += effective
         }
 
-        const formulaAdj = calculateFormulaTotal(formulas, buildFormulaCtx(chars, li.selection, product?.base_price ?? 0))
+        const formulaBreakdown = calculateFormulaBreakdown(formulas, buildFormulaCtx(chars, li.selection, product?.base_price ?? 0))
+        const formulaAdj       = formulaBreakdown.reduce((s, e) => s + e.amount, 0)
         return {
           product_id:      li.product_id,
           product_name:    product?.name ?? '',
@@ -361,6 +362,9 @@ export function QuotationFormPage() {
           quantity:        li.quantity,
           unit_price:      Math.max(0, unitPrice + formulaAdj),
           configuration:   config,
+          formulas:        formulaBreakdown.length > 0
+            ? formulaBreakdown.map(e => ({ formula_id: e.id, formula_name: e.name, amount: e.amount }))
+            : undefined,
           adjustments:     buildAdjustmentData(li.adjustments),
         }
       })

@@ -95,3 +95,25 @@ export function calculateFormulaTotal(formulas: PricingFormula[], ctx: FormulaCo
   }
   return total
 }
+
+export interface FormulaBreakdownEntry {
+  id:     string
+  name:   string
+  amount: number
+}
+
+export function calculateFormulaBreakdown(formulas: PricingFormula[], ctx: FormulaContext): FormulaBreakdownEntry[] {
+  const out: FormulaBreakdownEntry[] = []
+  const formulaResults: Record<string, number> = { ...ctx.formulaResults }
+  for (const f of formulas) {
+    if (!f.is_active) continue
+    try {
+      const result = evaluateFormula(f.formula as FormulaNode, { ...ctx, formulaResults }) as number
+      formulaResults[f.id] = result
+      out.push({ id: f.id, name: f.name, amount: result })
+    } catch {
+      // malformed formula — skip
+    }
+  }
+  return out
+}
