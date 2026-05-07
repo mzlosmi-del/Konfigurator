@@ -16,7 +16,7 @@ import {
 import { CSS } from '@dnd-kit/utilities'
 import { GripVertical, Lock, Eye, EyeOff, FileText } from 'lucide-react'
 import type { Quotation, QuotationLineItem, QuotationAdjustment, ProductText } from '@/types/database'
-import type { TenantProfile } from '@/lib/quotationPdf'
+import { type TenantProfile, type PdfTemplate, PDF_TEMPLATES } from '@/lib/quotationPdf'
 import { calcLineTotal, calcSubtotal, calcTotal } from '@/lib/quotations'
 import {
   Dialog,
@@ -50,10 +50,18 @@ interface Props {
   globalTexts:       ProductText[]
   productTexts?:     ProductTextGroup[]
   quotationHasNotes: boolean
-  onConfirm:         (sections: PdfSection[], lang: 'en' | 'sr') => void
+  onConfirm:         (sections: PdfSection[], lang: 'en' | 'sr', template: PdfTemplate) => void
   loading:           boolean
   quotation:         Quotation
   tenant:            TenantProfile
+}
+
+// Hex must stay in sync with the accent colours used in each template renderer.
+const TEMPLATE_ACCENTS: Record<PdfTemplate, string> = {
+  modern:  '#151928',
+  classic: '#2A3240',
+  compact: '#151928',
+  bold:    '#E84A1E',
 }
 
 function buildDefaultSections(
@@ -187,10 +195,12 @@ interface PreviewA4Props {
   globalTexts:  ProductText[]
   productTexts: ProductTextGroup[]
   lang:         'en' | 'sr'
+  template:     PdfTemplate
   onToggle:     (id: string) => void
 }
 
-function PreviewA4({ sections, quotation, tenant, globalTexts, productTexts, lang, onToggle }: PreviewA4Props) {
+function PreviewA4({ sections, quotation, tenant, globalTexts, productTexts, lang, template, onToggle }: PreviewA4Props) {
+  const accent = TEMPLATE_ACCENTS[template]
   const items = (Array.isArray(quotation.line_items) ? quotation.line_items : []) as unknown as QuotationLineItem[]
   const adjs  = (Array.isArray(quotation.adjustments) ? quotation.adjustments : []) as unknown as QuotationAdjustment[]
   const subtotal = calcSubtotal(items)
@@ -216,33 +226,53 @@ function PreviewA4({ sections, quotation, tenant, globalTexts, productTexts, lan
 
   return (
     <div
-      className="bg-white shadow-md text-[#151928] font-sans"
+      className="bg-white shadow-md text-[#151928] font-sans relative"
       style={{ width: 540, minHeight: 762, fontSize: 11 }}
     >
+      {/* Template-specific decoration */}
+      {template === 'classic' && (
+        <div className="absolute top-0 left-0 right-0" style={{ height: 56, background: accent }} />
+      )}
+      {template === 'bold' && (
+        <div className="absolute top-0 bottom-0 left-0" style={{ width: 14, background: accent }} />
+      )}
+
+      {/* Template badge */}
+      <div className="absolute top-2 right-2 text-[9px] uppercase tracking-widest font-medium px-1.5 py-0.5 rounded bg-white/90 border z-10"
+        style={{ color: accent, borderColor: accent }}>
+        {template}
+      </div>
+
       {/* Header */}
-      <div className="px-8 pt-7 pb-4 flex justify-between items-start">
+      <div className={`flex justify-between items-start ${template === 'classic' ? 'px-8 pt-12 pb-4 text-white' : template === 'bold' ? 'pl-10 pr-8 pt-7 pb-4' : template === 'compact' ? 'px-5 pt-4 pb-2' : 'px-8 pt-7 pb-4'}`}>
         <div style={{ maxWidth: 180 }}>
           {tenant.logo_url ? (
             <img src={tenant.logo_url} alt="logo" style={{ maxHeight: 44, maxWidth: 160, objectFit: 'contain' }} />
           ) : (
-            <span className="font-bold text-base text-[#151928]">{tenant.name}</span>
+            <span className="font-bold text-base" style={{ color: template === 'classic' ? '#fff' : '#151928' }}>{tenant.name}</span>
           )}
         </div>
         <div className="text-right">
-          <div className="font-bold text-xl tracking-wide text-[#151928]">
+          <div
+            className={template === 'bold' ? 'font-bold tracking-tight' : 'font-bold tracking-wide'}
+            style={{
+              fontSize: template === 'bold' ? 28 : template === 'compact' ? 16 : 22,
+              color: template === 'classic' ? '#fff' : accent,
+            }}
+          >
             {isEn ? 'QUOTATION' : 'PONUDA'}
           </div>
           {quotation.reference_number && (
-            <div className="text-[#6C7179] text-xs mt-0.5">{quotation.reference_number}</div>
+            <div className="text-xs mt-0.5" style={{ color: template === 'classic' ? '#D2D6DD' : '#6C7179' }}>{quotation.reference_number}</div>
           )}
           {quotation.title && (
-            <div className="text-[#151928] text-xs font-medium mt-0.5">{quotation.title}</div>
+            <div className="text-xs font-medium mt-0.5" style={{ color: template === 'classic' ? '#fff' : '#151928' }}>{quotation.title}</div>
           )}
-          <div className="text-[#6C7179] text-xs mt-0.5">
+          <div className="text-xs mt-0.5" style={{ color: template === 'classic' ? '#D2D6DD' : '#6C7179' }}>
             {isEn ? 'Issue Date' : 'Datum'}: {fmtDate(quotation.created_at)}
           </div>
           {quotation.valid_until && (
-            <div className="text-[#6C7179] text-xs">
+            <div className="text-xs" style={{ color: template === 'classic' ? '#D2D6DD' : '#6C7179' }}>
               {isEn ? 'Valid Until' : 'Važi do'}: {fmtDate(quotation.valid_until)}
             </div>
           )}
@@ -355,9 +385,16 @@ function PreviewA4({ sections, quotation, tenant, globalTexts, productTexts, lan
               </div>
             )
           })}
-          <div className="flex gap-6 text-xs font-bold border-t border-[#D2D4D8] pt-1 mt-0.5">
-            <span className="text-[#151928]">{isEn ? 'TOTAL DUE' : 'UKUPAN IZNOS'}</span>
-            <span className="tabular-nums w-24 text-right text-[#151928]">{total.toFixed(2)} {cur}</span>
+          <div
+            className={`flex gap-6 font-bold pt-1 mt-0.5 ${template === 'bold' ? 'rounded px-2 py-1' : 'border-t border-[#D2D4D8]'}`}
+            style={{
+              fontSize: template === 'bold' ? 14 : 12,
+              background: template === 'bold' ? `${accent}15` : undefined,
+              borderLeft: template === 'bold' ? `3px solid ${accent}` : undefined,
+            }}
+          >
+            <span style={{ color: accent }}>{isEn ? 'TOTAL DUE' : 'UKUPAN IZNOS'}</span>
+            <span className="tabular-nums w-24 text-right" style={{ color: accent }}>{total.toFixed(2)} {cur}</span>
           </div>
         </div>
       </div>
@@ -440,12 +477,14 @@ export function PdfLayoutDialog({
     buildDefaultSections(globalTexts, quotationHasNotes, productTexts)
   )
   const [lang, setLang] = useState<'en' | 'sr'>('en')
+  const [template, setTemplate] = useState<PdfTemplate>('modern')
 
   // Reset when dialog opens
   const [lastOpen, setLastOpen] = useState(false)
   if (open && !lastOpen) {
     setSections(buildDefaultSections(globalTexts, quotationHasNotes, productTexts))
     setLang('en')
+    setTemplate('modern')
     setLastOpen(true)
   }
   if (!open && lastOpen) setLastOpen(false)
@@ -499,31 +538,73 @@ export function PdfLayoutDialog({
 
         {/* Body: left controls + right preview */}
         <div className="flex flex-1 min-h-0">
-          {/* Left panel — section controls */}
-          <div className="w-56 shrink-0 border-r flex flex-col">
-            <div className="flex-1 overflow-y-auto px-3 py-3">
-              <p className="text-xs text-muted-foreground mb-2 leading-tight">
-                {t('Drag to reorder. Toggle eye to show / hide.')}
-              </p>
-              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-                <SortableContext items={sections.map(s => s.id)} strategy={verticalListSortingStrategy}>
-                  <div className="space-y-1.5">
-                    {sections.map(section => (
-                      <SortableItem
-                        key={section.id}
-                        section={section}
-                        onToggle={() => toggleSection(section.id)}
-                      />
-                    ))}
-                  </div>
-                </SortableContext>
-              </DndContext>
+          {/* Left panel — template + section controls */}
+          <div className="w-64 shrink-0 border-r flex flex-col">
+            <div className="flex-1 overflow-y-auto px-3 py-3 space-y-4">
+              {/* Template selector */}
+              <div>
+                <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+                  {t('Template')}
+                </p>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {PDF_TEMPLATES.map(tpl => {
+                    const accent  = TEMPLATE_ACCENTS[tpl.id]
+                    const active  = tpl.id === template
+                    return (
+                      <button
+                        key={tpl.id}
+                        type="button"
+                        onClick={() => setTemplate(tpl.id)}
+                        className={[
+                          'border rounded-md px-2 py-2 text-left transition-all hover:bg-muted/50',
+                          active ? 'border-primary ring-2 ring-primary/20 bg-primary/5' : 'border-border',
+                        ].join(' ')}
+                        title={tpl.description}
+                      >
+                        <div className="flex items-center gap-1.5 mb-0.5">
+                          <span
+                            className="inline-block w-2.5 h-2.5 rounded-sm shrink-0"
+                            style={{ background: accent }}
+                          />
+                          <span className="text-xs font-medium truncate">{t(tpl.label)}</span>
+                        </div>
+                        <p className="text-[10px] text-muted-foreground line-clamp-2 leading-tight">
+                          {t(tpl.description)}
+                        </p>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* Sections */}
+              <div>
+                <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+                  {t('Sections')}
+                </p>
+                <p className="text-xs text-muted-foreground mb-2 leading-tight">
+                  {t('Drag to reorder. Toggle eye to show / hide.')}
+                </p>
+                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                  <SortableContext items={sections.map(s => s.id)} strategy={verticalListSortingStrategy}>
+                    <div className="space-y-1.5">
+                      {sections.map(section => (
+                        <SortableItem
+                          key={section.id}
+                          section={section}
+                          onToggle={() => toggleSection(section.id)}
+                        />
+                      ))}
+                    </div>
+                  </SortableContext>
+                </DndContext>
+              </div>
             </div>
             <div className="px-3 py-3 border-t flex flex-col gap-2">
               <Button variant="outline" onClick={() => onOpenChange(false)} disabled={loading} className="w-full">
                 {t('Cancel')}
               </Button>
-              <Button onClick={() => onConfirm(sections, lang)} loading={loading} className="w-full">
+              <Button onClick={() => onConfirm(sections, lang, template)} loading={loading} className="w-full">
                 <FileText className="h-4 w-4 mr-1.5" />
                 {t('Generate PDF')}
               </Button>
@@ -539,6 +620,7 @@ export function PdfLayoutDialog({
               globalTexts={globalTexts}
               productTexts={productTexts ?? []}
               lang={lang}
+              template={template}
               onToggle={toggleSection}
             />
           </div>
