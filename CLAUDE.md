@@ -56,7 +56,36 @@ Uses `pdf-lib` with Helvetica/HelveticaBold (no custom font loading). Canvas is 
 16 functions covering: product config serving (for the widget), inquiry submission, quotation PDF email delivery, plan enforcement, Stripe webhooks, etc. Each function is a standalone Deno module. Shared code lives in `supabase/functions/_shared/`.
 
 ### Admin routing (`configurator-admin/src/App.tsx`)
-React Router v6. Top-level routes: `/login`, `/register`, and a layout wrapper for authenticated routes. Key page paths: `/products`, `/quotations`, `/inquiries`, `/settings`, `/analytics`, `/plan`.
+React Router v6. Top-level routes: `/login`, `/register`, and a layout wrapper for authenticated routes. Key page paths: `/products`, `/quotations`, `/inquiries`, `/settings`, `/analytics`, `/plan`, `/admin/audit-log`.
+
+### Per-role authorization system (migration 048)
+`role_permissions` table stores a per-tenant, per-role permission matrix. Roles: `admin`, `member`, `viewer`. Levels: `none`, `view`, `edit`. Functionalities: `dashboard`, `products`, `pricing`, `library`, `texts`, `inquiries`, `quotations`, `analytics`, `embed`, `settings`.
+
+- DB helpers: `auth_role()` returns current user's role; `auth_can(functionality, level)` returns boolean (admin always true, missing row = false/deny).
+- React hooks in `configurator-admin/src/hooks/usePermission.ts`: `usePermission(f)` → `PermLevel`, `useCanView(f)` → boolean, `useCanEdit(f)` → boolean.
+- `AuthContext` loads `permissions` map on login and makes it available throughout the app.
+- RLS on `products`, `characteristics`, `characteristic_values`, `inquiries`, `quotations` enforces these levels — not just UI gates.
+- New tenants get seeded defaults: `member` → `edit` everywhere, `viewer` → `view` everywhere (done inside `handle_new_user()`).
+
+### Audit log system (migration 060)
+`audit_log` table: one row per save/delete, stores a JSONB diff of only changed fields with human-readable keys. 90-day retention via pg_cron (falls back gracefully if pg_cron unavailable).
+
+- `configurator-admin/src/lib/auditLog.ts`: `logChange(opts)` — inserts a row, swallows errors so audit never breaks a save. `computeDiff(before, after, labelMap)` — compares two snapshots, returns only changed fields keyed by label. `fetchAuditLog(filter)` — paginated fetch with filters.
+- `configurator-admin/src/lib/auditLabels.ts`: entity-specific label maps that control which fields appear in diffs.
+- Components: `AuditHistory` (inline panel, shown on product/quotation detail pages), `AuditDiffTable` (renders the diff JSONB as a before/after table).
+- `AuditLogPage` at `/admin/audit-log` — global log visible to admins only, with entity-type and date filters.
+- Currently wired up on: products, quotations, quotation line items, characteristics, characteristic values, settings, texts, pricing formulas.
+
+**IMPORTANT: Migration 060 (`migrations/060_audit_log.sql`) has NOT yet been run in Supabase. Run it in the SQL editor before the audit log feature will work in production.**
+
+### Widget theme per product (migration 059)
+`products.widget_theme` column (text, default `'cloud'`). Persisted from the Embed panel (`EmbedPanel.tsx`) and read by the widget embed snippet to apply the correct theme automatically. Available themes are defined in the widget as `ThemeId`.
+
+### Quotation lifecycle
+Quotations have a status progression: `draft` → `preview` → `confirmed` → `locked`. Transitions are enforced in the UI. A locked quotation is read-only. Duplicate action available on any quotation to create a draft copy.
+
+### Analytics page
+`AnalyticsPage.tsx` has four advanced sections beyond basic counts: characteristic-value breakdown, inquiry-to-quotation conversion funnel, revenue over time, and top products by inquiry volume. All sections are tenant-scoped.
 
 ### Supabase client
 Single typed client in `configurator-admin/src/lib/supabase.ts` using env vars `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`. The widget uses its own client (same env vars, passed via data attributes on the embed `<div>`).
