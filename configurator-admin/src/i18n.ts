@@ -976,12 +976,12 @@ const sr: Record<string, string> = {
   'Bold':                                  'Naglašeni',
   'Minimal light palette. Hierarchy from typography and thin rules.':
     'Minimalna svetla paleta. Hijerarhija pomoću tipografije i tankih linija.',
-  'Traditional corporate. Dark navy header band, boxed sender/customer panels.':
-    'Tradicionalni korporativni. Tamno plava traka u zaglavlju, uokvireni paneli.',
-  'Dense single-page-friendly. Tight margins and smaller type for short quotes.':
-    'Zgusnut, jedna strana. Uske margine i manji font za kratke ponude.',
-  'Brand-forward. Vertical accent bar, oversized hero title, accent totals.':
-    'Brendiran. Vertikalna naglasna traka, veliki naslov, naglašeni iznosi.',
+  'Traditional invoice look. Navy accents, filled table header, navy total bar.':
+    'Tradicionalni izgled fakture. Tamno plavi akcenti, ispunjeno zaglavlje tabele, plava traka ukupnog iznosa.',
+  'Same content as Modern, tighter margins and smaller type. Fits short quotes on one page.':
+    'Isti sadržaj kao Moderni, uže margine i manji font. Za kratke ponude koje staju na jednu stranu.',
+  'Editorial style. Left accent stripe, coral section labels, accent total band.':
+    'Uredni stil. Naglasna traka s leve strane, koralni naslovi sekcija, naglašena traka ukupnog iznosa.',
   'View products':                         'Pogledaj proizvode',
   'Receive your first inquiry':            'Primite vaš prvi upit',
   'A customer fills out your configurator and submits a quote request.':

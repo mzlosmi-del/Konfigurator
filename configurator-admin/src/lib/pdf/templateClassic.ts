@@ -8,9 +8,10 @@ import {
 } from './shared'
 
 /**
- * Classic — traditional corporate invoice. Dark navy header band, boxed
- * sender/customer panels, filled table header, filled total panel. Heavier
- * visual structure than Modern.
+ * Classic — traditional professional invoice. Modeled on common online
+ * quotation templates (FreshBooks / QuickBooks / Wave): clean white surface
+ * with a single accent rule, navy table header, and a navy total bar. Every
+ * section is single-column and flows top-down — no overlapping panels.
  */
 export async function renderClassic(args: PdfBuildArgs): Promise<Uint8Array> {
   const { tenant, quotation, productTexts, globalTexts, layoutSections, lang, watermark } = args
@@ -18,14 +19,12 @@ export async function renderClassic(args: PdfBuildArgs): Promise<Uint8Array> {
   const pdfDoc = await PDFDocument.create()
   const { fontR, fontB } = await loadFonts(pdfDoc)
 
-  // Classic palette: navy primary + warm gray surfaces.
-  const NAVY      = rgb(0.165, 0.196, 0.251)   // #2A3240
-  const NAVY_DARK = rgb(0.110, 0.137, 0.184)   // #1C232F
-  const PANEL_BG  = rgb(0.973, 0.973, 0.969)   // #F8F8F7
-  const BORDER    = rgb(0.737, 0.749, 0.769)   // #BCBFC4
+  const NAVY     = rgb(0.165, 0.196, 0.251)   // #2A3240
+  const PANEL_BG = rgb(0.969, 0.973, 0.980)   // #F7F8FA
+  const BORDER   = rgb(0.804, 0.812, 0.831)   // #CDCFD4
 
   const W = 595, H = 842
-  const MX = 42, MB = 56
+  const MX = 44, MB = 56
   const col = W - MX * 2
 
   let page: PDFPage = pdfDoc.addPage([W, H])
@@ -34,11 +33,12 @@ export async function renderClassic(args: PdfBuildArgs): Promise<Uint8Array> {
   function newPage() {
     drawFooter()
     page = pdfDoc.addPage([W, H])
-    // Slim continuation header
-    page.drawRectangle({ x: 0, y: H - 22, width: W, height: 22, color: NAVY })
-    text(tenant.name.toUpperCase(), MX, H - 15, 8, fontB, C.white)
-    rText(`${L.quotation} · ${quotation.reference_number}`, W - MX, H - 15, 8, fontR, C.white)
-    y = H - 22 - 24
+    y = H - 32
+    text(tenant.name.toUpperCase(), MX, y, 8, fontB, NAVY)
+    rText(`${L.quotation} · ${quotation.reference_number}`, W - MX, y, 8, fontR, C.muted)
+    y -= 8
+    rule(y, NAVY, MX, W - MX, 1.2)
+    y -= 22
   }
 
   function ensureSpace(needed: number) {
@@ -56,182 +56,205 @@ export async function renderClassic(args: PdfBuildArgs): Promise<Uint8Array> {
     text(str, rightX - w, yPos, size, font, color)
   }
 
-  function rule(yPos: number, color = BORDER, x1 = MX, x2 = W - MX) {
-    page.drawLine({ start: { x: x1, y: yPos }, end: { x: x2, y: yPos }, thickness: 0.6, color })
+  function rule(yPos: number, color = BORDER, x1 = MX, x2 = W - MX, thickness = 0.5) {
+    page.drawLine({ start: { x: x1, y: yPos }, end: { x: x2, y: yPos }, thickness, color })
+  }
+
+  function sectionHeading(label: string) {
+    ensureSpace(20)
+    text(label, MX, y, 8, fontB, NAVY)
+    y -= 6
+    rule(y, NAVY, MX, MX + 36, 1)
+    y -= 14
   }
 
   function drawFooter() {
-    const fy = MB - 18
-    page.drawRectangle({ x: 0, y: 0, width: W, height: 24, color: NAVY })
+    const fy = MB - 16
+    rule(fy + 12, BORDER, MX, W - MX, 0.5)
     const validStr = quotation.valid_until
       ? L.validityText(new Date(quotation.valid_until).toLocaleDateString(L.dateLocale, { dateStyle: 'long' }))
       : L.contactText
-    text(validStr, MX, fy, 7.5, fontR, C.white)
-    rText(L.footer, W - MX, fy, 7.5, fontR, C.white)
+    text(validStr, MX, fy, 7.5, fontR, C.muted)
+    rText(L.footer, W - MX, fy, 7.5, fontR, C.faint)
   }
 
   const logoImg = await loadLogo(pdfDoc, tenant.logo_url)
 
-  // ── Header band ───────────────────────────────────────────────────────────
-  const HDR_H = 92
-  page.drawRectangle({ x: 0, y: H - HDR_H, width: W, height: HDR_H, color: NAVY })
+  // ── Header: logo (left) + title block (right). No band — clean white. ─────
+  const HDR_TOP = H - 44
+  const LOGO_W  = 150, LOGO_H = 50
 
   if (logoImg) {
-    // Logo gets a small white card on the navy band
-    const dims = logoImg.scaleToFit(120, 50)
-    const cardX = MX, cardY = H - HDR_H + (HDR_H - dims.height) / 2
-    page.drawRectangle({
-      x: cardX - 6, y: cardY - 6, width: dims.width + 12, height: dims.height + 12,
-      color: C.white,
+    const dims = logoImg.scaleToFit(LOGO_W, LOGO_H)
+    page.drawImage(logoImg, {
+      x: MX, y: HDR_TOP - dims.height + 2,
+      width: dims.width, height: dims.height,
     })
-    page.drawImage(logoImg, { x: cardX, y: cardY, width: dims.width, height: dims.height })
   } else {
-    text(tenant.name.toUpperCase(), MX, H - 38, 16, fontB, C.white)
-    text(L.preparedBy.toUpperCase(), MX, H - 56, 7, fontR, rgb(0.78, 0.82, 0.88))
+    text(tenant.name.toUpperCase(), MX, HDR_TOP - 4, 14, fontB, NAVY)
   }
 
-  rText(L.quotation, W - MX, H - 38, 24, fontB, C.white)
-  rText(quotation.reference_number, W - MX, H - 60, 9.5, fontR, rgb(0.78, 0.82, 0.88))
+  // Right-aligned title stack. The title's right edge sits at W - MX, so it
+  // never collides with the logo on the left.
+  rText(L.quotation, W - MX, HDR_TOP, 22, fontB, NAVY)
+  let metaY = HDR_TOP - 22
+  rText(quotation.reference_number, W - MX, metaY, 10, fontB, C.ink)
+  metaY -= 13
   if (quotation.title) {
-    rText(quotation.title, W - MX, H - 74, 8.5, fontR, rgb(0.78, 0.82, 0.88))
+    rText(quotation.title, W - MX, metaY, 9, fontR, C.muted)
+    metaY -= 12
   }
 
-  y = H - HDR_H - 18
+  // 1.5pt navy rule below the header
+  y = HDR_TOP - LOGO_H - 14
+  rule(y, NAVY, MX, W - MX, 1.5)
+  y -= 24
 
-  // ── Sender & customer panels (two boxes) ──────────────────────────────────
-  const issueDate = new Date(quotation.created_at).toLocaleDateString(L.dateLocale, { dateStyle: 'long' })
-  const half = (col - 14) / 2
-  const LX = MX, RX = MX + half + 14
-  const PANEL_PAD = 12
-  const PANEL_TOP_LBL_H = 22
+  // ── FROM / BILL TO — two text columns, no boxes ──────────────────────────
+  const half = (col - 24) / 2
+  const LX = MX
+  const RX = MX + half + 24
+  const secTopY = y
 
-  // Pre-compute heights so the two panels stay equal.
-  function senderLineCount(): number {
-    let n = 1   // company name
-    const senderParts = [
-      tenant.contact_person, tenant.company_address, tenant.company_phone,
-      tenant.company_email,  tenant.company_website,
-    ].filter(Boolean) as string[]
-    if (senderParts.length) n += senderParts.length
-    if (tenant.vat_number)         n++
-    if (tenant.company_reg_number) n++
-    return n
+  // Left: FROM
+  text(lang === 'en' ? 'FROM' : 'OD', LX, y, 7.5, fontB, NAVY)
+  y -= 14
+  text(tenant.name, LX, y, 11, fontB, C.ink)
+  y -= 14
+  if (tenant.contact_person) {
+    for (const line of wrapText(tenant.contact_person, fontR, 9, half)) {
+      text(line, LX, y, 9, fontR, C.muted); y -= 12
+    }
   }
-  function billLineCount(): number {
-    let n = 1   // customer name
-    if (quotation.customer_company) n++
-    if (quotation.customer_email)   n++
-    if (quotation.customer_phone)   n++
-    if (quotation.customer_address) n += wrapText(quotation.customer_address, fontR, 9, half - PANEL_PAD * 2).length
-    if (quotation.customer_vat_number) n++
-    return n
+  if (tenant.company_address) {
+    for (const line of wrapText(tenant.company_address, fontR, 9, half)) {
+      text(line, LX, y, 9, fontR, C.muted); y -= 12
+    }
   }
-  const PANEL_LINE_H = 13
-  const panelH = Math.max(senderLineCount(), billLineCount()) * PANEL_LINE_H + PANEL_TOP_LBL_H + PANEL_PAD
+  if (tenant.company_phone)   { text(tenant.company_phone,   LX, y, 9, fontR, C.muted);  y -= 12 }
+  if (tenant.company_email)   { text(tenant.company_email,   LX, y, 9, fontR, C.accent); y -= 12 }
+  if (tenant.company_website) { text(tenant.company_website, LX, y, 9, fontR, C.muted);  y -= 12 }
+  if (tenant.vat_number)         { text(`${L.vatNumber} ${tenant.vat_number}`,         LX, y, 8, fontR, C.faint); y -= 11 }
+  if (tenant.company_reg_number) { text(`${L.regNumber} ${tenant.company_reg_number}`, LX, y, 8, fontR, C.faint); y -= 11 }
+  const leftBotY = y
 
-  // Left panel: sender
-  page.drawRectangle({
-    x: LX, y: y - panelH, width: half, height: panelH,
-    color: PANEL_BG, borderColor: BORDER, borderWidth: 0.5,
-  })
-  let lpy = y - 14
-  text(L.preparedBy.toUpperCase(), LX + PANEL_PAD, lpy, 7.5, fontB, NAVY)
-  lpy -= PANEL_TOP_LBL_H - 14
-  rule(lpy + 4, BORDER, LX + PANEL_PAD, LX + half - PANEL_PAD)
-  lpy -= PANEL_LINE_H
-  text(tenant.name, LX + PANEL_PAD, lpy, 10, fontB, C.ink)
-  lpy -= PANEL_LINE_H
-  if (tenant.contact_person) { text(tenant.contact_person, LX + PANEL_PAD, lpy, 9, fontR, C.muted); lpy -= PANEL_LINE_H }
-  if (tenant.company_address) { text(tenant.company_address, LX + PANEL_PAD, lpy, 9, fontR, C.muted); lpy -= PANEL_LINE_H }
-  if (tenant.company_phone)   { text(tenant.company_phone,   LX + PANEL_PAD, lpy, 9, fontR, C.muted); lpy -= PANEL_LINE_H }
-  if (tenant.company_email)   { text(tenant.company_email,   LX + PANEL_PAD, lpy, 9, fontR, C.accent); lpy -= PANEL_LINE_H }
-  if (tenant.company_website) { text(tenant.company_website, LX + PANEL_PAD, lpy, 9, fontR, C.muted); lpy -= PANEL_LINE_H }
-  if (tenant.vat_number)         { text(`${L.vatNumber} ${tenant.vat_number}`,         LX + PANEL_PAD, lpy, 8, fontR, C.faint); lpy -= PANEL_LINE_H }
-  if (tenant.company_reg_number) { text(`${L.regNumber} ${tenant.company_reg_number}`, LX + PANEL_PAD, lpy, 8, fontR, C.faint); lpy -= PANEL_LINE_H }
-
-  // Right panel: bill-to
-  page.drawRectangle({
-    x: RX, y: y - panelH, width: half, height: panelH,
-    color: PANEL_BG, borderColor: BORDER, borderWidth: 0.5,
-  })
-  let rpy = y - 14
-  text(L.billTo, RX + PANEL_PAD, rpy, 7.5, fontB, NAVY)
-  rpy -= PANEL_TOP_LBL_H - 14
-  rule(rpy + 4, BORDER, RX + PANEL_PAD, RX + half - PANEL_PAD)
-  rpy -= PANEL_LINE_H
-  text(quotation.customer_name, RX + PANEL_PAD, rpy, 10, fontB, C.ink)
-  rpy -= PANEL_LINE_H
-  if (quotation.customer_company) { text(quotation.customer_company, RX + PANEL_PAD, rpy, 9, fontR, C.muted); rpy -= PANEL_LINE_H }
-  if (quotation.customer_email)   { text(quotation.customer_email,   RX + PANEL_PAD, rpy, 9, fontR, C.accent); rpy -= PANEL_LINE_H }
-  if (quotation.customer_phone)   { text(quotation.customer_phone,   RX + PANEL_PAD, rpy, 9, fontR, C.muted); rpy -= PANEL_LINE_H }
+  // Right: BILL TO
+  let ry = secTopY
+  text(L.billTo, RX, ry, 7.5, fontB, NAVY)
+  ry -= 14
+  text(quotation.customer_name, RX, ry, 11, fontB, C.ink)
+  ry -= 14
+  if (quotation.customer_company) {
+    for (const line of wrapText(quotation.customer_company, fontR, 9, half)) {
+      text(line, RX, ry, 9, fontR, C.muted); ry -= 12
+    }
+  }
   if (quotation.customer_address) {
-    for (const line of wrapText(quotation.customer_address, fontR, 9, half - PANEL_PAD * 2)) {
-      text(line, RX + PANEL_PAD, rpy, 9, fontR, C.muted); rpy -= PANEL_LINE_H
+    for (const line of wrapText(quotation.customer_address, fontR, 9, half)) {
+      text(line, RX, ry, 9, fontR, C.muted); ry -= 12
     }
   }
+  if (quotation.customer_phone) { text(quotation.customer_phone, RX, ry, 9, fontR, C.muted);  ry -= 12 }
+  if (quotation.customer_email) { text(quotation.customer_email, RX, ry, 9, fontR, C.accent); ry -= 12 }
   if (quotation.customer_vat_number) {
-    text(`${L.customerVat}: ${quotation.customer_vat_number}`, RX + PANEL_PAD, rpy, 8, fontR, C.faint)
-    rpy -= PANEL_LINE_H
+    text(`${L.customerVat}: ${quotation.customer_vat_number}`, RX, ry, 8, fontR, C.faint)
+    ry -= 11
   }
 
-  y -= panelH + 14
+  y = Math.min(leftBotY, ry) - 8
 
-  // ── Quote details strip (dates, currency, terms) ──────────────────────────
-  const strip = [
-    [L.issued, issueDate],
-    quotation.valid_until
-      ? [L.validUntil, new Date(quotation.valid_until).toLocaleDateString(L.dateLocale, { dateStyle: 'long' })]
-      : null,
-    [L.currency, quotation.currency],
-    quotation.payment_terms ? [L.paymentTerms, quotation.payment_terms] : null,
-  ].filter((x): x is [string, string] => Array.isArray(x))
-
-  const STRIP_H = 36
-  page.drawRectangle({
-    x: MX, y: y - STRIP_H, width: col, height: STRIP_H,
-    color: NAVY_DARK,
-  })
-  const cellW = col / strip.length
-  for (let i = 0; i < strip.length; i++) {
-    const cx = MX + cellW * i + 12
-    text(strip[i][0].toUpperCase(), cx, y - 13, 6.5, fontB, rgb(0.66, 0.71, 0.78))
-    text(strip[i][1],               cx, y - 26, 9,   fontB, C.white)
-    if (i > 0) {
-      page.drawLine({
-        start: { x: MX + cellW * i, y: y - 6 },
-        end:   { x: MX + cellW * i, y: y - STRIP_H + 6 },
-        thickness: 0.5, color: rgb(0.42, 0.46, 0.52),
-      })
-    }
-  }
-  y -= STRIP_H + 18
-
-  // ── Ship to ───────────────────────────────────────────────────────────────
+  // SHIP TO if delivery_address is set — full-width row below the two columns
   if (quotation.delivery_address) {
-    text(L.shipTo, MX, y, 8, fontB, NAVY)
+    rule(y); y -= 14
+    text(L.shipTo, MX, y, 7.5, fontB, NAVY)
     y -= 12
     for (const line of wrapText(quotation.delivery_address, fontR, 9, col)) {
       text(line, MX, y, 9, fontR, C.muted); y -= 12
     }
-    y -= 8
+    y -= 4
   }
+
+  y -= 8
+
+  // ── Quote details strip — light gray panel ───────────────────────────────
+  const issueDate = new Date(quotation.created_at).toLocaleDateString(L.dateLocale, { dateStyle: 'long' })
+  const detailRows: [string, string][] = [
+    [L.issued, issueDate],
+  ]
+  if (quotation.valid_until) {
+    detailRows.push([L.validUntil, new Date(quotation.valid_until).toLocaleDateString(L.dateLocale, { dateStyle: 'long' })])
+  }
+  detailRows.push([L.currency, quotation.currency])
+  if (tenant.contact_person)   detailRows.push([L.preparedBy,   tenant.contact_person])
+  if (quotation.payment_terms) detailRows.push([L.paymentTerms, quotation.payment_terms])
+
+  // Use up to 4 cells per visual row; if more, wrap onto a second row.
+  const cellsPerRow = Math.min(detailRows.length, 4)
+  const rowsOfCells = Math.ceil(detailRows.length / cellsPerRow)
+  const cellW = col / cellsPerRow
+  const STRIP_LINE_H = 11
+  const STRIP_PAD    = 14
+  const cellInnerW   = cellW - 16
+  // Pre-compute wrap counts for each value, so that we can fit the panel exactly.
+  const cellWrapLines: number[] = detailRows.map(([, val]) => wrapText(val, fontB, 9, cellInnerW).length)
+  const rowMaxLines: number[] = []
+  for (let r = 0; r < rowsOfCells; r++) {
+    const slice = cellWrapLines.slice(r * cellsPerRow, r * cellsPerRow + cellsPerRow)
+    rowMaxLines.push(Math.max(...slice, 1))
+  }
+  const rowHeights = rowMaxLines.map(n => 12 + n * STRIP_LINE_H)
+  const STRIP_H    = rowHeights.reduce((s, n) => s + n, 0) + STRIP_PAD
+  ensureSpace(STRIP_H + 22)
+  page.drawRectangle({
+    x: MX, y: y - STRIP_H, width: col, height: STRIP_H,
+    color: PANEL_BG, borderColor: BORDER, borderWidth: 0.5,
+  })
+
+  let stripY = y - 14
+  for (let r = 0; r < rowsOfCells; r++) {
+    const segH = rowHeights[r]
+    for (let c = 0; c < cellsPerRow; c++) {
+      const idx = r * cellsPerRow + c
+      if (idx >= detailRows.length) break
+      const [label, value] = detailRows[idx]
+      const cx = MX + cellW * c + 12
+      text(label.toUpperCase(), cx, stripY, 6.5, fontB, C.muted)
+      let valY = stripY - 11
+      for (const line of wrapText(value, fontB, 9, cellInnerW)) {
+        text(line, cx, valY, 9, fontB, C.ink)
+        valY -= STRIP_LINE_H
+      }
+    }
+    // Vertical separator lines between cells
+    for (let c = 1; c < cellsPerRow; c++) {
+      const sx = MX + cellW * c
+      page.drawLine({
+        start: { x: sx, y: stripY + 4 },
+        end:   { x: sx, y: stripY + 4 - segH + 6 },
+        thickness: 0.4, color: BORDER,
+      })
+    }
+    stripY -= segH
+  }
+  y -= STRIP_H + 24
 
   // ── Line items ────────────────────────────────────────────────────────────
   const items = (Array.isArray(quotation.line_items) ? quotation.line_items : []) as unknown as QuotationLineItem[]
 
   if (items.length > 0) {
-    ensureSpace(60)
+    sectionHeading(L.lineItems)
 
     const C_NUM  = MX + 6
-    const C_PROD = MX + 22
-    const C_QTY  = MX + col * 0.56
-    const C_UOM  = MX + col * 0.64
-    const C_UPR  = MX + col * 0.84
+    const C_PROD = MX + 24
+    const C_QTY  = MX + col * 0.55
+    const C_UOM  = MX + col * 0.63
+    const C_UPR  = MX + col * 0.83
     const C_TR   = MX + col - 6
     const PROD_W = C_QTY - C_PROD - 6
 
-    // Filled table header bar
+    // Filled navy header row
     const HDR_H_ROW = 22
+    ensureSpace(HDR_H_ROW + 6)
     page.drawRectangle({ x: MX, y: y - HDR_H_ROW, width: col, height: HDR_H_ROW, color: NAVY })
     const hbY = y - 14
     text('#',          C_NUM,  hbY, 8, fontB, C.white)
@@ -240,7 +263,7 @@ export async function renderClassic(args: PdfBuildArgs): Promise<Uint8Array> {
     text(L.uom,        C_UOM,  hbY, 8, fontB, C.white)
     rText(L.unitPrice, C_UPR,  hbY, 8, fontB, C.white)
     rText(L.total,     C_TR,   hbY, 8, fontB, C.white)
-    y -= HDR_H_ROW + 4
+    y -= HDR_H_ROW + 6
 
     for (let i = 0; i < items.length; i++) {
       const item         = items[i]
@@ -264,7 +287,6 @@ export async function renderClassic(args: PdfBuildArgs): Promise<Uint8Array> {
       rh += 14
       ensureSpace(rh)
 
-      // Striped rows
       if (i % 2 === 1)
         page.drawRectangle({ x: MX, y: y - rh + 4, width: col, height: rh, color: PANEL_BG })
 
@@ -276,7 +298,6 @@ export async function renderClassic(args: PdfBuildArgs): Promise<Uint8Array> {
         text(line, C_PROD, y, 10, fontB, NAVY)
         y -= 13
       }
-
       if (item.product_sku) {
         text(`SKU: ${item.product_sku}`, C_PROD, y, 7.5, fontR, C.muted)
         y -= 11
@@ -337,32 +358,25 @@ export async function renderClassic(args: PdfBuildArgs): Promise<Uint8Array> {
       rText(lineTotal.toFixed(2),       C_TR,  rowY, 10,  fontB, NAVY)
 
       y -= 8
-      page.drawLine({ start: { x: MX, y: y + 4 }, end: { x: MX + col, y: y + 4 }, thickness: 0.4, color: BORDER })
+      if (i < items.length - 1)
+        page.drawLine({ start: { x: MX, y: y + 4 }, end: { x: MX + col, y: y + 4 }, thickness: 0.3, color: BORDER })
     }
-    y -= 12
+    y -= 14
   }
 
-  // ── Financial summary: panel on right ────────────────────────────────────
+  // ── Financial summary — right-aligned, total in navy bar ─────────────────
   const adjustments = (Array.isArray(quotation.adjustments) ? quotation.adjustments : []) as unknown as QuotationAdjustment[]
-  const SUM_W = 260
+  const SUM_W = 250
   const SUM_L = W - MX - SUM_W
   const SUM_R = W - MX
-  const SUM_PAD = 12
 
-  const sumRowCount = 1 + adjustments.length   // subtotal + adjustments
-  const sumPanelH   = sumRowCount * 16 + 50    // rows + total row
-  ensureSpace(sumPanelH + 12)
+  ensureSpace(40 + adjustments.length * 16 + 36)
+  rule(y, BORDER, SUM_L, SUM_R, 0.5)
+  y -= 16
 
-  // Panel: light box with adjustments, dark band with total
-  page.drawRectangle({
-    x: SUM_L, y: y - sumPanelH, width: SUM_W, height: sumPanelH,
-    color: PANEL_BG, borderColor: BORDER, borderWidth: 0.5,
-  })
-
-  let sy = y - 16
-  text(L.subtotal, SUM_L + SUM_PAD, sy, 9, fontR, C.muted)
-  rText(`${quotation.subtotal.toFixed(2)} ${quotation.currency}`, SUM_R - SUM_PAD, sy, 9, fontR, C.ink)
-  sy -= 16
+  text(L.subtotal, SUM_L, y, 9.5, fontR, C.muted)
+  rText(`${quotation.subtotal.toFixed(2)} ${quotation.currency}`, SUM_R, y, 9.5, fontR, C.ink)
+  y -= 16
 
   let running = quotation.subtotal
   for (const adj of adjustments) {
@@ -374,58 +388,48 @@ export async function renderClassic(args: PdfBuildArgs): Promise<Uint8Array> {
 
     const pct    = adj.mode === 'percent' ? ` ${adj.value}%` : ''
     const label  = `${adj.label}${pct}`
-    const amtStr = `${applied >= 0 ? '+' : ''}${applied.toFixed(2)} ${quotation.currency}`
-    text(label, SUM_L + SUM_PAD, sy, 9, fontR, C.muted)
-    rText(amtStr, SUM_R - SUM_PAD, sy, 9, fontB, applied >= 0 ? C.positive : C.negative)
-    sy -= 16
+    text(label, SUM_L, y, 9, fontR, C.muted)
+    rText(`${applied >= 0 ? '+' : ''}${applied.toFixed(2)} ${quotation.currency}`,
+      SUM_R, y, 9, fontB, applied >= 0 ? C.positive : C.negative)
+    y -= 16
   }
 
-  // Total band
-  const TOT_H = 36
-  page.drawRectangle({
-    x: SUM_L, y: y - sumPanelH, width: SUM_W, height: TOT_H,
-    color: NAVY,
-  })
-  text(L.totalDue, SUM_L + SUM_PAD, y - sumPanelH + 14, 9, fontB, rgb(0.78, 0.82, 0.88))
-  rText(
-    `${quotation.total_price.toFixed(2)} ${quotation.currency}`,
-    SUM_R - SUM_PAD, y - sumPanelH + 12, 14, fontB, C.white,
-  )
+  // Total bar — navy fill. Both texts share the same baseline inside the bar.
+  ensureSpace(40)
+  y -= 4
+  const TOT_H = 30
+  const TOT_BASELINE = y - 19   // baseline inside the band — same for both texts
+  page.drawRectangle({ x: SUM_L, y: y - TOT_H, width: SUM_W, height: TOT_H, color: NAVY })
+  text(L.totalDue, SUM_L + 14, TOT_BASELINE, 9, fontB, rgb(0.78, 0.82, 0.88))
+  rText(`${quotation.total_price.toFixed(2)} ${quotation.currency}`,
+    SUM_R - 14, TOT_BASELINE, 13, fontB, C.white)
+  y -= TOT_H + 22
 
-  y -= sumPanelH + 22
-
-  // ── Notes / terms / global texts ─────────────────────────────────────────
-  function drawBorderedBlock(label: string, lines: string[], padded = false) {
-    const innerW = col - 24
-    const wrapped = lines.flatMap(line => wrapText(line, fontR, 9, innerW))
-    const BOX_H   = wrapped.length * 13 + 30
-    ensureSpace(BOX_H + 16)
-    y -= 8
-    page.drawRectangle({
-      x: MX, y: y - BOX_H, width: col, height: BOX_H,
-      color: padded ? PANEL_BG : C.white, borderColor: BORDER, borderWidth: 0.5,
-    })
-    text(label.toUpperCase(), MX + 12, y - 14, 7.5, fontB, NAVY)
-    rule(y - 18, BORDER, MX + 12, MX + col - 12)
-    let by = y - 30
-    for (const line of wrapped) {
-      text(line, MX + 12, by, 9, fontR, C.ink)
-      by -= 13
+  // ── Notes / terms / global texts — plain sections with navy heading rule
+  function drawSimpleSection(label: string, lines: string[]) {
+    if (!lines.length) return
+    sectionHeading(label)
+    for (const raw of lines) {
+      for (const line of wrapText(raw, fontR, 9.5, col)) {
+        ensureSpace(13)
+        text(line, MX, y, 9.5, fontR, C.ink)
+        y -= 13
+      }
     }
-    y -= BOX_H + 6
+    y -= 8
   }
 
   function drawNotesSection() {
     if (!quotation.notes) return
-    drawBorderedBlock(L.notes, quotation.notes.split(/\r?\n/))
+    drawSimpleSection(L.notes, quotation.notes.split(/\r?\n/))
   }
 
   function drawTermsSection() {
-    drawBorderedBlock(L.termsHeader, L.termsLines, true)
+    drawSimpleSection(L.termsHeader, L.termsLines)
   }
 
   function drawGlobalTextSection(txt: ProductText) {
-    drawBorderedBlock(txt.label, txt.content.split(/\r?\n/))
+    drawSimpleSection(txt.label.toUpperCase(), txt.content.split(/\r?\n/))
   }
 
   const orderedSections = buildOrderedSections(layoutSections, globalTexts, lang)
@@ -450,7 +454,7 @@ export async function renderClassic(args: PdfBuildArgs): Promise<Uint8Array> {
     const pg    = pages[i]
     const label = `${L.page} ${i + 1} ${L.of} ${N}`
     const lw    = fontR.widthOfTextAtSize(label, 7.5)
-    pg.drawText(label, { x: W / 2 - lw / 2, y: MB - 18, size: 7.5, font: fontR, color: C.white })
+    pg.drawText(label, { x: W / 2 - lw / 2, y: MB - 16, size: 7.5, font: fontR, color: C.muted })
   }
 
   if (watermark) {

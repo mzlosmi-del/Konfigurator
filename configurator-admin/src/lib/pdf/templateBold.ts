@@ -8,9 +8,11 @@ import {
 } from './shared'
 
 /**
- * Bold — brand-forward. Vertical accent bar on the left edge, oversized hero
- * title, accent-coloured totals and section labels. Designed for tenants with
- * a strong design POV.
+ * Bold — refined editorial. Narrow vertical accent stripe on the left edge.
+ * The header lays out as: logo top-left, dates right-aligned, then the
+ * "QUOTATION" hero title + reference stacked BELOW the logo (so the hero
+ * never collides with the logo or the dates). Coral accent appears on
+ * section headings and the total. Generous whitespace.
  */
 export async function renderBold(args: PdfBuildArgs): Promise<Uint8Array> {
   const { tenant, quotation, productTexts, globalTexts, layoutSections, lang, watermark } = args
@@ -18,34 +20,33 @@ export async function renderBold(args: PdfBuildArgs): Promise<Uint8Array> {
   const pdfDoc = await PDFDocument.create()
   const { fontR, fontB } = await loadFonts(pdfDoc)
 
-  // Bold palette: warm coral accent.
   const ACCENT      = rgb(0.910, 0.290, 0.118)   // #E84A1E
-  const ACCENT_SOFT = rgb(0.984, 0.929, 0.910)   // #FBEDE8 — pale tint for soft surfaces
+  const ACCENT_SOFT = rgb(0.992, 0.953, 0.945)   // #FDF3F1
 
   const W = 595, H = 842
-  const ACCENT_BAR_W = 18
-  const MX_L = ACCENT_BAR_W + 30   // body left edge
-  const MX_R = 36                   // body right margin from page edge
-  const MB   = 50
-  const col  = W - MX_L - MX_R
+  const ACCENT_W = 6                  // left accent stripe
+  const MX_L     = ACCENT_W + 36      // body left edge
+  const MX_R     = 36                 // body right margin from page edge
+  const MB       = 56
+  const col      = W - MX_L - MX_R
 
   let page: PDFPage = pdfDoc.addPage([W, H])
   let y = 0
 
-  function drawAccentBar() {
-    page.drawRectangle({ x: 0, y: 0, width: ACCENT_BAR_W, height: H, color: ACCENT })
+  function drawAccentStripe() {
+    page.drawRectangle({ x: 0, y: 0, width: ACCENT_W, height: H, color: ACCENT })
   }
 
   function newPage() {
     drawFooter()
     page = pdfDoc.addPage([W, H])
-    drawAccentBar()
-    y = H - 30
-    text(`${tenant.name} — ${L.quotation} ${quotation.reference_number}`,
+    drawAccentStripe()
+    y = H - 32
+    text(`${tenant.name.toUpperCase()} — ${L.quotation} ${quotation.reference_number}`,
       MX_L, y, 8, fontB, C.muted)
-    y -= 14
-    rule(y)
-    y -= 18
+    y -= 8
+    rule(y, ACCENT, MX_L, W - MX_R, 1)
+    y -= 22
   }
 
   function ensureSpace(needed: number) {
@@ -67,9 +68,17 @@ export async function renderBold(args: PdfBuildArgs): Promise<Uint8Array> {
     page.drawLine({ start: { x: x1, y: yPos }, end: { x: x2, y: yPos }, thickness, color })
   }
 
+  function sectionHeading(label: string) {
+    ensureSpace(20)
+    text(label.toUpperCase(), MX_L, y, 8, fontB, ACCENT)
+    y -= 6
+    rule(y, ACCENT, MX_L, W - MX_R, 1)
+    y -= 14
+  }
+
   function drawFooter() {
     const fy = MB - 16
-    rule(fy + 12, ACCENT, MX_L, W - MX_R, 1.2)
+    rule(fy + 12, ACCENT, MX_L, W - MX_R, 1)
     const validStr = quotation.valid_until
       ? L.validityText(new Date(quotation.valid_until).toLocaleDateString(L.dateLocale, { dateStyle: 'long' }))
       : L.contactText
@@ -77,148 +86,175 @@ export async function renderBold(args: PdfBuildArgs): Promise<Uint8Array> {
     rText(L.footer, W - MX_R, fy, 7.5, fontB, ACCENT)
   }
 
-  drawAccentBar()
+  drawAccentStripe()
   const logoImg = await loadLogo(pdfDoc, tenant.logo_url)
 
-  // ── Header: hero "QUOTATION" + reference + dates ─────────────────────────
-  const HDR_TOP = H - 48
+  // ── Header ────────────────────────────────────────────────────────────────
+  // Layout (no horizontal collisions):
+  //   • Logo (or company name) top-left
+  //   • Right-aligned dates stack at the same vertical band as the logo
+  //   • Title "QUOTATION" + reference stacked BELOW the logo
+  //   • Coral 1pt rule under the header
+  const HDR_TOP = H - 50
+  const LOGO_W  = 130, LOGO_H = 42
 
-  // Logo or company name top-left of body
   if (logoImg) {
-    const dims = logoImg.scaleToFit(110, 40)
+    const dims = logoImg.scaleToFit(LOGO_W, LOGO_H)
     page.drawImage(logoImg, {
       x: MX_L,
       y: HDR_TOP - dims.height + 6,
       width: dims.width, height: dims.height,
     })
   } else {
-    text(tenant.name.toUpperCase(), MX_L, HDR_TOP, 11, fontB, C.muted)
+    text(tenant.name.toUpperCase(), MX_L, HDR_TOP - 4, 12, fontB, C.muted)
   }
 
-  // Hero title row, accent
-  const heroY = HDR_TOP - 50
-  text(L.quotation, MX_L, heroY, 36, fontB, ACCENT)
-  // reference badge below hero
-  text(quotation.reference_number, MX_L, heroY - 22, 11, fontB, C.ink)
-  if (quotation.title) {
-    rText(quotation.title, W - MX_R, heroY - 4, 11, fontR, C.muted)
-  }
-
-  // Dates right-aligned
+  // Right-side meta stack
   const issueDate = new Date(quotation.created_at).toLocaleDateString(L.dateLocale, { dateStyle: 'long' })
-  let metaY = heroY
-  rText(`${L.issued.toUpperCase()}`, W - MX_R, metaY, 7, fontB, C.muted)
+  let metaY = HDR_TOP
+  rText(L.issued.toUpperCase(), W - MX_R, metaY, 7, fontB, C.muted)
   metaY -= 11
   rText(issueDate, W - MX_R, metaY, 9.5, fontB, C.ink)
+  metaY -= 16
   if (quotation.valid_until) {
-    metaY -= 16
-    rText(`${L.validUntil.toUpperCase()}`, W - MX_R, metaY, 7, fontB, C.muted)
+    rText(L.validUntil.toUpperCase(), W - MX_R, metaY, 7, fontB, C.muted)
     metaY -= 11
-    const expDate = new Date(quotation.valid_until).toLocaleDateString(L.dateLocale, { dateStyle: 'long' })
-    rText(expDate, W - MX_R, metaY, 9.5, fontB, ACCENT)
+    rText(
+      new Date(quotation.valid_until).toLocaleDateString(L.dateLocale, { dateStyle: 'long' }),
+      W - MX_R, metaY, 9.5, fontB, ACCENT,
+    )
+    metaY -= 16
   }
 
-  // Bold accent rule under hero
-  y = heroY - 42
-  rule(y, ACCENT, MX_L, W - MX_R, 1.5)
-  y -= 22
+  // Hero — placed BELOW the logo so it never overlaps it.
+  const heroY = HDR_TOP - LOGO_H - 16
+  text(L.quotation, MX_L, heroY, 26, fontB, ACCENT)
+  // 26pt hero descender clears at heroY - ~6pt; place reference at heroY - 22.
+  text(quotation.reference_number, MX_L, heroY - 22, 12, fontB, C.ink)
+  if (quotation.title) {
+    const refW = fontB.widthOfTextAtSize(quotation.reference_number, 12)
+    text(quotation.title, MX_L + refW + 14, heroY - 22, 10, fontR, C.muted)
+  }
 
-  // ── Sender + Bill-to side by side ────────────────────────────────────────
+  y = heroY - 38
+  rule(y, ACCENT, MX_L, W - MX_R, 1)
+  y -= 24
+
+  // ── FROM / TO — two columns ──────────────────────────────────────────────
   const half = (col - 24) / 2
   const LX = MX_L
   const RX = MX_L + half + 24
   const secTopY = y
 
-  // Left: From (sender)
-  text((lang === 'en' ? 'FROM' : 'OD'), LX, y, 7.5, fontB, ACCENT)
+  text((lang === 'en' ? 'FROM' : 'OD'), LX, y, 8, fontB, ACCENT)
   y -= 14
   text(tenant.name, LX, y, 11, fontB, C.ink)
   y -= 14
-  if (tenant.contact_person) { text(tenant.contact_person, LX, y, 9, fontR, C.muted); y -= 12 }
+  if (tenant.contact_person) {
+    for (const line of wrapText(tenant.contact_person, fontR, 9, half)) {
+      text(line, LX, y, 9, fontR, C.muted); y -= 12
+    }
+  }
   if (tenant.company_address) {
     for (const line of wrapText(tenant.company_address, fontR, 9, half)) {
       text(line, LX, y, 9, fontR, C.muted); y -= 12
     }
   }
-  if (tenant.company_phone) { text(tenant.company_phone, LX, y, 9, fontR, C.muted); y -= 12 }
-  if (tenant.company_email) { text(tenant.company_email, LX, y, 9, fontR, C.accent); y -= 12 }
-  if (tenant.company_website) { text(tenant.company_website, LX, y, 9, fontR, C.muted); y -= 12 }
-  const tenantRegParts = [
-    tenant.vat_number         ? `${L.vatNumber} ${tenant.vat_number}`         : null,
-    tenant.company_reg_number ? `${L.regNumber} ${tenant.company_reg_number}` : null,
-  ].filter(Boolean) as string[]
-  if (tenantRegParts.length > 0) {
-    text(tenantRegParts.join('   '), LX, y, 8, fontR, C.faint)
-    y -= 11
-  }
+  if (tenant.company_phone)   { text(tenant.company_phone,   LX, y, 9, fontR, C.muted);  y -= 12 }
+  if (tenant.company_email)   { text(tenant.company_email,   LX, y, 9, fontR, C.accent); y -= 12 }
+  if (tenant.company_website) { text(tenant.company_website, LX, y, 9, fontR, C.muted);  y -= 12 }
+  if (tenant.vat_number)         { text(`${L.vatNumber} ${tenant.vat_number}`,         LX, y, 8, fontR, C.faint); y -= 11 }
+  if (tenant.company_reg_number) { text(`${L.regNumber} ${tenant.company_reg_number}`, LX, y, 8, fontR, C.faint); y -= 11 }
   const leftBotY = y
 
-  // Right: To (customer)
   let ry = secTopY
-  text((lang === 'en' ? 'TO' : 'ZA'), RX, ry, 7.5, fontB, ACCENT)
+  text((lang === 'en' ? 'TO' : 'ZA'), RX, ry, 8, fontB, ACCENT)
   ry -= 14
   text(quotation.customer_name, RX, ry, 11, fontB, C.ink)
   ry -= 14
-  if (quotation.customer_company) { text(quotation.customer_company, RX, ry, 9, fontR, C.muted); ry -= 12 }
-  if (quotation.customer_email)   { text(quotation.customer_email,   RX, ry, 9, fontR, C.accent); ry -= 12 }
-  if (quotation.customer_phone)   { text(quotation.customer_phone,   RX, ry, 9, fontR, C.muted); ry -= 12 }
+  if (quotation.customer_company) {
+    for (const line of wrapText(quotation.customer_company, fontR, 9, half)) {
+      text(line, RX, ry, 9, fontR, C.muted); ry -= 12
+    }
+  }
   if (quotation.customer_address) {
     for (const line of wrapText(quotation.customer_address, fontR, 9, half)) {
       text(line, RX, ry, 9, fontR, C.muted); ry -= 12
     }
   }
+  if (quotation.customer_phone) { text(quotation.customer_phone, RX, ry, 9, fontR, C.muted);  ry -= 12 }
+  if (quotation.customer_email) { text(quotation.customer_email, RX, ry, 9, fontR, C.accent); ry -= 12 }
   if (quotation.customer_vat_number) {
     text(`${L.customerVat}: ${quotation.customer_vat_number}`, RX, ry, 8, fontR, C.faint)
     ry -= 11
   }
+
+  y = Math.min(leftBotY, ry) - 8
+
+  // SHIP TO if delivery_address is set — full-width row below
   if (quotation.delivery_address) {
-    ry -= 6
-    text(L.shipTo, RX, ry, 7.5, fontB, ACCENT)
-    ry -= 13
-    for (const line of wrapText(quotation.delivery_address, fontR, 9, half)) {
-      text(line, RX, ry, 9, fontR, C.muted); ry -= 12
+    text(L.shipTo, MX_L, y, 8, fontB, ACCENT)
+    y -= 12
+    for (const line of wrapText(quotation.delivery_address, fontR, 9, col)) {
+      text(line, MX_L, y, 9, fontR, C.muted); y -= 12
     }
+    y -= 4
   }
 
-  y = Math.min(leftBotY, ry) - 14
+  // Currency / prepared by / payment terms — meta strip
+  const metaParts: [string, string][] = [
+    [L.currency, quotation.currency],
+  ]
+  if (tenant.contact_person)   metaParts.push([L.preparedBy,   tenant.contact_person])
+  if (quotation.payment_terms) metaParts.push([L.paymentTerms, quotation.payment_terms])
 
-  // Currency + payment terms inline
-  if (quotation.currency || quotation.payment_terms) {
-    const parts = [
-      `${L.currency.toUpperCase()}: ${quotation.currency}`,
-      quotation.payment_terms ? `${L.paymentTerms.toUpperCase()}: ${quotation.payment_terms}` : null,
-    ].filter(Boolean) as string[]
-    text(parts.join('   ·   '), MX_L, y, 8, fontB, C.muted)
+  if (metaParts.length > 0) {
+    y -= 6
+    rule(y, C.rule)
     y -= 14
+    const mCol = col / metaParts.length
+    let metaRowMaxLines = 1
+    for (let i = 0; i < metaParts.length; i++) {
+      const [label, value] = metaParts[i]
+      const cx = MX_L + mCol * i
+      text(label.toUpperCase(), cx, y, 7, fontB, ACCENT)
+      const valueLines = wrapText(value, fontR, 9, mCol - 12)
+      let valueY = y - 11
+      for (const line of valueLines) {
+        text(line, cx, valueY, 9, fontR, C.ink)
+        valueY -= 11
+      }
+      metaRowMaxLines = Math.max(metaRowMaxLines, valueLines.length)
+    }
+    y -= 14 + metaRowMaxLines * 11
   }
 
-  rule(y)
+  rule(y, C.rule)
   y -= 22
 
-  // ── Line items table ─────────────────────────────────────────────────────
+  // ── Line items ────────────────────────────────────────────────────────────
   const items = (Array.isArray(quotation.line_items) ? quotation.line_items : []) as unknown as QuotationLineItem[]
 
   if (items.length > 0) {
-    ensureSpace(50)
+    sectionHeading(L.lineItems)
 
-    text(L.lineItems, MX_L, y, 9, fontB, ACCENT)
-    y -= 12
-
-    const C_PROD = MX_L
+    const C_NUM  = MX_L
+    const C_PROD = MX_L + 22
     const C_QTY  = MX_L + col * 0.55
-    const C_UOM  = MX_L + col * 0.62
-    const C_UPR  = MX_L + col * 0.82
+    const C_UOM  = MX_L + col * 0.63
+    const C_UPR  = MX_L + col * 0.83
     const C_TR   = W - MX_R
     const PROD_W = C_QTY - C_PROD - 6
 
+    text('#',          C_NUM,  y, 7, fontB, C.muted)
     text(L.product,    C_PROD, y, 7, fontB, C.muted)
     text(L.qty,        C_QTY,  y, 7, fontB, C.muted)
     text(L.uom,        C_UOM,  y, 7, fontB, C.muted)
     rText(L.unitPrice, C_UPR,  y, 7, fontB, C.muted)
     rText(L.total,     C_TR,   y, 7, fontB, C.muted)
     y -= 6
-    rule(y, C.ink, MX_L, W - MX_R, 1)
-    y -= 12
+    rule(y, ACCENT, MX_L, W - MX_R, 1)
+    y -= 14
 
     for (let i = 0; i < items.length; i++) {
       const item        = items[i]
@@ -239,10 +275,12 @@ export async function renderBold(args: PdfBuildArgs): Promise<Uint8Array> {
       if (showBreakdown)       rh += 11 + (cfg.length + formulas.length) * 11
       for (const pt of ptexts) rh += 11 + wrapText(pt.content, fontR, 8, PROD_W - 4).length * 11
       if (itemAdjs.length > 0) rh += 4 + 11 + itemAdjs.length * 11
-      rh += 16
+      rh += 14
       ensureSpace(rh)
 
       const rowY = y
+
+      text(`${i + 1}`, C_NUM, y, 9, fontR, C.faint)
 
       for (const line of nameLines) {
         text(line, C_PROD, y, 11, fontB, C.ink)
@@ -318,17 +356,18 @@ export async function renderBold(args: PdfBuildArgs): Promise<Uint8Array> {
   }
 
   // ── Financial summary ─────────────────────────────────────────────────────
-  rule(y)
-  y -= 22
-
   const adjustments = (Array.isArray(quotation.adjustments) ? quotation.adjustments : []) as unknown as QuotationAdjustment[]
   const SUM_W = 260
   const SUM_L = W - MX_R - SUM_W
   const SUM_R = W - MX_R
 
+  ensureSpace(40 + adjustments.length * 16 + 36)
+  rule(y, C.rule, SUM_L, SUM_R)
+  y -= 16
+
   text(L.subtotal, SUM_L, y, 9.5, fontR, C.muted)
   rText(`${quotation.subtotal.toFixed(2)} ${quotation.currency}`, SUM_R, y, 9.5, fontR, C.ink)
-  y -= 17
+  y -= 16
 
   let running = quotation.subtotal
   for (const adj of adjustments) {
@@ -346,70 +385,49 @@ export async function renderBold(args: PdfBuildArgs): Promise<Uint8Array> {
     y -= 16
   }
 
-  // Big total in accent — soft tinted band
-  ensureSpace(48)
-  const TOTAL_BAND_H = 38
+  // Total band — soft tint behind a single baseline. Both texts use the same y.
+  ensureSpace(40)
+  y -= 6
+  const TOT_H = 32
+  const TOT_BASELINE = y - 21
   page.drawRectangle({
-    x: SUM_L - 14, y: y - TOTAL_BAND_H + 8, width: SUM_W + 14, height: TOTAL_BAND_H,
+    x: SUM_L - 12, y: y - TOT_H, width: SUM_W + 12, height: TOT_H,
     color: ACCENT_SOFT,
   })
-  // Left accent stub on the band
   page.drawRectangle({
-    x: SUM_L - 14, y: y - TOTAL_BAND_H + 8, width: 4, height: TOTAL_BAND_H,
+    x: SUM_L - 12, y: y - TOT_H, width: 4, height: TOT_H,
     color: ACCENT,
   })
-  y -= 12
-  text(L.totalDue, SUM_L, y, 8.5, fontB, C.muted)
-  rText(`${quotation.total_price.toFixed(2)} ${quotation.currency}`, SUM_R, y - 4, 18, fontB, ACCENT)
-  y -= TOTAL_BAND_H
+  text(L.totalDue, SUM_L, TOT_BASELINE, 9, fontB, C.muted)
+  rText(`${quotation.total_price.toFixed(2)} ${quotation.currency}`,
+    SUM_R, TOT_BASELINE, 14, fontB, ACCENT)
+  y -= TOT_H + 24
 
   // ── Notes / terms / global texts ────────────────────────────────────────
-  function drawSectionLabel(label: string) {
-    ensureSpace(18)
-    text(label.toUpperCase(), MX_L, y, 8, fontB, ACCENT)
-    y -= 6
-    rule(y, ACCENT, MX_L, MX_L + 24, 1.5)
-    y -= 14
+  function drawSimpleSection(label: string, lines: string[]) {
+    if (!lines.length) return
+    sectionHeading(label)
+    for (const raw of lines) {
+      for (const line of wrapText(raw, fontR, 9.5, col)) {
+        ensureSpace(13)
+        text(line, MX_L, y, 9.5, fontR, C.ink)
+        y -= 13
+      }
+    }
+    y -= 8
   }
 
   function drawNotesSection() {
     if (!quotation.notes) return
-    const lines = wrapText(quotation.notes, fontR, 9.5, col)
-    ensureSpace(36 + lines.length * 14)
-    y -= 18
-    drawSectionLabel(L.notes)
-    for (const line of lines) {
-      ensureSpace(14)
-      text(line, MX_L, y, 9.5, fontR, C.ink)
-      y -= 14
-    }
-    y -= 6
+    drawSimpleSection(L.notes, quotation.notes.split(/\r?\n/))
   }
 
   function drawTermsSection() {
-    const boxLines = L.termsLines
-    ensureSpace(36 + boxLines.length * 13)
-    y -= 18
-    drawSectionLabel(L.termsHeader)
-    for (const line of boxLines) {
-      ensureSpace(13)
-      text(line, MX_L, y, 8.5, fontR, C.muted)
-      y -= 13
-    }
-    y -= 6
+    drawSimpleSection(L.termsHeader, L.termsLines)
   }
 
   function drawGlobalTextSection(txt: ProductText) {
-    const lines = wrapText(txt.content, fontR, 9.5, col)
-    ensureSpace(36 + lines.length * 14)
-    y -= 18
-    drawSectionLabel(txt.label)
-    for (const line of lines) {
-      ensureSpace(14)
-      text(line, MX_L, y, 9.5, fontR, C.ink)
-      y -= 14
-    }
-    y -= 6
+    drawSimpleSection(txt.label.toUpperCase(), txt.content.split(/\r?\n/))
   }
 
   const orderedSections = buildOrderedSections(layoutSections, globalTexts, lang)
