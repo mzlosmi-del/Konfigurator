@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { BarChart2, Eye, Send, TrendingUp, DollarSign, Lock } from 'lucide-react'
+import { BarChart2, Eye, Send, TrendingUp, DollarSign, Lock, FileText } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useAuthContext } from '@/components/auth/AuthContext'
 import { PageHeader } from '@/components/layout/PageHeader'
@@ -14,6 +14,7 @@ interface EventRow {
   payload:    Record<string, unknown>
   created_at: string
   product_id: string
+  session_id: string
 }
 
 interface DayStat { day: string; views: number; inquiries: number }
@@ -24,6 +25,29 @@ interface ProductStat {
   views: number
   inquiries: number
   conversion: number
+}
+
+interface PriceBucket { label: string; count: number }
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function computePriceBuckets(prices: number[]): PriceBucket[] {
+  if (prices.length === 0) return []
+  const max = Math.max(...prices)
+  if (max === 0) return [{ label: '0', count: prices.length }]
+  const magnitude = Math.pow(10, Math.floor(Math.log10(max)))
+  const ceiling   = Math.ceil(max / magnitude) * magnitude
+  const step      = ceiling / 5
+  return Array.from({ length: 5 }, (_, i) => {
+    const lo = i * step
+    const hi = (i + 1) * step
+    return {
+      label: i === 4
+        ? `${lo.toLocaleString()}+`
+        : `${lo.toLocaleString()}–${hi.toLocaleString()}`,
+      count: prices.filter(p => (i === 4 ? p >= lo : p >= lo && p < hi)).length,
+    }
+  })
 }
 
 // ── Tiny inline SVG sparkline ─────────────────────────────────────────────────
@@ -74,6 +98,33 @@ function StatCard({
   )
 }
 
+// ── Horizontal bar row ────────────────────────────────────────────────────────
+
+function BarRow({
+  label, sub, count, maxCount, color = 'bg-indigo-500',
+}: {
+  label: string; sub?: string; count: number; maxCount: number; color?: string
+}) {
+  return (
+    <div className="flex items-center gap-3">
+      <div className="w-44 shrink-0 min-w-0">
+        <p className="text-xs font-medium truncate">{label}</p>
+        {sub && <p className="text-xs text-muted-foreground truncate">{sub}</p>}
+      </div>
+      <div className="flex-1 h-2 rounded-full bg-muted overflow-hidden">
+        <div className={`h-full rounded-full ${color}`} style={{ width: `${(count / maxCount) * 100}%` }} />
+      </div>
+      <span className="text-xs tabular-nums text-muted-foreground w-10 text-right">{count}</span>
+    </div>
+  )
+}
+
+// ── Section heading ───────────────────────────────────────────────────────────
+
+function SectionHeading({ children }: { children: string }) {
+  return <h2 className="text-sm font-semibold mb-3">{children}</h2>
+}
+
 // ── Advanced gate ─────────────────────────────────────────────────────────────
 
 function AdvancedGate() {
@@ -99,23 +150,26 @@ export function AnalyticsPage() {
   const { tenant, planLimits } = useAuthContext()
   const isAdvanced = planLimits?.analytics === 'advanced'
 
-  const [loading, setLoading]         = useState(true)
-  const [events, setEvents]           = useState<EventRow[]>([])
+  const [loading, setLoading]           = useState(true)
+  const [events, setEvents]             = useState<EventRow[]>([])
   const [productNames, setProductNames] = useState<Record<string, string>>({})
-  const [charNames, setCharNames]     = useState<Record<string, string>>({})
+  const [charNames, setCharNames]       = useState<Record<string, string>>({})
+  const [valueNames, setValueNames]     = useState<Record<string, string>>({})
+  const [quotConversion, setQuotConversion] = useState({ total: 0, fromWidget: 0, accepted: 0 })
 
   useEffect(() => {
     if (!tenant) return
 
     const since = new Date()
     since.setDate(since.getDate() - 30)
+    const sinceIso = since.toISOString()
 
     Promise.all([
       supabase
         .from('widget_events')
-        .select('event_type, payload, created_at, product_id')
+        .select('event_type, payload, created_at, product_id, session_id')
         .eq('tenant_id', tenant.id)
-        .gte('created_at', since.toISOString())
+        .gte('created_at', sinceIso)
         .order('created_at', { ascending: true })
         .limit(10000),
       supabase
@@ -127,14 +181,35 @@ export function AnalyticsPage() {
         .from('characteristics')
         .select('id, name')
         .eq('tenant_id', tenant.id),
-    ]).then(([evRes, prRes, charRes]) => {
+      supabase
+        .from('characteristic_values')
+        .select('id, label')
+        .eq('tenant_id', tenant.id),
+      supabase
+        .from('quotations')
+        .select('status, source_inquiry_id')
+        .eq('tenant_id', tenant.id)
+        .gte('created_at', sinceIso),
+    ]).then(([evRes, prRes, charRes, valRes, quotRes]) => {
       setEvents((evRes.data ?? []) as EventRow[])
+
       const names: Record<string, string> = {}
       for (const p of (prRes.data ?? []) as { id: string; name: string }[]) names[p.id] = p.name
       setProductNames(names)
+
       const cnames: Record<string, string> = {}
       for (const c of (charRes.data ?? []) as { id: string; name: string }[]) cnames[c.id] = c.name
       setCharNames(cnames)
+
+      const vnames: Record<string, string> = {}
+      for (const v of (valRes.data ?? []) as { id: string; label: string }[]) vnames[v.id] = v.label
+      setValueNames(vnames)
+
+      const quots = (quotRes.data ?? []) as { status: string; source_inquiry_id: string | null }[]
+      const fromWidget = quots.filter(q => q.source_inquiry_id != null)
+      const accepted   = fromWidget.filter(q => q.status === 'accepted_no_changes' || q.status === 'accepted_with_changes')
+      setQuotConversion({ total: quots.length, fromWidget: fromWidget.length, accepted: accepted.length })
+
       setLoading(false)
     })
   }, [tenant])
@@ -162,10 +237,10 @@ export function AnalyticsPage() {
   for (const e of events) {
     const k = e.created_at.slice(0, 10)
     if (!dayMap[k]) continue
-    if (e.event_type === 'view')               dayMap[k].views++
-    if (e.event_type === 'inquiry_submitted')  dayMap[k].inquiries++
+    if (e.event_type === 'view')              dayMap[k].views++
+    if (e.event_type === 'inquiry_submitted') dayMap[k].inquiries++
   }
-  const days  = Object.values(dayMap)
+  const days           = Object.values(dayMap)
   const sparkViews     = days.map(d => d.views)
   const sparkInquiries = days.map(d => d.inquiries)
 
@@ -187,9 +262,12 @@ export function AnalyticsPage() {
     }))
     .sort((a, b) => b.views - a.views)
 
-  // Advanced: funnel + characteristic frequency
-  const started    = events.filter(e => e.event_type === 'inquiry_started').length
-  const charFreq   = events
+  // ── Advanced aggregations ──────────────────────────────────────────────────
+
+  const started = events.filter(e => e.event_type === 'inquiry_started').length
+
+  // Most-interacted characteristics (product × char)
+  const charFreq = events
     .filter(e => e.event_type === 'characteristic_changed' && typeof e.payload?.char_id === 'string')
     .reduce<Record<string, number>>((acc, e) => {
       const k = `${e.product_id}:::${e.payload.char_id as string}`
@@ -197,6 +275,46 @@ export function AnalyticsPage() {
       return acc
     }, {})
   const topChars = Object.entries(charFreq).sort((a, b) => b[1] - a[1]).slice(0, 8)
+
+  // 1. Value frequency (product × char × value)
+  const valueFreq = events
+    .filter(e =>
+      e.event_type === 'characteristic_changed' &&
+      typeof e.payload?.char_id === 'string' &&
+      typeof e.payload?.value_id === 'string'
+    )
+    .reduce<Record<string, number>>((acc, e) => {
+      const k = `${e.product_id}:::${e.payload.char_id as string}:::${e.payload.value_id as string}`
+      acc[k] = (acc[k] ?? 0) + 1
+      return acc
+    }, {})
+  const topValues = Object.entries(valueFreq).sort((a, b) => b[1] - a[1]).slice(0, 10)
+
+  // 2. Price distribution
+  const priceBuckets = computePriceBuckets(prices)
+
+  // 3. Drop-off by characteristic — last char changed before abandonment
+  const sessionMap: Record<string, EventRow[]> = {}
+  for (const e of events) {
+    if (!sessionMap[e.session_id]) sessionMap[e.session_id] = []
+    sessionMap[e.session_id].push(e)
+  }
+  const dropOffFreq = Object.values(sessionMap)
+    .filter(evs =>
+      evs.some(e => e.event_type === 'inquiry_started') &&
+      !evs.some(e => e.event_type === 'inquiry_submitted')
+    )
+    .reduce<Record<string, number>>((acc, evs) => {
+      const charEvents = evs
+        .filter(e => e.event_type === 'characteristic_changed' && typeof e.payload?.char_id === 'string')
+        .sort((a, b) => b.created_at.localeCompare(a.created_at))
+      if (charEvents.length === 0) return acc
+      const last = charEvents[0]
+      const k = `${last.product_id}:::${last.payload.char_id as string}`
+      acc[k] = (acc[k] ?? 0) + 1
+      return acc
+    }, {})
+  const topDropOff = Object.entries(dropOffFreq).sort((a, b) => b[1] - a[1]).slice(0, 6)
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
@@ -217,16 +335,16 @@ export function AnalyticsPage() {
 
         {/* ── Summary cards ──────────────────────────────────────────────── */}
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-          <StatCard icon={Eye}        label={t('Views')}          value={views.toLocaleString()}      sparkData={sparkViews}     color="#6366f1" />
-          <StatCard icon={Send}       label={t('Inquiries')}      value={inquiries.toLocaleString()}  sparkData={sparkInquiries} color="#10b981" />
-          <StatCard icon={TrendingUp} label={t('Conversion')}     value={`${conversion}%`}            sub={t('views → inquiry')} />
+          <StatCard icon={Eye}        label={t('Views')}           value={views.toLocaleString()}     sparkData={sparkViews}     color="#6366f1" />
+          <StatCard icon={Send}       label={t('Inquiries')}       value={inquiries.toLocaleString()} sparkData={sparkInquiries} color="#10b981" />
+          <StatCard icon={TrendingUp} label={t('Conversion')}      value={`${conversion}%`}           sub={t('views → inquiry')} />
           <StatCard icon={DollarSign} label={t('Avg quote price')} value={avgPrice}                   sub={prices.length > 0 ? `${prices.length} ${t('quotes')}` : undefined} />
         </div>
 
         {/* ── Per-product table ───────────────────────────────────────────── */}
         {productStats.length > 0 && (
           <div>
-            <h2 className="text-sm font-semibold mb-3">{t('By product')}</h2>
+            <SectionHeading>{t('By product')}</SectionHeading>
             <div className="rounded-lg border overflow-hidden">
               <table className="w-full text-sm">
                 <thead className="bg-muted/40 border-b">
@@ -254,14 +372,16 @@ export function AnalyticsPage() {
 
         {/* ── Advanced analytics ─────────────────────────────────────────── */}
         {isAdvanced ? (
-          <div className="space-y-6">
+          <div className="space-y-8">
+
+            {/* Funnel */}
             <div>
-              <h2 className="text-sm font-semibold mb-3">{t('Funnel')}</h2>
+              <SectionHeading>{t('Funnel')}</SectionHeading>
               <div className="flex items-end gap-4">
                 {[
-                  { label: t('Views'),      value: views,     color: 'bg-indigo-500' },
-                  { label: t('Started'),    value: started,   color: 'bg-amber-500' },
-                  { label: t('Submitted'),  value: inquiries, color: 'bg-emerald-500' },
+                  { label: t('Views'),     value: views,     color: 'bg-indigo-500' },
+                  { label: t('Started'),   value: started,   color: 'bg-amber-500' },
+                  { label: t('Submitted'), value: inquiries, color: 'bg-emerald-500' },
                 ].map(step => {
                   const pct = views > 0 ? Math.round((step.value / views) * 100) : 0
                   return (
@@ -277,33 +397,139 @@ export function AnalyticsPage() {
               </div>
             </div>
 
+            {/* Most-interacted characteristics */}
             {topChars.length > 0 && (
               <div>
-                <h2 className="text-sm font-semibold mb-3">{t('Most-interacted characteristics')}</h2>
+                <SectionHeading>{t('Most-interacted characteristics')}</SectionHeading>
                 <div className="space-y-2">
                   {topChars.map(([key, cnt]) => {
-                    const maxCnt = topChars[0][1]
                     const [productId, charId] = key.split(':::')
-                    const charName    = charNames[charId]    ?? charId.slice(0, 8)
-                    const productName = productNames[productId] ?? ''
                     return (
-                      <div key={key} className="flex items-center gap-3">
-                        <div className="w-44 shrink-0 min-w-0">
-                          <p className="text-xs font-medium truncate">{charName}</p>
-                          {productName && (
-                            <p className="text-xs text-muted-foreground truncate">{productName}</p>
-                          )}
-                        </div>
-                        <div className="flex-1 h-2 rounded-full bg-muted overflow-hidden">
-                          <div className="h-full bg-indigo-500 rounded-full" style={{ width: `${(cnt / maxCnt) * 100}%` }} />
-                        </div>
-                        <span className="text-xs tabular-nums text-muted-foreground w-10 text-right">{cnt}</span>
-                      </div>
+                      <BarRow
+                        key={key}
+                        label={charNames[charId] ?? charId.slice(0, 8)}
+                        sub={productNames[productId]}
+                        count={cnt}
+                        maxCount={topChars[0][1]}
+                      />
                     )
                   })}
                 </div>
               </div>
             )}
+
+            {/* 1. Value frequency */}
+            {topValues.length > 0 && (
+              <div>
+                <SectionHeading>{t('Most selected values')}</SectionHeading>
+                <div className="space-y-2">
+                  {topValues.map(([key, cnt]) => {
+                    const [productId, charId, valueId] = key.split(':::')
+                    const charName  = charNames[charId]   ?? charId.slice(0, 8)
+                    const valueName = valueNames[valueId] ?? valueId.slice(0, 8)
+                    const productName = productNames[productId] ?? ''
+                    return (
+                      <BarRow
+                        key={key}
+                        label={`${charName}: ${valueName}`}
+                        sub={productName}
+                        count={cnt}
+                        maxCount={topValues[0][1]}
+                        color="bg-violet-500"
+                      />
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* 2. Price distribution */}
+            {priceBuckets.length > 0 && (
+              <div>
+                <SectionHeading>{t('Price distribution')}</SectionHeading>
+                <div className="flex items-end gap-2 h-24">
+                  {(() => {
+                    const maxCount = Math.max(...priceBuckets.map(b => b.count), 1)
+                    return priceBuckets.map(bucket => (
+                      <div key={bucket.label} className="flex-1 flex flex-col items-center gap-1">
+                        <span className="text-xs tabular-nums text-muted-foreground">{bucket.count || ''}</span>
+                        <div
+                          className="w-full rounded-t bg-emerald-500"
+                          style={{ height: `${Math.max((bucket.count / maxCount) * 60, bucket.count > 0 ? 4 : 0)}px` }}
+                        />
+                        <span className="text-[10px] text-muted-foreground text-center leading-tight w-full truncate">{bucket.label}</span>
+                      </div>
+                    ))
+                  })()}
+                </div>
+              </div>
+            )}
+
+            {/* 3. Drop-off by characteristic */}
+            {topDropOff.length > 0 && (
+              <div>
+                <SectionHeading>{t('Drop-off — last characteristic before abandonment')}</SectionHeading>
+                <div className="space-y-2">
+                  {topDropOff.map(([key, cnt]) => {
+                    const [productId, charId] = key.split(':::')
+                    return (
+                      <BarRow
+                        key={key}
+                        label={charNames[charId] ?? charId.slice(0, 8)}
+                        sub={productNames[productId]}
+                        count={cnt}
+                        maxCount={topDropOff[0][1]}
+                        color="bg-rose-500"
+                      />
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* 5. Inquiry → quotation conversion */}
+            {(quotConversion.total > 0 || inquiries > 0) && (
+              <div>
+                <SectionHeading>{t('Inquiry → quotation pipeline')}</SectionHeading>
+                <div className="flex items-stretch gap-px rounded-lg overflow-hidden border text-sm">
+                  {[
+                    {
+                      icon: Send,
+                      label: t('Widget inquiries'),
+                      value: inquiries,
+                      pct: null,
+                      color: 'bg-indigo-50 dark:bg-indigo-950/30',
+                    },
+                    {
+                      icon: FileText,
+                      label: t('Became quotations'),
+                      value: quotConversion.fromWidget,
+                      pct: inquiries > 0 ? Math.round((quotConversion.fromWidget / inquiries) * 100) : 0,
+                      color: 'bg-amber-50 dark:bg-amber-950/30',
+                    },
+                    {
+                      icon: TrendingUp,
+                      label: t('Accepted'),
+                      value: quotConversion.accepted,
+                      pct: quotConversion.fromWidget > 0 ? Math.round((quotConversion.accepted / quotConversion.fromWidget) * 100) : 0,
+                      color: 'bg-emerald-50 dark:bg-emerald-950/30',
+                    },
+                  ].map(({ icon: Icon, label, value, pct, color }) => (
+                    <div key={label} className={`flex-1 px-4 py-3 ${color}`}>
+                      <div className="flex items-center gap-1.5 text-muted-foreground mb-1">
+                        <Icon className="h-3.5 w-3.5" />
+                        <span className="text-xs">{label}</span>
+                      </div>
+                      <p className="text-xl font-bold tabular-nums">{value.toLocaleString()}</p>
+                      {pct !== null && (
+                        <p className="text-xs text-muted-foreground mt-0.5">{pct}%</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
           </div>
         ) : (
           <AdvancedGate />
