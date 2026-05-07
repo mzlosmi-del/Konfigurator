@@ -10,9 +10,9 @@ export type { TenantProfile, PdfTemplate } from './pdf/shared'
 
 export const PDF_TEMPLATES: { id: PdfTemplate; label: string; description: string }[] = [
   { id: 'modern',  label: 'Modern',  description: 'Minimal light palette. Hierarchy from typography and thin rules.' },
-  { id: 'classic', label: 'Classic', description: 'Traditional corporate. Dark navy header band, boxed sender/customer panels.' },
-  { id: 'compact', label: 'Compact', description: 'Dense single-page-friendly. Tight margins and smaller type for short quotes.' },
-  { id: 'bold',    label: 'Bold',    description: 'Brand-forward. Vertical accent bar, oversized hero title, accent totals.' },
+  { id: 'classic', label: 'Classic', description: 'Traditional invoice look. Navy accents, filled table header, navy total bar.' },
+  { id: 'compact', label: 'Compact', description: 'Same content as Modern, tighter margins and smaller type. Fits short quotes on one page.' },
+  { id: 'bold',    label: 'Bold',    description: 'Editorial style. Left accent stripe, coral section labels, accent total band.' },
 ]
 
 export async function buildQuotationPdfBytes(

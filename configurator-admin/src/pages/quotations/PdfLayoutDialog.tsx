@@ -230,11 +230,8 @@ function PreviewA4({ sections, quotation, tenant, globalTexts, productTexts, lan
       style={{ width: 540, minHeight: 762, fontSize: 11 }}
     >
       {/* Template-specific decoration */}
-      {template === 'classic' && (
-        <div className="absolute top-0 left-0 right-0" style={{ height: 56, background: accent }} />
-      )}
       {template === 'bold' && (
-        <div className="absolute top-0 bottom-0 left-0" style={{ width: 14, background: accent }} />
+        <div className="absolute top-0 bottom-0 left-0" style={{ width: 6, background: accent }} />
       )}
 
       {/* Template badge */}
@@ -244,41 +241,48 @@ function PreviewA4({ sections, quotation, tenant, globalTexts, productTexts, lan
       </div>
 
       {/* Header */}
-      <div className={`flex justify-between items-start ${template === 'classic' ? 'px-8 pt-12 pb-4 text-white' : template === 'bold' ? 'pl-10 pr-8 pt-7 pb-4' : template === 'compact' ? 'px-5 pt-4 pb-2' : 'px-8 pt-7 pb-4'}`}>
+      <div className={`flex justify-between items-start ${template === 'bold' ? 'pl-8 pr-8 pt-7 pb-3' : template === 'compact' ? 'px-5 pt-4 pb-2' : 'px-8 pt-7 pb-4'}`}>
         <div style={{ maxWidth: 180 }}>
           {tenant.logo_url ? (
-            <img src={tenant.logo_url} alt="logo" style={{ maxHeight: 44, maxWidth: 160, objectFit: 'contain' }} />
+            <img src={tenant.logo_url} alt="logo" style={{ maxHeight: 40, maxWidth: 160, objectFit: 'contain' }} />
           ) : (
-            <span className="font-bold text-base" style={{ color: template === 'classic' ? '#fff' : '#151928' }}>{tenant.name}</span>
+            <span className="font-bold text-base" style={{ color: '#151928' }}>{tenant.name}</span>
           )}
         </div>
         <div className="text-right">
           <div
-            className={template === 'bold' ? 'font-bold tracking-tight' : 'font-bold tracking-wide'}
+            className="font-bold tracking-wide"
             style={{
-              fontSize: template === 'bold' ? 28 : template === 'compact' ? 16 : 22,
-              color: template === 'classic' ? '#fff' : accent,
+              fontSize: template === 'bold' ? 22 : template === 'compact' ? 16 : 22,
+              color: accent,
             }}
           >
             {isEn ? 'QUOTATION' : 'PONUDA'}
           </div>
           {quotation.reference_number && (
-            <div className="text-xs mt-0.5" style={{ color: template === 'classic' ? '#D2D6DD' : '#6C7179' }}>{quotation.reference_number}</div>
+            <div className="text-xs mt-0.5 text-[#6C7179]">{quotation.reference_number}</div>
           )}
           {quotation.title && (
-            <div className="text-xs font-medium mt-0.5" style={{ color: template === 'classic' ? '#fff' : '#151928' }}>{quotation.title}</div>
+            <div className="text-xs font-medium mt-0.5 text-[#151928]">{quotation.title}</div>
           )}
-          <div className="text-xs mt-0.5" style={{ color: template === 'classic' ? '#D2D6DD' : '#6C7179' }}>
+          <div className="text-xs mt-0.5 text-[#6C7179]">
             {isEn ? 'Issue Date' : 'Datum'}: {fmtDate(quotation.created_at)}
           </div>
           {quotation.valid_until && (
-            <div className="text-xs" style={{ color: template === 'classic' ? '#D2D6DD' : '#6C7179' }}>
+            <div className="text-xs text-[#6C7179]">
               {isEn ? 'Valid Until' : 'Važi do'}: {fmtDate(quotation.valid_until)}
             </div>
           )}
         </div>
       </div>
-      <div className="mx-8 border-t border-[#D2D4D8]" />
+      {/* Header rule — accent colour for Classic / Bold to hint at the template */}
+      <div
+        className="mx-8 border-t"
+        style={{
+          borderColor: template === 'classic' || template === 'bold' ? accent : '#D2D4D8',
+          borderTopWidth: template === 'classic' ? 1.5 : template === 'bold' ? 1 : 1,
+        }}
+      />
 
       {/* Sender strip */}
       <div className="mx-8 mt-3 mb-1 bg-[#F4F5F7] rounded px-3 py-2 text-xs text-[#6C7179] flex flex-wrap gap-x-4 gap-y-0.5">
