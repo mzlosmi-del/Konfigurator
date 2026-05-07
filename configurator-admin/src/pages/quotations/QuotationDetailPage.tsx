@@ -6,7 +6,7 @@ import {
   fetchRejectionReasons, calcSubtotal, calcTotal, deleteQuotation,
 } from '@/lib/quotations'
 import { fetchProductTexts, fetchGlobalTexts } from '@/lib/products'
-import { buildQuotationPdfBytes, openPdfBlob, type TenantProfile } from '@/lib/quotationPdf'
+import { buildQuotationPdfBytes, openPdfBlob, type TenantProfile, type PdfTemplate } from '@/lib/quotationPdf'
 import { useAuthContext } from '@/components/auth/AuthContext'
 import { supabase } from '@/lib/supabase'
 import type { Quotation, QuotationStatus, QuotationLineItem, QuotationAdjustment, QuotationRejectionReason, ProductText } from '@/types/database'
@@ -194,7 +194,7 @@ export function QuotationDetailPage() {
     }
   }
 
-  async function handleLayoutConfirm(sections: PdfSection[], lang: 'en' | 'sr') {
+  async function handleLayoutConfirm(sections: PdfSection[], lang: 'en' | 'sr', template: PdfTemplate) {
     if (!id || !quotation) return
     setGeneratingPdf(true)
     try {
@@ -212,6 +212,7 @@ export function QuotationDetailPage() {
         tenantProfile ?? { name: tenant?.name ?? 'Your store' },
         quotation, filtered, pdfGlobalTexts, sections, lang,
         isPreview,
+        template,
       )
       setLayoutOpen(false)
       openPdfBlob(bytes)

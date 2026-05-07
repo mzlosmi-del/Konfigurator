@@ -968,6 +968,20 @@ const sr: Record<string, string> = {
   'Disabled':                              'Onemogućeno',
   'Preview':                               'Pregled',
   'PDF Preview':                           'Pregled PDF-a',
+  'Template':                              'Šablon',
+  'Sections':                              'Sekcije',
+  'Modern':                                'Moderni',
+  'Classic':                               'Klasični',
+  'Compact':                               'Kompaktni',
+  'Bold':                                  'Naglašeni',
+  'Minimal light palette. Hierarchy from typography and thin rules.':
+    'Minimalna svetla paleta. Hijerarhija pomoću tipografije i tankih linija.',
+  'Traditional corporate. Dark navy header band, boxed sender/customer panels.':
+    'Tradicionalni korporativni. Tamno plava traka u zaglavlju, uokvireni paneli.',
+  'Dense single-page-friendly. Tight margins and smaller type for short quotes.':
+    'Zgusnut, jedna strana. Uske margine i manji font za kratke ponude.',
+  'Brand-forward. Vertical accent bar, oversized hero title, accent totals.':
+    'Brendiran. Vertikalna naglasna traka, veliki naslov, naglašeni iznosi.',
   'View products':                         'Pogledaj proizvode',
   'Receive your first inquiry':            'Primite vaš prvi upit',
   'A customer fills out your configurator and submits a quote request.':
