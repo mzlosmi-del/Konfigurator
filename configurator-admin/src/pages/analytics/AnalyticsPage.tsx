@@ -102,6 +102,7 @@ export function AnalyticsPage() {
   const [loading, setLoading]         = useState(true)
   const [events, setEvents]           = useState<EventRow[]>([])
   const [productNames, setProductNames] = useState<Record<string, string>>({})
+  const [charNames, setCharNames]     = useState<Record<string, string>>({})
 
   useEffect(() => {
     if (!tenant) return
@@ -122,11 +123,18 @@ export function AnalyticsPage() {
         .select('id, name')
         .eq('tenant_id', tenant.id)
         .eq('is_template', false),
-    ]).then(([evRes, prRes]) => {
+      supabase
+        .from('characteristics')
+        .select('id, name')
+        .eq('tenant_id', tenant.id),
+    ]).then(([evRes, prRes, charRes]) => {
       setEvents((evRes.data ?? []) as EventRow[])
       const names: Record<string, string> = {}
       for (const p of (prRes.data ?? []) as { id: string; name: string }[]) names[p.id] = p.name
       setProductNames(names)
+      const cnames: Record<string, string> = {}
+      for (const c of (charRes.data ?? []) as { id: string; name: string }[]) cnames[c.id] = c.name
+      setCharNames(cnames)
       setLoading(false)
     })
   }, [tenant])
@@ -184,11 +192,11 @@ export function AnalyticsPage() {
   const charFreq   = events
     .filter(e => e.event_type === 'characteristic_changed' && typeof e.payload?.char_id === 'string')
     .reduce<Record<string, number>>((acc, e) => {
-      const k = e.payload.char_id as string
+      const k = `${e.product_id}:::${e.payload.char_id as string}`
       acc[k] = (acc[k] ?? 0) + 1
       return acc
     }, {})
-  const topChars = Object.entries(charFreq).sort((a, b) => b[1] - a[1]).slice(0, 5)
+  const topChars = Object.entries(charFreq).sort((a, b) => b[1] - a[1]).slice(0, 8)
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
@@ -273,11 +281,19 @@ export function AnalyticsPage() {
               <div>
                 <h2 className="text-sm font-semibold mb-3">{t('Most-interacted characteristics')}</h2>
                 <div className="space-y-2">
-                  {topChars.map(([charId, cnt]) => {
+                  {topChars.map(([key, cnt]) => {
                     const maxCnt = topChars[0][1]
+                    const [productId, charId] = key.split(':::')
+                    const charName    = charNames[charId]    ?? charId.slice(0, 8)
+                    const productName = productNames[productId] ?? ''
                     return (
-                      <div key={charId} className="flex items-center gap-3">
-                        <span className="text-xs font-mono text-muted-foreground w-20 truncate">{charId.slice(0, 8)}</span>
+                      <div key={key} className="flex items-center gap-3">
+                        <div className="w-44 shrink-0 min-w-0">
+                          <p className="text-xs font-medium truncate">{charName}</p>
+                          {productName && (
+                            <p className="text-xs text-muted-foreground truncate">{productName}</p>
+                          )}
+                        </div>
                         <div className="flex-1 h-2 rounded-full bg-muted overflow-hidden">
                           <div className="h-full bg-indigo-500 rounded-full" style={{ width: `${(cnt / maxCnt) * 100}%` }} />
                         </div>
