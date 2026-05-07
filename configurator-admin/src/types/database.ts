@@ -412,6 +412,22 @@ export interface Database {
         Insert: Omit<Database['public']['Tables']['quotations']['Row'], 'id' | 'created_at' | 'updated_at'> & { id?: string }
         Update: Partial<Database['public']['Tables']['quotations']['Insert']>
       }
+      audit_log: {
+        Row: {
+          id:              string
+          tenant_id:       string
+          entity_type:     string
+          entity_id:       string
+          entity_name:     string | null
+          change_type:     'create' | 'update' | 'delete'
+          changed_by:      string | null
+          changed_by_name: string | null
+          changed_at:      string
+          diff:            Record<string, { old: unknown; new: unknown }> | null
+        }
+        Insert: Omit<Database['public']['Tables']['audit_log']['Row'], 'id' | 'changed_at'> & { id?: string; changed_at?: string }
+        Update: Partial<Database['public']['Tables']['audit_log']['Insert']>
+      }
     }
     Functions: {
       auth_tenant_id: {
@@ -496,3 +512,15 @@ export type ProductTextType            = 'product' | 'specification' | 'note' | 
 export type QuotationRejectionReason   = Database['public']['Tables']['quotation_rejection_reasons']['Row']
 export type RolePermission             = Database['public']['Tables']['role_permissions']['Row']
 export type PermLevel                  = 'none' | 'view' | 'edit'
+export type AuditLog                   = Database['public']['Tables']['audit_log']['Row']
+export type AuditEntityType =
+  | 'product'
+  | 'characteristic'
+  | 'characteristic_value'
+  | 'class'
+  | 'pricing_schedule'
+  | 'pricing_formula'
+  | 'product_text'
+  | 'global_text'
+  | 'settings'
+  | 'quotation'

@@ -11,6 +11,8 @@ import { Spinner } from '@/components/ui/spinner'
 import { useToast } from '@/hooks/useToast'
 import { Toaster } from '@/components/ui/toast'
 import { t } from '@/i18n'
+import { logChange } from '@/lib/auditLog'
+import { useAuthContext } from '@/components/auth/AuthContext'
 
 interface Props {
   productId: string
@@ -42,6 +44,8 @@ const LANG_BADGE: Record<string, string> = {
 
 export function TextsPanel({ productId }: Props) {
   const { toasts, toast, dismiss } = useToast()
+  const { profile } = useAuthContext()
+  const userName = profile?.email ?? null
 
   const [texts,     setTexts]     = useState<ProductText[]>([])
   const [loading,   setLoading]   = useState(true)
@@ -84,6 +88,7 @@ export function TextsPanel({ productId }: Props) {
         language:   addLang,
         sort_order: texts.length,
       })
+      logChange({ entityType: 'product_text', entityId: created.id, entityName: created.label, changeType: 'create', changedByName: userName })
       setTexts(prev => [...prev, created])
       setAddLabel('')
       setAddContent('')
@@ -113,12 +118,21 @@ export function TextsPanel({ productId }: Props) {
     }
     setSaving(true)
     try {
+      const before = texts.find(g => g.id === editingId)
       const updated = await updateProductText(editingId, {
         label:     editLabel.trim(),
         content:   editContent.trim(),
         text_type: editType,
         language:  editLang,
       })
+      const diff: Record<string, { old: unknown; new: unknown }> = {}
+      if (before) {
+        if (before.label     !== updated.label)     diff[t('Label')]    = { old: before.label,     new: updated.label }
+        if (before.content   !== updated.content)   diff[t('Content')]  = { old: before.content,   new: updated.content }
+        if (before.text_type !== updated.text_type) diff[t('Type')]     = { old: before.text_type, new: updated.text_type }
+        if (before.language  !== updated.language)  diff[t('Language')] = { old: before.language,  new: updated.language }
+      }
+      logChange({ entityType: 'product_text', entityId: updated.id, entityName: updated.label, changeType: 'update', diff, changedByName: userName })
       setTexts(prev => prev.map(t => t.id === editingId ? updated : t))
       setEditingId(null)
       toast({ title: t('Text block saved') })
@@ -134,6 +148,7 @@ export function TextsPanel({ productId }: Props) {
     setDeleting(true)
     try {
       await deleteProductText(toDelete.id)
+      logChange({ entityType: 'product_text', entityId: toDelete.id, entityName: toDelete.label, changeType: 'delete', changedByName: userName })
       setTexts(prev => prev.filter(t => t.id !== toDelete.id))
       setToDelete(null)
       toast({ title: t('Text block deleted') })

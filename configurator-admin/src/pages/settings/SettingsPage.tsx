@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Check, Copy, CreditCard, Globe, Pencil, Plus, RefreshCw, Shield, Trash2, Upload, UserMinus, UserPlus, X, Zap } from 'lucide-react'
 import { useAuthContext } from '@/components/auth/AuthContext'
 import { supabase } from '@/lib/supabase'
+import { logChange } from '@/lib/auditLog'
 import {
   fetchRejectionReasons,
   createRejectionReason,
@@ -95,6 +96,7 @@ const FUNCTIONALITIES: { key: string; label: string }[] = [
 
 export function SettingsPage() {
   const { tenant, user, profile, planLimits, refreshTenant } = useAuthContext()
+  const userName = profile?.email ?? null
   const { toasts, toast, dismiss } = useToast()
   const navigate     = useNavigate()
   const logoInputRef = useRef<HTMLInputElement>(null)
@@ -125,11 +127,20 @@ export function SettingsPage() {
     if (!tenant) return
     setSaving(true)
     try {
+      const oldEmail = (tenant as { notification_email?: string | null }).notification_email ?? null
       const { error } = await supabase
         .from('tenants')
         .update({ notification_email: notifyEmail || null } as unknown as never)
         .eq('id', tenant.id)
       if (error) throw error
+      logChange({
+        entityType: 'settings',
+        entityId:   tenant.id,
+        entityName: tenant.name ?? null,
+        changeType: 'update',
+        diff:       { [t('Notification email')]: { old: oldEmail, new: notifyEmail || null } },
+        changedByName: userName,
+      })
       toast({ title: t('Notification email saved') })
     } catch (e) {
       toast({
@@ -146,11 +157,20 @@ export function SettingsPage() {
     if (!tenant) return
     setSavingMessage(true)
     try {
+      const oldMsg = tenant.post_inquiry_message ?? null
       const { error } = await supabase
         .from('tenants')
         .update({ post_inquiry_message: postInquiryMessage || null } as unknown as never)
         .eq('id', tenant.id)
       if (error) throw error
+      logChange({
+        entityType: 'settings',
+        entityId:   tenant.id,
+        entityName: tenant.name ?? null,
+        changeType: 'update',
+        diff:       { [t('Post-inquiry message')]: { old: oldMsg, new: postInquiryMessage || null } },
+        changedByName: userName,
+      })
       toast({ title: t('Post-inquiry message saved') })
     } catch (e) {
       toast({
@@ -502,7 +522,8 @@ export function SettingsPage() {
     if (!tenant) return
     setSavingProfile(true)
     try {
-      const { error } = await supabase.from('tenants').update({
+      const before = tenant as unknown as Record<string, unknown>
+      const next: Record<string, unknown> = {
         company_address:    companyAddress.trim()   || null,
         company_phone:      companyPhone.trim()     || null,
         company_email:      companyEmail.trim()     || null,
@@ -510,8 +531,32 @@ export function SettingsPage() {
         contact_person:     contactPerson.trim()    || null,
         vat_number:         vatNumber.trim()        || null,
         company_reg_number: companyRegNumber.trim() || null,
-      } as unknown as never).eq('id', tenant.id)
+      }
+      const { error } = await supabase.from('tenants').update(next as unknown as never).eq('id', tenant.id)
       if (error) throw error
+      const labels: Record<string, string> = {
+        company_address:    t('Address'),
+        company_phone:      t('Phone'),
+        company_email:      t('Email'),
+        company_website:    t('Website'),
+        contact_person:     t('Contact person'),
+        vat_number:         t('VAT number'),
+        company_reg_number: t('Company registration number'),
+      }
+      const diff: Record<string, { old: unknown; new: unknown }> = {}
+      for (const [k, label] of Object.entries(labels)) {
+        const oldVal = (before[k] ?? null) as unknown
+        const newVal = next[k] ?? null
+        if (oldVal !== newVal) diff[label] = { old: oldVal, new: newVal }
+      }
+      logChange({
+        entityType: 'settings',
+        entityId:   tenant.id,
+        entityName: tenant.name ?? null,
+        changeType: 'update',
+        diff,
+        changedByName: userName,
+      })
       await refreshTenant()
       toast({ title: t('Company profile saved') })
     } catch (e) {

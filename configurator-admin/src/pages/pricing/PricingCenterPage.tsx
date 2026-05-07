@@ -40,6 +40,7 @@ import {
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { t } from '@/i18n'
 import { useAuthContext } from '@/components/auth/AuthContext'
+import { logChange } from '@/lib/auditLog'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -71,6 +72,8 @@ function ActiveBadge({ active }: { active: boolean }) {
 
 function BasePricesTab({ products, tenantId }: { products: Product[], tenantId: string }) {
   const { toasts, toast, dismiss } = useToast()
+  const { profile } = useAuthContext()
+  const userName = profile?.email ?? null
   const [schedules, setSchedules] = useState<ProductPriceSchedule[]>([])
   const [loading, setLoading] = useState(false)
   const [selectedProduct, setSelectedProduct] = useState(products[0]?.id ?? '')
@@ -116,7 +119,21 @@ function BasePricesTab({ products, tenantId }: { products: Product[], tenantId: 
         valid_to: form.valid_to || null,
         note: form.note || null,
       }
-      await upsertPriceSchedule(row as any)
+      const saved = await upsertPriceSchedule(row as any)
+      const productName = products.find(p => p.id === selectedProduct)?.name ?? null
+      const entityName = productName ? `${productName} — ${form.valid_from}` : form.valid_from
+      logChange({
+        entityType: 'pricing_schedule',
+        entityId:   saved.id,
+        entityName,
+        changeType: editing ? 'update' : 'create',
+        diff: editing ? {
+          [t('Base price')]: { old: editing.price, new: price },
+          [t('Starts on')]:  { old: editing.valid_from, new: form.valid_from },
+          [t('Ends on')]:    { old: editing.valid_to,   new: form.valid_to || null },
+        } : undefined,
+        changedByName: userName,
+      })
       setDialogOpen(false)
       await load()
       toast({ title: editing ? t('Updated') : t('Created') })
@@ -125,7 +142,20 @@ function BasePricesTab({ products, tenantId }: { products: Product[], tenantId: 
 
   async function handleDelete() {
     if (!deleteId) return
-    try { await deletePriceSchedule(deleteId); await load(); toast({ title: t('Deleted') }) }
+    try {
+      const before = schedules.find(s => s.id === deleteId)
+      const productName = products.find(p => p.id === selectedProduct)?.name ?? null
+      await deletePriceSchedule(deleteId)
+      logChange({
+        entityType: 'pricing_schedule',
+        entityId:   deleteId,
+        entityName: productName && before ? `${productName} — ${before.valid_from}` : null,
+        changeType: 'delete',
+        changedByName: userName,
+      })
+      await load()
+      toast({ title: t('Deleted') })
+    }
     catch (e: any) { toast({ title: t('Error'), description: e.message, variant: 'destructive' }) }
     finally { setDeleteId(null) }
   }
@@ -237,6 +267,8 @@ interface CharValueOption { id: string; label: string; charName: string }
 
 function ModifiersTab({ tenantId }: { products: Product[], tenantId: string }) {
   const { toasts, toast, dismiss } = useToast()
+  const { profile } = useAuthContext()
+  const userName = profile?.email ?? null
   const [allSchedules, setAllSchedules] = useState<CharModifierSchedule[]>([])
   const [charValues, setCharValues] = useState<CharValueOption[]>([])
   const [loading, setLoading] = useState(false)
@@ -297,7 +329,21 @@ function ModifiersTab({ tenantId }: { products: Product[], tenantId: string }) {
         valid_to: form.valid_to || null,
         note: form.note || null,
       }
-      await upsertModifierSchedule(row as any)
+      const saved = await upsertModifierSchedule(row as any)
+      const cv = charValues.find(c => c.id === form.characteristic_value_id)
+      const entityName = cv ? `${cv.charName}: ${cv.label} — ${form.valid_from}` : form.valid_from
+      logChange({
+        entityType: 'pricing_schedule',
+        entityId:   saved.id,
+        entityName,
+        changeType: editing ? 'update' : 'create',
+        diff: editing ? {
+          [t('Price modifier')]: { old: editing.price_modifier, new: mod },
+          [t('Starts on')]:      { old: editing.valid_from,     new: form.valid_from },
+          [t('Ends on')]:        { old: editing.valid_to,       new: form.valid_to || null },
+        } : undefined,
+        changedByName: userName,
+      })
       setDialogOpen(false)
       await loadData()
       toast({ title: editing ? t('Updated') : t('Created') })
@@ -306,7 +352,19 @@ function ModifiersTab({ tenantId }: { products: Product[], tenantId: string }) {
 
   async function handleDelete() {
     if (!deleteId) return
-    try { await deleteModifierSchedule(deleteId); await loadData(); toast({ title: t('Deleted') }) }
+    try {
+      const before = allSchedules.find(s => s.id === deleteId)
+      const cv = before ? charValues.find(c => c.id === before.characteristic_value_id) : null
+      await deleteModifierSchedule(deleteId)
+      logChange({
+        entityType: 'pricing_schedule',
+        entityId:   deleteId,
+        entityName: cv ? `${cv.charName}: ${cv.label}` : null,
+        changeType: 'delete',
+        changedByName: userName,
+      })
+      await loadData(); toast({ title: t('Deleted') })
+    }
     catch (e: any) { toast({ title: t('Error'), description: e.message, variant: 'destructive' }) }
     finally { setDeleteId(null) }
   }
@@ -423,6 +481,8 @@ function ModifiersTab({ tenantId }: { products: Product[], tenantId: string }) {
 
 function TaxRatesTab({ products, tenantId }: { products: Product[], tenantId: string }) {
   const { toasts, toast, dismiss } = useToast()
+  const { profile } = useAuthContext()
+  const userName = profile?.email ?? null
   const [presets, setPresets] = useState<ProductTaxPreset[]>([])
   const [loading, setLoading] = useState(false)
   const [selectedProduct, setSelectedProduct] = useState(products[0]?.id ?? '')
@@ -468,7 +528,21 @@ function TaxRatesTab({ products, tenantId }: { products: Product[], tenantId: st
         valid_from: form.valid_from,
         valid_to: form.valid_to || null,
       }
-      await upsertTaxPreset(row as any)
+      const saved = await upsertTaxPreset(row as any)
+      const productName = products.find(p => p.id === selectedProduct)?.name ?? null
+      logChange({
+        entityType: 'pricing_schedule',
+        entityId:   saved.id,
+        entityName: productName ? `${productName} — ${form.label.trim()}` : form.label.trim(),
+        changeType: editing ? 'update' : 'create',
+        diff: editing ? {
+          [t('Label')]:     { old: editing.label,      new: form.label.trim() },
+          [t('Rate')]:      { old: editing.rate,       new: rate },
+          [t('Starts on')]: { old: editing.valid_from, new: form.valid_from },
+          [t('Ends on')]:   { old: editing.valid_to,   new: form.valid_to || null },
+        } : undefined,
+        changedByName: userName,
+      })
       setDialogOpen(false)
       await load()
       toast({ title: editing ? t('Updated') : t('Created') })
@@ -477,7 +551,19 @@ function TaxRatesTab({ products, tenantId }: { products: Product[], tenantId: st
 
   async function handleDelete() {
     if (!deleteId) return
-    try { await deleteTaxPreset(deleteId); await load(); toast({ title: t('Deleted') }) }
+    try {
+      const before = presets.find(p => p.id === deleteId)
+      const productName = products.find(p => p.id === selectedProduct)?.name ?? null
+      await deleteTaxPreset(deleteId)
+      logChange({
+        entityType: 'pricing_schedule',
+        entityId:   deleteId,
+        entityName: productName && before ? `${productName} — ${before.label}` : null,
+        changeType: 'delete',
+        changedByName: userName,
+      })
+      await load(); toast({ title: t('Deleted') })
+    }
     catch (e: any) { toast({ title: t('Error'), description: e.message, variant: 'destructive' }) }
     finally { setDeleteId(null) }
   }
@@ -579,6 +665,8 @@ function TaxRatesTab({ products, tenantId }: { products: Product[], tenantId: st
 
 function AdjustmentPresetsTab({ products, tenantId }: { products: Product[], tenantId: string }) {
   const { toasts, toast, dismiss } = useToast()
+  const { profile } = useAuthContext()
+  const userName = profile?.email ?? null
   const [presets, setPresets] = useState<ProductAdjustmentPreset[]>([])
   const [loading, setLoading] = useState(false)
   const [selectedProduct, setSelectedProduct] = useState(products[0]?.id ?? '')
@@ -626,7 +714,21 @@ function AdjustmentPresetsTab({ products, tenantId }: { products: Product[], ten
         valid_from: form.valid_from,
         valid_to: form.valid_to || null,
       }
-      await upsertAdjustmentPreset(row as any)
+      const saved = await upsertAdjustmentPreset(row as any)
+      const productName = products.find(p => p.id === selectedProduct)?.name ?? null
+      logChange({
+        entityType: 'pricing_schedule',
+        entityId:   saved.id,
+        entityName: productName ? `${productName} — ${form.label.trim()}` : form.label.trim(),
+        changeType: editing ? 'update' : 'create',
+        diff: editing ? {
+          [t('Label')]: { old: editing.label, new: form.label.trim() },
+          [t('Type')]:  { old: editing.adjustment_type, new: form.adjustment_type },
+          [t('Mode')]:  { old: editing.mode,  new: form.mode },
+          [t('Value')]: { old: editing.value, new: val },
+        } : undefined,
+        changedByName: userName,
+      })
       setDialogOpen(false)
       await load()
       toast({ title: editing ? t('Updated') : t('Created') })
@@ -635,7 +737,19 @@ function AdjustmentPresetsTab({ products, tenantId }: { products: Product[], ten
 
   async function handleDelete() {
     if (!deleteId) return
-    try { await deleteAdjustmentPreset(deleteId); await load(); toast({ title: t('Deleted') }) }
+    try {
+      const before = presets.find(p => p.id === deleteId)
+      const productName = products.find(p => p.id === selectedProduct)?.name ?? null
+      await deleteAdjustmentPreset(deleteId)
+      logChange({
+        entityType: 'pricing_schedule',
+        entityId:   deleteId,
+        entityName: productName && before ? `${productName} — ${before.label}` : null,
+        changeType: 'delete',
+        changedByName: userName,
+      })
+      await load(); toast({ title: t('Deleted') })
+    }
     catch (e: any) { toast({ title: t('Error'), description: e.message, variant: 'destructive' }) }
     finally { setDeleteId(null) }
   }

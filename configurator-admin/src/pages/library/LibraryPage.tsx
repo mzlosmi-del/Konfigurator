@@ -35,6 +35,8 @@ import { useToast } from '@/hooks/useToast'
 import { Toaster } from '@/components/ui/toast'
 import { useAuthContext } from '@/components/auth/AuthContext'
 import { t } from '@/i18n'
+import { computeDiff, logChange } from '@/lib/auditLog'
+import { CHARACTERISTIC_LABELS, CLASS_LABELS } from '@/lib/auditLabels'
 
 // ─── DroppableClass card ─────────────────────────────────────────────────────
 
@@ -308,7 +310,8 @@ function DraggableChar({
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export function LibraryPage() {
-  const { tenant } = useAuthContext()
+  const { tenant, profile } = useAuthContext()
+  const userName = profile?.email ?? null
   const { toasts, toast, dismiss } = useToast()
 
   const [loading, setLoading]             = useState(true)
@@ -408,6 +411,7 @@ export function LibraryPage() {
     setCreatingChar(true)
     try {
       const created = await createCharacteristic({ name: newName.trim(), display_type: newType })
+      logChange({ entityType: 'characteristic', entityId: created.id, entityName: created.name, changeType: 'create', changedByName: userName })
       setChars(prev => [...prev, created])
       setValues(prev => ({ ...prev, [created.id]: [] }))
       setNewName('')
@@ -424,6 +428,8 @@ export function LibraryPage() {
     if (!name.trim() || name === char.name) return
     try {
       const updated = await updateCharacteristic(char.id, { name: name.trim() })
+      const diff = computeDiff(char as unknown as Record<string, unknown>, updated as unknown as Record<string, unknown>, CHARACTERISTIC_LABELS)
+      logChange({ entityType: 'characteristic', entityId: updated.id, entityName: updated.name, changeType: 'update', diff, changedByName: userName })
       setChars(prev => prev.map(c => c.id === char.id ? updated : c))
     } catch {
       toast({ title: t('Failed to rename characteristic'), variant: 'destructive' })
@@ -442,6 +448,8 @@ export function LibraryPage() {
   async function handleChangeType(char: Characteristic, display_type: Characteristic['display_type']) {
     try {
       const updated = await updateCharacteristic(char.id, { display_type })
+      const diff = computeDiff(char as unknown as Record<string, unknown>, updated as unknown as Record<string, unknown>, CHARACTERISTIC_LABELS)
+      logChange({ entityType: 'characteristic', entityId: updated.id, entityName: updated.name, changeType: 'update', diff, changedByName: userName })
       setChars(prev => prev.map(c => c.id === char.id ? updated : c))
     } catch {
       toast({ title: t('Failed to update type'), variant: 'destructive' })
@@ -453,6 +461,7 @@ export function LibraryPage() {
     setDeleting(true)
     try {
       await deleteCharacteristic(toDelete.id)
+      logChange({ entityType: 'characteristic', entityId: toDelete.id, entityName: toDelete.name, changeType: 'delete', changedByName: userName })
       setChars(prev => prev.filter(c => c.id !== toDelete.id))
       setMemberships(prev => {
         const next = { ...prev }
@@ -474,6 +483,7 @@ export function LibraryPage() {
     setCreatingClass(true)
     try {
       const created = await createClass({ name: newClassName.trim(), name_i18n: newClassI18n })
+      logChange({ entityType: 'class', entityId: created.id, entityName: created.name, changeType: 'create', changedByName: userName })
       setClasses(prev => [...prev, created])
       setMemberships(prev => ({ ...prev, [created.id]: [] }))
       setNewClassName('')
@@ -489,7 +499,10 @@ export function LibraryPage() {
   async function handleRenameClass(id: string, name: string) {
     if (!name.trim()) return
     try {
+      const before = classes.find(c => c.id === id)
       const updated = await updateClass(id, { name: name.trim() })
+      const diff = computeDiff(before as unknown as Record<string, unknown>, updated as unknown as Record<string, unknown>, CLASS_LABELS)
+      logChange({ entityType: 'class', entityId: updated.id, entityName: updated.name, changeType: 'update', diff, changedByName: userName })
       setClasses(prev => prev.map(c => c.id === id ? updated : c))
     } catch {
       toast({ title: t('Failed to rename class'), variant: 'destructive' })
@@ -510,6 +523,7 @@ export function LibraryPage() {
     setDeletingClass(true)
     try {
       await deleteClass(toDeleteClass.id)
+      logChange({ entityType: 'class', entityId: toDeleteClass.id, entityName: toDeleteClass.name, changeType: 'delete', changedByName: userName })
       setClasses(prev => prev.filter(c => c.id !== toDeleteClass.id))
       setMemberships(prev => {
         const next = { ...prev }

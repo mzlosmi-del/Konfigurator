@@ -16,6 +16,9 @@ import { Input } from '@/components/ui/input'
 import { useToast } from '@/hooks/useToast'
 import { Toaster } from '@/components/ui/toast'
 import { t } from '@/i18n'
+import { computeDiff, logChange } from '@/lib/auditLog'
+import { CHARACTERISTIC_VALUE_LABELS } from '@/lib/auditLabels'
+import { useAuthContext } from '@/components/auth/AuthContext'
 
 const valueSchema = z.object({
   label: z.string().min(1, 'Label is required').max(300),
@@ -38,6 +41,8 @@ export function CharacteristicValuesEditor({
   onChange,
 }: Props) {
   const { toasts, toast, dismiss } = useToast()
+  const { profile } = useAuthContext()
+  const userName = profile?.email ?? null
   const [adding, setAdding] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [editLang, setEditLang] = useState<string>('primary')
@@ -79,6 +84,7 @@ export function CharacteristicValuesEditor({
         sort_order: values.length,
         hex_color: data.hex_color?.trim() || null,
       } as any)
+      logChange({ entityType: 'characteristic_value', entityId: created.id, entityName: created.label, changeType: 'create', changedByName: userName })
       onChange([...values, created])
       reset({ label: '', price_modifier: 0, hex_color: '' })
       setAdding(false)
@@ -103,7 +109,9 @@ export function CharacteristicValuesEditor({
   async function handleDelete(id: string) {
     setDeletingId(id)
     try {
+      const before = values.find(v => v.id === id)
       await deleteCharacteristicValue(id)
+      logChange({ entityType: 'characteristic_value', entityId: id, entityName: before?.label ?? null, changeType: 'delete', changedByName: userName })
       onChange(values.filter(v => v.id !== id))
     } catch {
       toast({ title: t('Failed to delete value'), variant: 'destructive' })
@@ -117,6 +125,8 @@ export function CharacteristicValuesEditor({
       if (rawValue === value.label) return
       try {
         const result = await updateCharacteristicValue(value.id, { label: rawValue })
+        const diff = computeDiff(value as unknown as Record<string, unknown>, result as unknown as Record<string, unknown>, CHARACTERISTIC_VALUE_LABELS)
+        logChange({ entityType: 'characteristic_value', entityId: result.id, entityName: result.label, changeType: 'update', diff, changedByName: userName })
         onChange(values.map(v => (v.id === value.id ? result : v)))
       } catch {
         const fresh = await fetchValuesForCharacteristic(characteristicId)
@@ -144,6 +154,8 @@ export function CharacteristicValuesEditor({
     if (price_modifier === value.price_modifier) return
     try {
       const result = await updateCharacteristicValue(value.id, { price_modifier })
+      const diff = computeDiff(value as unknown as Record<string, unknown>, result as unknown as Record<string, unknown>, CHARACTERISTIC_VALUE_LABELS)
+      logChange({ entityType: 'characteristic_value', entityId: result.id, entityName: result.label, changeType: 'update', diff, changedByName: userName })
       onChange(values.map(v => (v.id === value.id ? result : v)))
     } catch {
       const fresh = await fetchValuesForCharacteristic(characteristicId)

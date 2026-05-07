@@ -15,6 +15,7 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { useToast } from '@/hooks/useToast'
 import { Toaster } from '@/components/ui/toast'
 import { t } from '@/i18n'
+import { logChange } from '@/lib/auditLog'
 
 const statusVariant: Record<Product['status'], 'success' | 'warning' | 'secondary'> = {
   published: 'success',
@@ -24,7 +25,8 @@ const statusVariant: Record<Product['status'], 'success' | 'warning' | 'secondar
 
 export function ProductsPage() {
   const navigate = useNavigate()
-  const { tenant, planLimits } = useAuthContext()
+  const { tenant, profile, planLimits } = useAuthContext()
+  const userName = profile?.email ?? null
   const canEdit = useCanEdit('products')
   const { toasts, toast, dismiss } = useToast()
   const [products, setProducts] = useState<Product[]>([])
@@ -62,6 +64,7 @@ export function ProductsPage() {
     setDeleting(true)
     try {
       await deleteProduct(toDelete.id)
+      logChange({ entityType: 'product', entityId: toDelete.id, entityName: toDelete.name, changeType: 'delete', changedByName: userName })
       const wasPublished = toDelete.status === 'published'
       setProducts(p => p.filter(x => x.id !== toDelete.id))
       if (wasPublished) setPublishedCount(c => Math.max(0, c - 1))

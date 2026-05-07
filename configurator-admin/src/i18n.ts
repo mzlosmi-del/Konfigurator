@@ -1087,6 +1087,38 @@ const sr: Record<string, string> = {
   'No access':                             'Bez pristupa',
   'View':                                  'Pregled',
   'Failed to save permission':             'Nije uspelo čuvanje dozvole',
+
+  // Audit log
+  'Audit log':                             'Dnevnik izmena',
+  'Recent changes across products, pricing, texts, settings, and quotations. Retained for 90 days.':
+    'Nedavne izmene proizvoda, cena, tekstova, podešavanja i ponuda. Čuva se 90 dana.',
+  'Change history':                        'Istorija izmena',
+  'Recent changes to this product. Visible to admins only.':
+    'Nedavne izmene ovog proizvoda. Vidljivo samo administratorima.',
+  'No history recorded yet.':              'Još nema zabeleženih izmena.',
+  'No log entries match your filters.':    'Nijedan zapis ne odgovara filterima.',
+  'No field changes recorded':             'Nije zabeležena izmena polja',
+  'Failed to load audit log':              'Nije uspelo učitavanje dnevnika',
+  'Entity type':                           'Tip entiteta',
+  'Entity':                                'Entitet',
+  'All entities':                          'Svi entiteti',
+  'Class':                                 'Klasa',
+  'Formula':                               'Formula',
+  'Product text':                          'Tekst proizvoda',
+  'Global text':                           'Globalni tekst',
+  'When':                                  'Kada',
+  'Change':                                'Izmena',
+  'Fields':                                'Polja',
+  'Field':                                 'Polje',
+  'Before':                                'Pre',
+  'After':                                 'Posle',
+  'Unknown':                               'Nepoznato',
+  'Unknown user':                          'Nepoznat korisnik',
+  'Clear filters':                         'Obriši filtere',
+  'History':                               'Istorija',
+  'Page':                                  'Strana',
+  'Previous':                              'Prethodno',
+  'Company registration number':           'Matični broj',
 }
 
 export const LANGS = ['en', 'sr'] as const

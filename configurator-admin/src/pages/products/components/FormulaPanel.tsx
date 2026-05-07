@@ -10,6 +10,8 @@ import { useToast } from '@/hooks/useToast'
 import { Toaster } from '@/components/ui/toast'
 import { FormulaBuilder } from './FormulaBuilder'
 import { t } from '@/i18n'
+import { logChange } from '@/lib/auditLog'
+import { useAuthContext } from '@/components/auth/AuthContext'
 
 interface Props {
   productId: string
@@ -19,6 +21,8 @@ const DEFAULT_FORMULA: FormulaNode = { type: 'number', value: 0 }
 
 export function FormulaPanel({ productId }: Props) {
   const { toasts, toast, dismiss } = useToast()
+  const { profile } = useAuthContext()
+  const userName = profile?.email ?? null
 
   const [loading, setLoading]               = useState(true)
   const [formulas, setFormulas]             = useState<PricingFormula[]>([])
@@ -62,6 +66,7 @@ export function FormulaPanel({ productId }: Props) {
     setSaving(true)
     try {
       const created = await createFormula({ product_id: productId, name: newName.trim(), formula: newFormula })
+      logChange({ entityType: 'pricing_formula', entityId: created.id, entityName: created.name, changeType: 'create', changedByName: userName })
       setFormulas(prev => [...prev, created])
       setNewName('')
       setNewFormula(DEFAULT_FORMULA)
@@ -77,10 +82,18 @@ export function FormulaPanel({ productId }: Props) {
   async function handleSave(id: string) {
     setSavingId(id)
     try {
+      const before = formulas.find(f => f.id === id)
       const updated = await updateFormula(id, {
         name:    editNames[id]    ?? formulas.find(f => f.id === id)?.name,
         formula: editFormulas[id] ?? formulas.find(f => f.id === id)?.formula as FormulaNode,
       })
+      const diff: Record<string, { old: unknown; new: unknown }> = {}
+      if (before) {
+        if (before.name !== updated.name) diff[t('Name')] = { old: before.name, new: updated.name }
+        if (JSON.stringify(before.formula) !== JSON.stringify(updated.formula))
+          diff[t('Formula')] = { old: before.formula, new: updated.formula }
+      }
+      logChange({ entityType: 'pricing_formula', entityId: updated.id, entityName: updated.name, changeType: 'update', diff, changedByName: userName })
       setFormulas(prev => prev.map(f => f.id === id ? updated : f))
       setEditFormulas(prev => { const n = { ...prev }; delete n[id]; return n })
       setEditNames(prev =>    { const n = { ...prev }; delete n[id]; return n })
@@ -95,6 +108,14 @@ export function FormulaPanel({ productId }: Props) {
   async function handleToggleActive(formula: PricingFormula) {
     try {
       const updated = await updateFormula(formula.id, { is_active: !formula.is_active })
+      logChange({
+        entityType: 'pricing_formula',
+        entityId:   updated.id,
+        entityName: updated.name,
+        changeType: 'update',
+        diff:       { [t('Active')]: { old: formula.is_active, new: updated.is_active } },
+        changedByName: userName,
+      })
       setFormulas(prev => prev.map(f => f.id === formula.id ? updated : f))
     } catch {
       toast({ title: t('Failed to update formula'), variant: 'destructive' })
@@ -103,7 +124,9 @@ export function FormulaPanel({ productId }: Props) {
 
   async function handleDelete(id: string) {
     try {
+      const before = formulas.find(f => f.id === id)
       await deleteFormula(id)
+      logChange({ entityType: 'pricing_formula', entityId: id, entityName: before?.name ?? null, changeType: 'delete', changedByName: userName })
       setFormulas(prev => prev.filter(f => f.id !== id))
     } catch {
       toast({ title: t('Failed to delete formula'), variant: 'destructive' })

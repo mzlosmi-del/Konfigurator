@@ -19,10 +19,14 @@ import { FormConfigPanel, type FormConfig } from './components/FormConfigPanel'
 import { useToast } from '@/hooks/useToast'
 import { Toaster } from '@/components/ui/toast'
 import { t } from '@/i18n'
+import { computeDiff, logChange } from '@/lib/auditLog'
+import { PRODUCT_LABELS } from '@/lib/auditLabels'
+import { useAuthContext } from '@/components/auth/AuthContext'
+import { AuditHistory } from '@/components/audit-log/AuditHistory'
 
-type Tab = 'details' | 'characteristics' | 'rules' | 'formulas' | 'visualization' | 'form' | 'embed' | 'texts'
+type Tab = 'details' | 'characteristics' | 'rules' | 'formulas' | 'visualization' | 'form' | 'embed' | 'texts' | 'history'
 
-const TAB_KEYS: Tab[] = ['details', 'characteristics', 'rules', 'formulas', 'visualization', 'form', 'embed', 'texts']
+const TAB_KEYS: Tab[] = ['details', 'characteristics', 'rules', 'formulas', 'visualization', 'form', 'embed', 'texts', 'history']
 
 const TAB_LABELS: Record<Tab, string> = {
   details:         'Details',
@@ -33,6 +37,7 @@ const TAB_LABELS: Record<Tab, string> = {
   form:            'Form',
   embed:           'Embed',
   texts:           'Texts',
+  history:         'History',
 }
 
 const statusVariant: Record<Product['status'], 'success' | 'warning' | 'secondary'> = {
@@ -45,6 +50,8 @@ export function EditProductPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const { toasts, toast, dismiss } = useToast()
+  const { profile } = useAuthContext()
+  const userName = profile?.email ?? null
 
   const [product, setProduct] = useState<Product | null>(null)
   const [loading, setLoading] = useState(true)
@@ -61,6 +68,7 @@ export function EditProductPage() {
   async function handleSaveDetails(values: ProductFormValues) {
     if (!product) return
     try {
+      const before = product
       const updated = await updateProduct(product.id, {
         name:             values.name,
         name_i18n:        values.name_i18n,
@@ -72,6 +80,8 @@ export function EditProductPage() {
         unit_of_measure:  values.unit_of_measure?.trim() || null,
       })
       setProduct(updated as Product)
+      const diff = computeDiff(before as unknown as Record<string, unknown>, updated as unknown as Record<string, unknown>, PRODUCT_LABELS)
+      logChange({ entityType: 'product', entityId: updated.id, entityName: updated.name, changeType: 'update', diff, changedByName: userName })
       toast({ title: t('Product saved') })
     } catch (e) {
       toast({
@@ -88,6 +98,14 @@ export function EditProductPage() {
     try {
       const updated = await updateProduct(product.id, { status: next })
       setProduct(updated as Product)
+      logChange({
+        entityType:  'product',
+        entityId:    updated.id,
+        entityName:  updated.name,
+        changeType:  'update',
+        diff:        { [t('Published')]: { old: product.status === 'published', new: next === 'published' } },
+        changedByName: userName,
+      })
       toast({ title: next === 'published' ? t('Product published') : t('Product unpublished') })
     } catch {
       toast({ title: t('Failed to update status'), variant: 'destructive' })
@@ -153,7 +171,7 @@ export function EditProductPage() {
       <div className="px-4 pt-4 md:px-6">
         <div className="overflow-x-auto">
           <div className="flex gap-1 border-b min-w-max">
-            {TAB_KEYS.map(tab => (
+            {TAB_KEYS.filter(tab => tab !== 'history' || profile?.role === 'admin').map(tab => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
@@ -298,6 +316,18 @@ export function EditProductPage() {
             </CardHeader>
             <CardContent>
               <TextsPanel productId={product.id} />
+            </CardContent>
+          </Card>
+        )}
+
+        {activeTab === 'history' && profile?.role === 'admin' && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">{t('Change history')}</CardTitle>
+              <CardDescription>{t('Recent changes to this product. Visible to admins only.')}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <AuditHistory entityType="product" entityId={product.id} />
             </CardContent>
           </Card>
         )}

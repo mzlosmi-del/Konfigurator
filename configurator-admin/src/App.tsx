@@ -28,6 +28,7 @@ import { TextsPage } from '@/pages/texts/TextsPage'
 import { AnalyticsPage } from '@/pages/analytics/AnalyticsPage'
 import { EmbedDocsPage } from '@/pages/embed-docs/EmbedDocsPage'
 import { PublicPreviewPage } from '@/pages/public/PublicPreviewPage'
+import { AuditLogPage } from '@/pages/admin/AuditLogPage'
 
 export function App() {
   const [lang, setLangState] = useState<Lang>(getLang())
@@ -100,6 +101,9 @@ export function App() {
               <Route element={<ProtectedRoute functionality="settings" />}>
                 <Route path="/settings" element={<SettingsPage />} />
               </Route>
+
+              {/* Audit log — admin-only (page enforces it) */}
+              <Route path="/audit-log" element={<AuditLogPage />} />
             </Route>
           </Route>
 

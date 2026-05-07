@@ -13,11 +13,15 @@ import { Toaster } from '@/components/ui/toast'
 import { useCanEdit } from '@/hooks/usePermission'
 import { t } from '@/i18n'
 import { STATUS_LABELS, statusVariant } from './quotationStatusConfig'
+import { logChange } from '@/lib/auditLog'
+import { useAuthContext } from '@/components/auth/AuthContext'
 
 export function QuotationsPage() {
   const navigate = useNavigate()
   const canEdit = useCanEdit('quotations')
   const { toasts, toast, dismiss } = useToast()
+  const { profile } = useAuthContext()
+  const userName = profile?.email ?? null
   const [quotations, setQuotations] = useState<Quotation[]>([])
   const [loading, setLoading] = useState(true)
   const [duplicatingId, setDuplicatingId] = useState<string | null>(null)
@@ -28,6 +32,7 @@ export function QuotationsPage() {
     setDuplicatingId(sourceId)
     try {
       const copy = await duplicateQuotation(sourceId)
+      logChange({ entityType: 'quotation', entityId: copy.id, entityName: copy.reference_number, changeType: 'create', changedByName: userName })
       navigate(`/quotations/${copy.id}/edit`)
     } catch (err) {
       toast({ title: t('Failed to copy quotation'), description: String(err), variant: 'destructive' })

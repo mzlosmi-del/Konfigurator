@@ -20,6 +20,9 @@ import { fetchActivePricing, type ActivePricing } from '@/lib/pricing'
 import { inquiryToQuotationDraft } from '@/lib/inquiryConversion'
 import { evaluateRules } from '@/lib/configurationRules'
 import { calculateFormulaBreakdown, calculateFormulaTotal, type FormulaContext } from '@/lib/formulaEngine'
+import { computeDiff, logChange } from '@/lib/auditLog'
+import { QUOTATION_LABELS } from '@/lib/auditLabels'
+import { useAuthContext } from '@/components/auth/AuthContext'
 import { supabase } from '@/lib/supabase'
 import type {
   Product,
@@ -72,6 +75,8 @@ export function QuotationFormPage() {
   const isEdit  = Boolean(id)
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
+  const { profile } = useAuthContext()
+  const userName = profile?.email ?? null
   const inquiryIdParam = searchParams.get('inquiry_id')
   const { toasts, toast, dismiss } = useToast()
 
@@ -109,6 +114,8 @@ export function QuotationFormPage() {
 
   // ── Saving state ───────────────────────────────────────────────────────────
   const [saving,        setSaving]        = useState(false)
+  // Snapshot of the loaded quotation (only set in edit mode) — used to compute the audit diff on save
+  const [loadedQuotation, setLoadedQuotation] = useState<Record<string, unknown> | null>(null)
 
   // ── Load products + (in edit mode) existing quotation ─────────────────────
   useEffect(() => {
@@ -129,6 +136,7 @@ export function QuotationFormPage() {
           navigate(`/quotations/${id}`, { replace: true })
           return
         }
+        setLoadedQuotation(q as unknown as Record<string, unknown>)
         setCustomerName(q.customer_name)
         setCustomerEmail(q.customer_email)
         setCustomerCompany(q.customer_company ?? '')
@@ -413,9 +421,20 @@ export function QuotationFormPage() {
       }
 
       let savedId: string
+      let savedRef: string | null = null
       if (isEdit && id) {
         await updateQuotation(id, payload)
         savedId = id
+        savedRef = (loadedQuotation as { reference_number?: string } | null)?.reference_number ?? null
+        const diff = computeDiff(loadedQuotation, payload as unknown as Record<string, unknown>, QUOTATION_LABELS)
+        logChange({
+          entityType: 'quotation',
+          entityId:   savedId,
+          entityName: savedRef,
+          changeType: 'update',
+          diff,
+          changedByName: userName,
+        })
       } else {
         const q = await createQuotation({
           ...payload,
@@ -426,6 +445,14 @@ export function QuotationFormPage() {
           source_inquiry_id:   sourceInquiryId,
         })
         savedId = q.id
+        savedRef = q.reference_number
+        logChange({
+          entityType: 'quotation',
+          entityId:   savedId,
+          entityName: savedRef,
+          changeType: 'create',
+          changedByName: userName,
+        })
       }
 
       // Best-effort: mark source inquiry as replied. Do not block on failure.

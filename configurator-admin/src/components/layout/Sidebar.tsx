@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { NavLink } from 'react-router-dom'
-import { LayoutDashboard, Package, Inbox, Settings, LogOut, Layers, FileText, AlignLeft, BarChart2, Code2, X, DollarSign } from 'lucide-react'
+import { LayoutDashboard, Package, Inbox, Settings, LogOut, Layers, FileText, AlignLeft, BarChart2, Code2, X, DollarSign, History } from 'lucide-react'
 import { Logo } from '@/components/ui/Logo'
 import { cn } from '@/lib/utils'
 import { useAuthContext } from '@/components/auth/AuthContext'
@@ -15,8 +15,9 @@ interface SidebarProps {
 }
 
 export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
-  const { signOut } = useAuthContext()
+  const { signOut, profile } = useAuthContext()
   const { newCount } = useInquiryCounts()
+  const isAdmin = profile?.role === 'admin'
   const [lang, setLangState] = useState<Lang>(getLang())
 
   const canViewDashboard  = useCanView('dashboard')
@@ -46,6 +47,7 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
     { to: '/analytics',  icon: BarChart2,       label: 'Analytics',   badge: 0,        visible: canViewAnalytics },
     { to: '/embed-docs', icon: Code2,           label: 'Embed',       badge: 0,        visible: canViewEmbed },
     { to: '/settings',   icon: Settings,        label: 'Settings',    badge: 0,        visible: canViewSettings },
+    { to: '/audit-log',  icon: History,         label: 'Audit log',   badge: 0,        visible: isAdmin },
   ]
 
   return (

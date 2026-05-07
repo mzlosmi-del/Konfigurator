@@ -21,6 +21,7 @@ import { ProductForm, type ProductFormValues } from './components/ProductForm'
 import { useToast } from '@/hooks/useToast'
 import { Toaster } from '@/components/ui/toast'
 import { t } from '@/i18n'
+import { logChange } from '@/lib/auditLog'
 
 interface Template {
   id: string
@@ -48,7 +49,8 @@ const VERTICALS = [
 export function NewProductPage() {
   const navigate = useNavigate()
   const { toasts, toast, dismiss } = useToast()
-  const { tenant, planLimits } = useAuthContext()
+  const { tenant, profile, planLimits } = useAuthContext()
+  const userName = profile?.email ?? null
   const [tab, setTab] = useState('template')
 
   // Templates
@@ -111,6 +113,7 @@ export function NewProductPage() {
         sku:              values.sku?.trim() || null,
         unit_of_measure:  values.unit_of_measure?.trim() || null,
       })
+      logChange({ entityType: 'product', entityId: product.id, entityName: product.name, changeType: 'create', changedByName: userName })
       navigate(`/products/${product.id}/edit`, { replace: true })
     } catch (e) {
       toast({
@@ -159,6 +162,7 @@ export function NewProductPage() {
         base_price:  aiResult.base_price,
         currency:    aiResult.currency,
       })
+      logChange({ entityType: 'product', entityId: product.id, entityName: product.name, changeType: 'create', changedByName: userName })
 
       for (let i = 0; i < aiResult.characteristics.length; i++) {
         const ch = aiResult.characteristics[i]

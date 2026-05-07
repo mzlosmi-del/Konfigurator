@@ -32,12 +32,15 @@ import { useToast } from '@/hooks/useToast'
 import { Toaster } from '@/components/ui/toast'
 import { useCanEdit } from '@/hooks/usePermission'
 import { t } from '@/i18n'
+import { logChange } from '@/lib/auditLog'
+import { AuditHistory } from '@/components/audit-log/AuditHistory'
 
 export function QuotationDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const { toasts, toast, dismiss } = useToast()
-  const { tenant } = useAuthContext()
+  const { tenant, profile } = useAuthContext()
+  const userName = profile?.email ?? null
   const canEdit = useCanEdit('quotations')
 
   const [quotation,      setQuotation]      = useState<Quotation | null>(null)
@@ -93,6 +96,14 @@ export function QuotationDetailPage() {
     setUpdatingStatus(true)
     try {
       const updated = await updateQuotation(id, { status, rejection_reason_id: null, rejection_note: null })
+      logChange({
+        entityType: 'quotation',
+        entityId:   updated.id,
+        entityName: updated.reference_number,
+        changeType: 'update',
+        diff:       { [t('Status')]: { old: quotation.status, new: status } },
+        changedByName: userName,
+      })
       setQuotation(updated)
       toast({ title: t('Status updated') })
     } catch {
@@ -111,6 +122,18 @@ export function QuotationDetailPage() {
         rejection_reason_id: selectedReasonId || null,
         rejection_note:      rejectionNote.trim() || null,
       })
+      logChange({
+        entityType: 'quotation',
+        entityId:   updated.id,
+        entityName: updated.reference_number,
+        changeType: 'update',
+        diff: {
+          [t('Status')]:           { old: quotation.status,           new: 'rejected' },
+          [t('Rejection reason')]: { old: quotation.rejection_reason_id, new: selectedReasonId || null },
+          [t('Rejection note')]:   { old: quotation.rejection_note,   new: rejectionNote.trim() || null },
+        },
+        changedByName: userName,
+      })
       setQuotation(updated)
       setShowRejectionDialog(false)
       toast({ title: t('Quotation marked as rejected') })
@@ -125,7 +148,9 @@ export function QuotationDetailPage() {
     if (!id) return
     setDeleting(true)
     try {
+      const ref = quotation?.reference_number ?? null
       await deleteQuotation(id)
+      logChange({ entityType: 'quotation', entityId: id, entityName: ref, changeType: 'delete', changedByName: userName })
       navigate('/quotations')
     } catch {
       toast({ title: t('Failed to delete quotation'), variant: 'destructive' })
@@ -196,6 +221,14 @@ export function QuotationDetailPage() {
         // quotation is locked — the saved PDF is the only one that can be reprinted.
         const url     = await uploadQuotationPdf(id, quotation.tenant_id, bytes)
         const updated = await updateQuotation(id, { pdf_url: url, status: 'confirmed_sent' })
+        logChange({
+          entityType: 'quotation',
+          entityId:   updated.id,
+          entityName: updated.reference_number,
+          changeType: 'update',
+          diff: { [t('Status')]: { old: quotation.status, new: 'confirmed_sent' } },
+          changedByName: userName,
+        })
         setQuotation(updated)
         toast({ title: t('Quotation confirmed') })
       }
@@ -485,6 +518,16 @@ export function QuotationDetailPage() {
             <CardHeader><CardTitle>{t('Notes')}</CardTitle></CardHeader>
             <CardContent>
               <p className="text-sm whitespace-pre-wrap text-muted-foreground">{quotation.notes}</p>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* ── Change history (admin only) ───────────────────────────────── */}
+        {profile?.role === 'admin' && (
+          <Card>
+            <CardHeader><CardTitle>{t('Change history')}</CardTitle></CardHeader>
+            <CardContent>
+              <AuditHistory entityType="quotation" entityId={quotation.id} />
             </CardContent>
           </Card>
         )}
