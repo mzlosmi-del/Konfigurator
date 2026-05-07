@@ -2,7 +2,7 @@
 // the caller is responsible for fetching the inquiry, the product, and the
 // product's characteristics (with values) before invoking these.
 
-import type { Inquiry, Product, QuotationConfigItem } from '@/types/database'
+import type { Inquiry, Product } from '@/types/database'
 import type { CharacteristicWithValues } from './products'
 
 // Shape stored in inquiries.configuration JSONB (snapshot, no IDs).
@@ -46,22 +46,24 @@ export function parseInquiryMessage(msg: string | null): ParsedMessage {
 }
 
 export interface MappedConfig {
-  config:  QuotationConfigItem[]
-  dropped: string[]   // human-readable labels of items that could not be matched
+  selection: Record<string, string>   // charId → valueId (or raw numeric string for number-type chars)
+  dropped:   string[]                 // human-readable labels of items that could not be matched
 }
 
 /**
- * Map an inquiry's snapshot configuration back to QuotationConfigItem[] by
- * looking up the matching characteristic + value IDs in the product's current
- * characteristic list. Items that no longer exist (renamed or deleted) are
- * skipped and surfaced via `dropped` so the caller can warn the admin.
+ * Map an inquiry's snapshot configuration back to a selection map by looking
+ * up the matching characteristic (and value, for select/radio chars) in the
+ * product's current characteristic list. For number-type chars, the
+ * `value_label` from the inquiry is the raw numeric input and is used
+ * directly. Items that no longer exist (renamed or deleted) are skipped and
+ * surfaced via `dropped` so the caller can warn the admin.
  */
 export function mapInquiryConfiguration(
   inquiryConfig: InquiryConfigItem[],
   characteristics: CharacteristicWithValues[],
 ): MappedConfig {
-  const config:  QuotationConfigItem[] = []
-  const dropped: string[]              = []
+  const selection: Record<string, string> = {}
+  const dropped:   string[]               = []
 
   for (const item of inquiryConfig) {
     const char = characteristics.find(
@@ -71,6 +73,15 @@ export function mapInquiryConfiguration(
       dropped.push(`${item.characteristic_name}: ${item.value_label}`)
       continue
     }
+    if (char.display_type === 'number') {
+      const num = Number(item.value_label)
+      if (!Number.isFinite(num)) {
+        dropped.push(`${item.characteristic_name}: ${item.value_label}`)
+        continue
+      }
+      selection[char.id] = String(num)
+      continue
+    }
     const value = char.characteristic_values.find(
       v => v.label.trim().toLowerCase() === item.value_label.trim().toLowerCase(),
     )
@@ -78,16 +89,10 @@ export function mapInquiryConfiguration(
       dropped.push(`${item.characteristic_name}: ${item.value_label}`)
       continue
     }
-    config.push({
-      characteristic_id:   char.id,
-      characteristic_name: char.name,
-      value_id:            value.id,
-      value_label:         value.label,
-      price_modifier:      Number(value.price_modifier),
-    })
+    selection[char.id] = value.id
   }
 
-  return { config, dropped }
+  return { selection, dropped }
 }
 
 export interface QuotationDraftFromInquiry {
@@ -116,10 +121,7 @@ export function inquiryToQuotationDraft(
 ): QuotationDraftFromInquiry {
   const parsed = parseInquiryMessage(inquiry.message)
   const inqConfig = (Array.isArray(inquiry.configuration) ? inquiry.configuration : []) as unknown as InquiryConfigItem[]
-  const { config, dropped } = mapInquiryConfiguration(inqConfig, characteristics)
-
-  const selection: Record<string, string> = {}
-  for (const c of config) selection[c.characteristic_id] = c.value_id
+  const { selection, dropped } = mapInquiryConfiguration(inqConfig, characteristics)
 
   return {
     customer_name:    inquiry.customer_name,
