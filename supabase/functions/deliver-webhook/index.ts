@@ -92,6 +92,20 @@ Deno.serve(async (req: Request) => {
   const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
   const sb = createClient(supabaseUrl, serviceRoleKey)
 
+  // Plan gate: short-circuit if the tenant's plan no longer includes webhooks.
+  // Catches the stale-plan window between subscription change and downgrade
+  // cleanup (apply_plan_downgrade flips enabled=false, but a delivery in
+  // flight could still race past it).
+  const { data: featureCheck } = await sb.rpc('tenant_has_feature', {
+    p_tenant_id: body.tenant_id,
+    p_feature:   'webhooks',
+  })
+  if (featureCheck === false) {
+    return new Response(JSON.stringify({ ok: true, delivered: 0, skipped: 'feature_disabled' }), {
+      headers: { ...CORS, 'Content-Type': 'application/json' },
+    })
+  }
+
   // Enrich payload for inquiry events before delivery
   const outPayload = body.event === 'inquiry.created'
     ? await enrichInquiryPayload(body.payload, sb)

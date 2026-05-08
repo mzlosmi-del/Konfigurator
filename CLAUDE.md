@@ -87,6 +87,31 @@ Quotations have a status progression: `draft` → `preview` → `confirmed` → 
 ### Analytics page
 `AnalyticsPage.tsx` has four advanced sections beyond basic counts: characteristic-value breakdown, inquiry-to-quotation conversion funnel, revenue over time, and top products by inquiry volume. All sections are tenant-scoped.
 
+### Plan enforcement (migration 062)
+Server-side feature gates and downgrade safety. All gated dimensions raise `RAISE EXCEPTION ... USING ERRCODE='P0001', DETAIL=json_build_object('code','...','plan',..., 'limit',..., 'current',...)::text` so clients can parse a structured error.
+
+- DB triggers: `check_webhook_endpoint_feature` (BEFORE INSERT on `webhook_endpoints`) and `check_visualization_3d_feature` (BEFORE INSERT on `visualization_assets` when `asset_type='3d_model'`) both call `tenant_has_feature()` and raise `PLAN_FEATURE_DISABLED` on mismatch. `check_product_ar_enable` (BEFORE UPDATE OF `ar_enabled` on `products`) blocks false→true transitions when `three_d` is off.
+- `check_inquiry_limit`, `check_product_limit`, `check_team_limit` (replacing earlier 029 versions) carry structured DETAIL JSON.
+- `apply_plan_downgrade(tenant_id)` and `apply_plan_upgrade(tenant_id)` are idempotent helpers called by `stripe-webhook` on every plan change. Downgrade: re-marks product overage, disables webhook endpoints, marks 3D assets `read_only` (new column), turns AR off on products, zeroes AI counter when feature drops to 0. Upgrade: clears stale 3D `read_only` and re-runs `mark_over_limit_products`. Webhook endpoints are not auto-re-enabled — tenant must explicitly opt in.
+- Edge Functions use `_shared/planGate.ts` (`assertFeature`, `assertMonthlyLimit` — both return `Response | null`) and `_shared/monthlyUsage.ts` (`getMonthlyUsage`, `incrementMonthlyUsage`, `currentPeriodMonth`).
+- The widget's `submitInquiry` parses the DETAIL JSON into a `PlanLimitError` so `InquiryForm` can render a friendly localised message instead of leaking the raw DB exception text to the customer.
+
+**IMPORTANT: Migration 062 (`migrations/062_feature_gate_triggers.sql`) has NOT yet been run in Supabase. Apply it before deploying these enforcement changes.**
+
+### White-label features (migrations 063, 064, 065)
+Honour `plan_limits.white_label` (scale plan only) by letting tenants override Configureout-branded surfaces:
+
+- **`tenants.pdf_footer`** (063) — overrides the hardcoded "Configureout" footer in every PDF template via `getFooterLabel(tenant, defaultLabel)` in `configurator-admin/src/lib/pdf/shared.ts`. Settings → Branding has the input.
+- **`tenants.email_from_address` + `email_from_verified` + `resend_domain_id`** (064) — per-tenant verified sending domain. The `verify-email-domain` Edge Function calls the Resend Domains API (register / status / remove) using a single POST body shape `{ action, domain? }`. `_shared/emailSender.ts getFromAddress(sb, tenantId)` resolves the From address; falls back to `NOTIFY_FROM_EMAIL` unless both `white_label` is on AND the domain is verified. All sender Edge Functions (notify-inquiry, generate-quote, send-invite) call this helper.
+- **`tenants.favicon_url` + `public_page_title`** (065) — applied by both the SPA `PublicPreviewPage.tsx` and the SSR `public-preview` Edge Function `buildPage()`. Future `/q/:token` public quotation page will use the same fields.
+
+#### Deferred: custom CNAME for the widget URL (Phase F4)
+Not implemented. Intended design for a follow-up:
+- New column `tenants.widget_cname text` (e.g. `widget.acme.com`).
+- Tenant adds a CNAME record `widget.acme.com → cdn.configureout.app` at their DNS provider.
+- A Cloudflare Worker (or equivalent edge layer) intercepts requests to `cdn.configureout.app`, reads the SNI host, looks up `tenants.widget_cname` to confirm ownership, and serves the same static `widget.js` bundle with `WIDGET_API_BASE` rewritten to a tenant-pinned origin.
+- Requires CDN/edge infra changes outside the application codebase, so was intentionally deferred from the white-label rollout. The `email_from_address` and PDF footer paths cover the most visible "this is built on Configureout" signals without it.
+
 ### Supabase client
 Single typed client in `configurator-admin/src/lib/supabase.ts` using env vars `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`. The widget uses its own client (same env vars, passed via data attributes on the embed `<div>`).
 

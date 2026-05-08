@@ -66,29 +66,36 @@ export async function loadPlanLimits(
 }
 
 /**
- * Throw a 403 Response if the plan doesn't include this boolean feature.
- * Call with the limits object and the feature key.
+ * Returns a 403 Response if the plan doesn't include this boolean feature,
+ * else returns null. Caller pattern: `const err = assertFeature(...); if (err) return err`.
  */
 export function assertFeature(
   feature: keyof Pick<PlanLimits, 'three_d' | 'quotations' | 'webhooks' | 'white_label'>,
   limits: PlanLimits,
-): void {
+  cors: Record<string, string> = {},
+): Response | null {
   if (!limits[feature]) {
-    throw gateForbidden(makePlanError(feature, limits.plan))
+    return gateForbidden(makePlanError(feature, limits.plan), cors)
   }
+  return null
 }
 
-/** Throw a 403 Response if the monthly usage has hit the limit. */
+/**
+ * Returns a 403 Response if monthly usage has hit the limit, else null.
+ * `limitValue < 0` means unlimited.
+ */
 export function assertMonthlyLimit(
   dimension: 'ai_setup' | 'inquiries',
   limitValue: number,
   current: number,
   plan: string,
-): void {
-  if (limitValue < 0) return  // -1 = unlimited
+  cors: Record<string, string> = {},
+): Response | null {
+  if (limitValue < 0) return null
   if (current >= limitValue) {
-    throw gateForbidden(makePlanError(dimension, plan, current, limitValue))
+    return gateForbidden(makePlanError(dimension, plan, current, limitValue), cors)
   }
+  return null
 }
 
 /** Build a 403 Response carrying the structured error JSON. */

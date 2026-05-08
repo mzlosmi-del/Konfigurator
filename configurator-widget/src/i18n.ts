@@ -25,6 +25,8 @@ const sr: Record<string, string> = {
   'Sending…':                         'Slanje…',
   'Send inquiry':                          'Pošalji upit',
   'Failed to submit. Please try again.':   'Slanje nije uspelo. Pokušajte ponovo.',
+  'Quote requests are temporarily paused. Please contact us directly.':
+    'Slanje upita je privremeno pauzirano. Kontaktirajte nas direktno.',
 
   // CharacteristicInput
   'Auto-set':                              'Automatski postavljeno',

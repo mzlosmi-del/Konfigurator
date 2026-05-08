@@ -50,18 +50,6 @@ export function limitDisplay(max: number): string {
   return max < 0 ? '∞' : String(max)
 }
 
-// ── Backwards-compat shims (used by ProductsPage / SettingsPage) ──────────────
-
-export function productLimit(_plan: string): number {
-  return FREE_FALLBACK.products_max  // overridden once planLimits loads from context
-}
-
-export function atProductLimit(_plan: string, _count: number): boolean {
-  return false  // overridden once planLimits loads from context
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-
 const FREE_FALLBACK: PlanLimits = {
   plan:                'free',
   products_max:         3,

@@ -86,6 +86,12 @@ export interface Database {
           vat_number:          string | null
           company_reg_number:  string | null
           post_inquiry_message: string | null
+          pdf_footer:          string | null
+          email_from_address:  string | null
+          email_from_verified: boolean
+          resend_domain_id:    string | null
+          favicon_url:         string | null
+          public_page_title:   string | null
           created_at: string
           updated_at: string
         }
@@ -244,6 +250,7 @@ export interface Database {
           is_default: boolean
           sort_order: number
           mesh_rules: Json
+          read_only: boolean
           created_at: string
           updated_at: string
         }

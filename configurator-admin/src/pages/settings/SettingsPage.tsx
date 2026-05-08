@@ -108,8 +108,23 @@ export function SettingsPage() {
   const [postInquiryMessage, setPostInquiryMessage] = useState(
     tenant?.post_inquiry_message ?? ''
   )
+  const [pdfFooter,    setPdfFooter]    = useState(tenant?.pdf_footer ?? '')
+  const [faviconUrl,       setFaviconUrl]       = useState(tenant?.favicon_url ?? '')
+  const [publicPageTitle,  setPublicPageTitle]  = useState(tenant?.public_page_title ?? '')
+  const [savingPublicBrand, setSavingPublicBrand] = useState(false)
+  const [emailFromAddress, setEmailFromAddress] = useState(tenant?.email_from_address ?? '')
+  const [emailFromVerified, setEmailFromVerified] = useState(tenant?.email_from_verified ?? false)
+  const [emailDomain, setEmailDomain] = useState(
+    (tenant?.email_from_address ?? '').split('@')[1] ?? ''
+  )
+  const [emailDomainRecords, setEmailDomainRecords] = useState<Array<{ name: string; type: string; value: string; status?: string }>>([])
+  const [savingDomain, setSavingDomain]     = useState(false)
+  const [checkingDomain, setCheckingDomain] = useState(false)
+  const [removingDomain, setRemovingDomain] = useState(false)
+  const [savingFromAddress, setSavingFromAddress] = useState(false)
   const [saving, setSaving] = useState(false)
   const [savingMessage, setSavingMessage] = useState(false)
+  const [savingPdfFooter, setSavingPdfFooter] = useState(false)
 
   // Company profile state
   const [companyAddress, setCompanyAddress] = useState(tenant?.company_address ?? '')
@@ -150,6 +165,165 @@ export function SettingsPage() {
       })
     } finally {
       setSaving(false)
+    }
+  }
+
+  async function handleRegisterDomain() {
+    if (!tenant) return
+    const domain = emailDomain.trim().toLowerCase()
+    if (!/^[a-z0-9.-]+\.[a-z]{2,}$/.test(domain)) {
+      toast({ title: t('Enter a valid domain (e.g. yourcompany.com)'), variant: 'destructive' })
+      return
+    }
+    setSavingDomain(true)
+    try {
+      const { data, error } = await supabase.functions.invoke('verify-email-domain', {
+        body: { action: 'register', domain },
+      })
+      if (error) throw error
+      const records = (data as { records?: Array<{ name: string; type: string; value: string; status?: string }> })?.records ?? []
+      setEmailDomainRecords(records)
+      setEmailFromVerified(false)
+      toast({ title: t('Domain registered. Add the DNS records below, then click Re-check.') })
+    } catch (e) {
+      toast({
+        title: t('Domain registration failed'),
+        description: e instanceof Error ? e.message : undefined,
+        variant: 'destructive',
+      })
+    } finally {
+      setSavingDomain(false)
+    }
+  }
+
+  async function handleCheckDomainStatus() {
+    setCheckingDomain(true)
+    try {
+      const { data, error } = await supabase.functions.invoke('verify-email-domain', {
+        body: { action: 'status' },
+      })
+      if (error) throw error
+      const verified = (data as { verified?: boolean })?.verified === true
+      const records  = (data as { records?: Array<{ name: string; type: string; value: string; status?: string }> })?.records ?? []
+      setEmailFromVerified(verified)
+      setEmailDomainRecords(records)
+      toast({ title: verified ? t('Domain verified') : t('Domain still pending verification') })
+    } catch (e) {
+      toast({
+        title: t('Status check failed'),
+        description: e instanceof Error ? e.message : undefined,
+        variant: 'destructive',
+      })
+    } finally {
+      setCheckingDomain(false)
+    }
+  }
+
+  async function handleRemoveDomain() {
+    if (!tenant) return
+    setRemovingDomain(true)
+    try {
+      const { error } = await supabase.functions.invoke('verify-email-domain', {
+        body: { action: 'remove' },
+      })
+      if (error) throw error
+      setEmailFromAddress('')
+      setEmailDomain('')
+      setEmailFromVerified(false)
+      setEmailDomainRecords([])
+      toast({ title: t('Email domain removed') })
+    } catch (e) {
+      toast({
+        title: t('Remove failed'),
+        description: e instanceof Error ? e.message : undefined,
+        variant: 'destructive',
+      })
+    } finally {
+      setRemovingDomain(false)
+    }
+  }
+
+  async function handleSaveFromAddress() {
+    if (!tenant) return
+    const next = emailFromAddress.trim() || null
+    if (next && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(next)) {
+      toast({ title: t('Enter a valid email address'), variant: 'destructive' })
+      return
+    }
+    setSavingFromAddress(true)
+    try {
+      const { error } = await supabase
+        .from('tenants')
+        .update({ email_from_address: next } as unknown as never)
+        .eq('id', tenant.id)
+      if (error) throw error
+      toast({ title: t('Email from-address saved') })
+    } catch (e) {
+      toast({
+        title: t('Failed to save'),
+        description: e instanceof Error ? e.message : undefined,
+        variant: 'destructive',
+      })
+    } finally {
+      setSavingFromAddress(false)
+    }
+  }
+
+  async function handleSavePublicBranding() {
+    if (!tenant) return
+    const fav   = faviconUrl.trim() || null
+    const title = publicPageTitle.trim() || null
+    if (fav && !/^https?:\/\//.test(fav)) {
+      toast({ title: t('Favicon URL must start with http:// or https://'), variant: 'destructive' })
+      return
+    }
+    setSavingPublicBrand(true)
+    try {
+      const { error } = await supabase
+        .from('tenants')
+        .update({ favicon_url: fav, public_page_title: title } as unknown as never)
+        .eq('id', tenant.id)
+      if (error) throw error
+      toast({ title: t('Public page branding saved') })
+    } catch (e) {
+      toast({
+        title: t('Failed to save'),
+        description: e instanceof Error ? e.message : undefined,
+        variant: 'destructive',
+      })
+    } finally {
+      setSavingPublicBrand(false)
+    }
+  }
+
+  async function handleSavePdfFooter() {
+    if (!tenant) return
+    setSavingPdfFooter(true)
+    try {
+      const oldFooter = tenant.pdf_footer ?? null
+      const newFooter = pdfFooter.trim() || null
+      const { error } = await supabase
+        .from('tenants')
+        .update({ pdf_footer: newFooter } as unknown as never)
+        .eq('id', tenant.id)
+      if (error) throw error
+      logChange({
+        entityType: 'settings',
+        entityId:   tenant.id,
+        entityName: tenant.name ?? null,
+        changeType: 'update',
+        diff:       { [t('PDF footer')]: { old: oldFooter, new: newFooter } },
+        changedByName: userName,
+      })
+      toast({ title: t('PDF footer saved') })
+    } catch (e) {
+      toast({
+        title: t('Failed to save'),
+        description: e instanceof Error ? e.message : undefined,
+        variant: 'destructive',
+      })
+    } finally {
+      setSavingPdfFooter(false)
     }
   }
 
@@ -872,6 +1046,160 @@ export function SettingsPage() {
             <Button size="sm" onClick={handleSavePostInquiryMessage} loading={savingMessage}>
               {t('Save')}
             </Button>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">{t('PDF footer')}</CardTitle>
+            <CardDescription>
+              {planLimits?.white_label
+                ? t('Replaces the default attribution at the bottom of every quotation PDF.')
+                : t('Available on Scale plan. Upgrade to remove the default attribution from your PDFs.')}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <Input
+              id="pdf-footer"
+              placeholder={t('e.g. Acme Corp · contact@acme.com')}
+              value={pdfFooter}
+              onChange={e => setPdfFooter(e.target.value)}
+              disabled={!planLimits?.white_label}
+              maxLength={120}
+            />
+            <Button
+              size="sm"
+              onClick={handleSavePdfFooter}
+              loading={savingPdfFooter}
+              disabled={!planLimits?.white_label}
+            >
+              {t('Save')}
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">{t('Public page branding')}</CardTitle>
+            <CardDescription>
+              {planLimits?.white_label
+                ? t('Browser tab title and favicon shown on public preview pages.')
+                : t('Available on Scale plan. Upgrade to use your own favicon and tab title on public pages.')}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="space-y-1.5">
+              <label htmlFor="public-page-title" className="text-xs text-muted-foreground">{t('Browser tab title')}</label>
+              <Input
+                id="public-page-title"
+                placeholder={t('e.g. Configure your Acme product')}
+                value={publicPageTitle}
+                onChange={e => setPublicPageTitle(e.target.value)}
+                disabled={!planLimits?.white_label}
+                maxLength={120}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label htmlFor="favicon-url" className="text-xs text-muted-foreground">{t('Favicon URL')}</label>
+              <Input
+                id="favicon-url"
+                type="url"
+                placeholder="https://yourcompany.com/favicon.ico"
+                value={faviconUrl}
+                onChange={e => setFaviconUrl(e.target.value)}
+                disabled={!planLimits?.white_label}
+              />
+            </div>
+            <Button
+              size="sm"
+              onClick={handleSavePublicBranding}
+              loading={savingPublicBrand}
+              disabled={!planLimits?.white_label}
+            >
+              {t('Save')}
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">{t('Email from-address')}</CardTitle>
+            <CardDescription>
+              {planLimits?.white_label
+                ? t('Send quotations and notifications from your own verified domain.')
+                : t('Available on Scale plan. Upgrade to send emails from your own domain.')}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex flex-col sm:flex-row gap-2">
+              <Input
+                id="email-domain"
+                placeholder="yourcompany.com"
+                value={emailDomain}
+                onChange={e => setEmailDomain(e.target.value)}
+                disabled={!planLimits?.white_label}
+                className="flex-1"
+              />
+              <Button
+                size="sm"
+                onClick={handleRegisterDomain}
+                loading={savingDomain}
+                disabled={!planLimits?.white_label}
+              >
+                {t('Register domain')}
+              </Button>
+            </div>
+
+            {emailDomainRecords.length > 0 && (
+              <div className="rounded-md border bg-muted/30 p-3 space-y-2">
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  {t('Add these DNS records at your domain registrar')}
+                </p>
+                <div className="space-y-1 text-xs font-mono">
+                  {emailDomainRecords.map((r, i) => (
+                    <div key={i} className="grid grid-cols-[60px_1fr_1fr] gap-2">
+                      <span className="font-bold">{r.type}</span>
+                      <span className="truncate">{r.name}</span>
+                      <span className="truncate text-muted-foreground">{r.value}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex gap-2 pt-1">
+                  <Button size="sm" variant="outline" onClick={handleCheckDomainStatus} loading={checkingDomain}>
+                    {t('Re-check verification')}
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={handleRemoveDomain} loading={removingDomain}>
+                    {t('Remove domain')}
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {emailFromVerified && (
+              <div className="rounded-md border-l-2 border-green-600 bg-green-50 dark:bg-green-950/40 px-3 py-2 text-xs">
+                {t('Domain verified. Emails will send from your address below.')}
+              </div>
+            )}
+
+            <div className="flex flex-col sm:flex-row gap-2">
+              <Input
+                id="email-from-address"
+                type="email"
+                placeholder="quotes@yourcompany.com"
+                value={emailFromAddress}
+                onChange={e => setEmailFromAddress(e.target.value)}
+                disabled={!planLimits?.white_label || !emailFromVerified}
+                className="flex-1"
+              />
+              <Button
+                size="sm"
+                onClick={handleSaveFromAddress}
+                loading={savingFromAddress}
+                disabled={!planLimits?.white_label || !emailFromVerified}
+              >
+                {t('Save')}
+              </Button>
+            </div>
           </CardContent>
         </Card>
 

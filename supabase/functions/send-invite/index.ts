@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { loadPlanLimits, makePlanError, gateForbidden } from '../_shared/planGate.ts'
+import { getFromAddress } from '../_shared/emailSender.ts'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -22,7 +23,6 @@ Deno.serve(async (req: Request) => {
   const supabaseUrl    = Deno.env.get('SUPABASE_URL')!
   const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
   const resendApiKey   = Deno.env.get('RESEND_API_KEY')!
-  const fromEmail      = Deno.env.get('NOTIFY_FROM_EMAIL') ?? 'notifications@konfigurator.app'
   const siteUrl        = Deno.env.get('SITE_URL') ?? 'https://app.konfigurator.app'
 
   // Verify caller is authenticated
@@ -167,7 +167,7 @@ Deno.serve(async (req: Request) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        from:    fromEmail,
+        from:    await getFromAddress(sb, tenantId),
         to:      [body.email],
         subject: `You've been invited to ${tenantName} on Konfigurator`,
         html,

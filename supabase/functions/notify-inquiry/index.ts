@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { getFromAddress } from '../_shared/emailSender.ts'
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -46,7 +47,6 @@ Deno.serve(async (req: Request) => {
   const supabaseUrl     = Deno.env.get('SUPABASE_URL')!
   const serviceRoleKey  = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
   const resendApiKey    = Deno.env.get('RESEND_API_KEY')!
-  const fromEmail       = Deno.env.get('NOTIFY_FROM_EMAIL') ?? 'notifications@konfigurator.app'
 
   if (!resendApiKey) {
     console.error('notify-inquiry: RESEND_API_KEY not set')
@@ -127,7 +127,7 @@ Deno.serve(async (req: Request) => {
         'Content-Type':  'application/json',
       },
       body: JSON.stringify({
-        from:    fromEmail,
+        from:    await getFromAddress(supabase, inq.tenant_id),
         to:      [toEmail],
         subject: `New inquiry: ${productName} from ${inq.customer_name}`,
         html,

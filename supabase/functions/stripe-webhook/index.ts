@@ -59,6 +59,8 @@ Deno.serve(async (req: Request) => {
           subscription_status:    sub.status,
           grace_period_ends_at:   null,
         } as never).eq('id', tenantId)
+        // Re-enable resources gated by features the new plan unlocks.
+        await supabase.rpc('apply_plan_upgrade', { p_tenant_id: tenantId })
         break
       }
 
@@ -73,8 +75,10 @@ Deno.serve(async (req: Request) => {
           subscription_status:  sub.status,
           grace_period_ends_at: null,
         } as never).eq('id', tenantId)
-        // Re-evaluate over-limit resources when downgrading
-        await supabase.rpc('mark_over_limit_products', { p_tenant_id: tenantId })
+        // Cover both directions — apply_plan_downgrade is idempotent and
+        // apply_plan_upgrade only clears stale read_only flags.
+        await supabase.rpc('apply_plan_downgrade', { p_tenant_id: tenantId })
+        await supabase.rpc('apply_plan_upgrade',   { p_tenant_id: tenantId })
         break
       }
 
@@ -88,7 +92,7 @@ Deno.serve(async (req: Request) => {
           subscription_status:    'canceled',
           grace_period_ends_at:   null,
         } as never).eq('id', tenantId)
-        await supabase.rpc('mark_over_limit_products', { p_tenant_id: tenantId })
+        await supabase.rpc('apply_plan_downgrade', { p_tenant_id: tenantId })
         break
       }
 
