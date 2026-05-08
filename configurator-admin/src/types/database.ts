@@ -416,10 +416,23 @@ export interface Database {
           rejection_reason_id: string | null
           rejection_note:      string | null
           source_inquiry_id:   string | null
+          public_token:        string | null
+          responded_at:        string | null
+          responded_ip:        string | null
+          responded_user_agent: string | null
           created_at: string
           updated_at: string
         }
-        Insert: Omit<Database['public']['Tables']['quotations']['Row'], 'id' | 'created_at' | 'updated_at'> & { id?: string }
+        Insert: Omit<
+          Database['public']['Tables']['quotations']['Row'],
+          'id' | 'created_at' | 'updated_at' | 'public_token' | 'responded_at' | 'responded_ip' | 'responded_user_agent'
+        > & {
+          id?:                   string
+          public_token?:         string | null
+          responded_at?:         string | null
+          responded_ip?:         string | null
+          responded_user_agent?: string | null
+        }
         Update: Partial<Database['public']['Tables']['quotations']['Insert']>
       }
       audit_log: {
