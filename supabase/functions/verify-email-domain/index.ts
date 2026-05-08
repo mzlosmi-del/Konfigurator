@@ -10,10 +10,12 @@
 //   { action: 'status' }                       → poll Resend, update flag
 //   { action: 'remove' }                       → unregister, clear address + flag
 //
-// We resolve the caller's tenant from their JWT (admin-only).
+// We resolve the caller's tenant from their JWT (admin-only). The plan
+// feature check uses the tenant_has_feature SQL function directly so the
+// function bundle has no sibling _shared/ dependency (dashboard deploys
+// don't pull adjacent folders).
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { loadPlanLimits, assertFeature } from '../_shared/planGate.ts'
 
 const CORS = {
   'Access-Control-Allow-Origin':  '*',
@@ -73,11 +75,24 @@ Deno.serve(async (req: Request) => {
   }
   const tenantId = (profile as { tenant_id: string }).tenant_id
 
-  // ── Plan gate ─────────────────────────────────────────────────────────────
-  const limits = await loadPlanLimits(sb, tenantId)
-  if (!limits) return json({ error: 'Tenant not found' }, 404)
-  const featureGate = assertFeature('white_label', limits, CORS)
-  if (featureGate) return featureGate
+  // ── Plan gate (white_label feature) ───────────────────────────────────────
+  // Resolve plan + feature flag via the SQL helper. Mirrors the shape that
+  // _shared/planGate.ts produces for consistent client-side parsing.
+  const { data: tenantRow } = await sb
+    .from('tenants').select('plan').eq('id', tenantId).single()
+  const plan = (tenantRow as { plan: string } | null)?.plan ?? 'free'
+  const { data: hasFeature } = await sb.rpc('tenant_has_feature', {
+    p_tenant_id: tenantId,
+    p_feature:   'white_label',
+  })
+  if (hasFeature !== true) {
+    return json({
+      code:       'PLAN_LIMIT_EXCEEDED',
+      dimension:  'white_label',
+      plan,
+      upgrade_to: 'scale',
+    }, 403)
+  }
 
   // ── Dispatch ──────────────────────────────────────────────────────────────
   let body: { action?: string; domain?: string }
