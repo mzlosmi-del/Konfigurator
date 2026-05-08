@@ -1459,7 +1459,9 @@ export function SettingsPage() {
                     <UsageRow label={t('Products')}           used={productCount ?? 0} max={planLimits.products_max} />
                     <UsageRow label={t('Inquiries this month')} used={monthlyUsage?.inquiries_count ?? 0} max={planLimits.inquiries_per_month} />
                     <UsageRow label={t('Team members')}       used={members.length}    max={planLimits.team_members_max} />
+                    {/* AI setup usage hidden for now — uncomment when re-enabling AI product setup.
                     <UsageRow label={t('AI setups this month')} used={monthlyUsage?.ai_setup_count ?? 0} max={planLimits.ai_setup_per_month} />
+                    */}
                   </div>
                   {(tenant as any)?.grace_period_ends_at && (
                     <div className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
@@ -1483,7 +1485,7 @@ export function SettingsPage() {
               {([
                 { plan: 'starter', label: 'Starter', monthly: '49', annual: '490', features: ['25 products', '250 inquiries/mo', '3 team members', '3D models', 'Quotations'] },
                 { plan: 'growth',  label: 'Growth',  monthly: '149', annual: '1490', features: ['Unlimited products', '2000 inquiries/mo', '10 team members', 'Webhooks', 'Advanced analytics', 'Remove branding'] },
-                { plan: 'scale',   label: 'Scale',   monthly: '399', annual: '3990', features: ['Everything unlimited', 'White-label', 'AI product setup ∞', 'Priority support'] },
+                { plan: 'scale',   label: 'Scale',   monthly: '399', annual: '3990', features: ['Everything unlimited', 'White-label', 'Priority support'] },
               ] as const).map(({ plan, label, monthly, annual, features }) => {
                 const isCurrent = tenant?.plan === plan
                 return (
