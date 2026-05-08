@@ -186,11 +186,77 @@ export async function loadProductConfig(config: WidgetConfig): Promise<FullProdu
   }
 }
 
+/**
+ * Thrown when the tenant has hit a plan-imposed quota or feature gate. The
+ * widget UI catches this to render a friendly message instead of leaking
+ * the raw DB exception text to the customer.
+ */
+export class PlanLimitError extends Error {
+  code:    string
+  plan?:   string
+  limit?:  number
+  current?: number
+  constructor(detail: { code: string; plan?: string; limit?: number; current?: number }, message?: string) {
+    super(message ?? detail.code)
+    this.name    = 'PlanLimitError'
+    this.code    = detail.code
+    this.plan    = detail.plan
+    this.limit   = detail.limit
+    this.current = detail.current
+  }
+}
+
+interface PostgrestErrorLike {
+  message?: string
+  details?: string
+  code?:    string
+}
+
+function parsePlanLimitError(err: PostgrestErrorLike): PlanLimitError | null {
+  // 1. Structured DETAIL JSON (added in migration 062)
+  if (err.details) {
+    try {
+      const parsed = JSON.parse(err.details) as {
+        code?:    string
+        plan?:    string
+        limit?:   number
+        current?: number
+      }
+      if (parsed.code && (
+        parsed.code === 'INQUIRY_LIMIT_EXCEEDED'
+        || parsed.code === 'PRODUCT_LIMIT_EXCEEDED'
+        || parsed.code === 'TEAM_LIMIT_EXCEEDED'
+        || parsed.code === 'PLAN_FEATURE_DISABLED'
+      )) {
+        return new PlanLimitError({
+          code:    parsed.code,
+          plan:    parsed.plan,
+          limit:   parsed.limit,
+          current: parsed.current,
+        }, err.message)
+      }
+    } catch { /* fall through */ }
+  }
+  // 2. Fallback: match on message prefix (pre-062 deployments)
+  const msg = err.message ?? ''
+  if (msg.startsWith('inquiry_limit_exceeded')) {
+    return new PlanLimitError({ code: 'INQUIRY_LIMIT_EXCEEDED' }, msg)
+  }
+  if (msg.startsWith('plan_feature_disabled')) {
+    return new PlanLimitError({ code: 'PLAN_FEATURE_DISABLED' }, msg)
+  }
+  return null
+}
+
 export async function submitInquiry(
   config: WidgetConfig,
   payload: InquiryPayload
 ): Promise<void> {
   const sb = createSupabaseClient(config)
   const { error } = await sb.from('inquiries').insert(payload as never)
-  if (error) throw new Error(error.message)
+  if (error) {
+    const planErr = parsePlanLimitError(error as PostgrestErrorLike)
+    if (planErr) throw planErr
+    throw new Error(error.message)
+  }
 }

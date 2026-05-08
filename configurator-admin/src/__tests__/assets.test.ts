@@ -18,6 +18,7 @@ function makeAsset(
     is_default: false,
     sort_order: 0,
     mesh_rules: [],
+    read_only: false,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
     ...overrides,

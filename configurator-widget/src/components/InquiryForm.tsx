@@ -1,7 +1,7 @@
 import { h } from 'preact'
 import { useState } from 'preact/hooks'
 import type { WidgetConfig, ConfigLineItem, FormConfig } from '../types'
-import { submitInquiry } from '../api'
+import { submitInquiry, PlanLimitError } from '../api'
 import { t } from '../i18n'
 
 interface Props {
@@ -70,9 +70,13 @@ export function InquiryForm({ config, productId, tenantId, lineItems, totalPrice
       })
       onSuccess()
     } catch (err) {
-      setServerError(
-        err instanceof Error ? err.message : t('Failed to submit. Please try again.')
-      )
+      if (err instanceof PlanLimitError) {
+        setServerError(t('Quote requests are temporarily paused. Please contact us directly.'))
+      } else {
+        setServerError(
+          err instanceof Error ? err.message : t('Failed to submit. Please try again.')
+        )
+      }
     } finally {
       setSubmitting(false)
     }

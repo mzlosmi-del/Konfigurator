@@ -1,6 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { PDFDocument, rgb, StandardFonts } from 'npm:pdf-lib@1.17.1'
-import { loadPlanLimits, makePlanError, gateForbidden } from '../_shared/planGate.ts'
+import { loadPlanLimits, assertFeature } from '../_shared/planGate.ts'
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -108,9 +108,8 @@ Deno.serve(async (req: Request) => {
     // ── Plan gate: quotations feature ─────────────────────────────────────
     const limits = await loadPlanLimits(sb, inq.tenant_id)
     if (!limits) return new Response('Tenant not found', { status: 404, headers: corsHeaders })
-    if (!limits.quotations) {
-      return gateForbidden(makePlanError('quotations', limits.plan), corsHeaders)
-    }
+    const featureGate = assertFeature('quotations', limits, corsHeaders)
+    if (featureGate) return featureGate
 
     // ── 5. Generate PDF ───────────────────────────────────────────────────
     const pdfBytes = await buildQuotePdf({

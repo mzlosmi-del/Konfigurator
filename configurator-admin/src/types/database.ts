@@ -244,6 +244,7 @@ export interface Database {
           is_default: boolean
           sort_order: number
           mesh_rules: Json
+          read_only: boolean
           created_at: string
           updated_at: string
         }

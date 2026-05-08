@@ -1,5 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import Anthropic from 'npm:@anthropic-ai/sdk'
+import { loadPlanLimits, assertMonthlyLimit, gateForbidden, makePlanError } from '../_shared/planGate.ts'
+import { getMonthlyUsage, incrementMonthlyUsage } from '../_shared/monthlyUsage.ts'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -87,38 +89,16 @@ Deno.serve(async (req: Request) => {
   if (!profile) return new Response('Profile not found', { status: 404, headers: CORS })
   const tenantId = profile.tenant_id as string
 
-  // Plan gating
-  const { data: tenant } = await supabase
-    .from('tenants').select('plan').eq('id', tenantId).single()
-  const { data: limits } = await supabase
-    .from('plan_limits').select('ai_setup_per_month').eq('plan', tenant?.plan ?? 'free').single()
-  const maxSetups = (limits?.ai_setup_per_month as number) ?? 0
-
-  if (maxSetups === 0) {
-    return new Response(JSON.stringify({ error: 'plan_limit_exceeded: AI setup not available on your plan' }), {
-      status: 403, headers: { ...CORS, 'Content-Type': 'application/json' },
-    })
+  // Plan gating — uses the shared loadPlanLimits + assertMonthlyLimit pair so
+  // every gated function speaks the same structured error shape.
+  const limits = await loadPlanLimits(supabase, tenantId)
+  if (!limits) return new Response('Tenant not found', { status: 404, headers: CORS })
+  if (limits.ai_setup_per_month === 0) {
+    return gateForbidden(makePlanError('ai_setup', limits.plan, 0, 0), CORS)
   }
-
-  if (maxSetups > 0) {
-    const periodMonth = new Date()
-    periodMonth.setDate(1)
-    const monthStr = periodMonth.toISOString().slice(0, 10)
-
-    const { data: usage } = await supabase
-      .from('monthly_usage')
-      .select('ai_setup_count')
-      .eq('tenant_id', tenantId)
-      .eq('period_month', monthStr)
-      .single()
-
-    const used = (usage?.ai_setup_count as number) ?? 0
-    if (used >= maxSetups) {
-      return new Response(JSON.stringify({ error: 'plan_limit_exceeded: monthly AI setup limit reached' }), {
-        status: 429, headers: { ...CORS, 'Content-Type': 'application/json' },
-      })
-    }
-  }
+  const used = await getMonthlyUsage(supabase, tenantId, 'ai_setup')
+  const monthlyGate = assertMonthlyLimit('ai_setup', limits.ai_setup_per_month, used, limits.plan, CORS)
+  if (monthlyGate) return monthlyGate
 
   // Parse body
   let description: string, vertical: string | undefined
@@ -181,29 +161,7 @@ Deno.serve(async (req: Request) => {
     })
   }
 
-  // Increment ai_setup_count in monthly_usage (read-then-write; low-concurrency path)
-  const periodMonth = new Date()
-  periodMonth.setDate(1)
-  const monthStr = periodMonth.toISOString().slice(0, 10)
-
-  const { data: existingUsage } = await supabase
-    .from('monthly_usage')
-    .select('ai_setup_count')
-    .eq('tenant_id', tenantId)
-    .eq('period_month', monthStr)
-    .maybeSingle()
-
-  if (existingUsage) {
-    await supabase
-      .from('monthly_usage')
-      .update({ ai_setup_count: (existingUsage.ai_setup_count as number) + 1 } as unknown as never)
-      .eq('tenant_id', tenantId)
-      .eq('period_month', monthStr)
-  } else {
-    await supabase
-      .from('monthly_usage')
-      .insert({ tenant_id: tenantId, period_month: monthStr, ai_setup_count: 1, inquiries_count: 0 } as unknown as never)
-  }
+  await incrementMonthlyUsage(supabase, tenantId, 'ai_setup')
 
   return new Response(JSON.stringify(result), {
     headers: { ...CORS, 'Content-Type': 'application/json' },
