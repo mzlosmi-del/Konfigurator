@@ -1428,11 +1428,11 @@ export function SettingsPage() {
                     {planLabel(tenant?.plan ?? 'free')}
                   </Badge>
                 </CardTitle>
-                <CardDescription>
-                  {(tenant as any)?.subscription_status
-                    ? `${t('Subscription status')}: ${(tenant as any).subscription_status}`
-                    : t('No active subscription — on free plan.')}
-                </CardDescription>
+                {(tenant as any)?.subscription_status && (
+                  <CardDescription>
+                    {t('Subscription status')}: {(tenant as any).subscription_status}
+                  </CardDescription>
+                )}
               </CardHeader>
               {planLimits && (
                 <CardContent className="space-y-3">
