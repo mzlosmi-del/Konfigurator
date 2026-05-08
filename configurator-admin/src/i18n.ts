@@ -915,6 +915,8 @@ const sr: Record<string, string> = {
 
   // Billing / plan
   'Billing':                               'Naplata',
+  'To change your plan, reach out to sales.': 'Za promenu plana, kontaktirajte prodaju.',
+  "and we'll set you up.":                 'i mi ćemo vam pomoći.',
   'Billing Address':                       'Adresa za naplatu',
   'Delivery Address':                      'Adresa za dostavu',
   'Leave blank if same as billing':        'Ostavite prazno ako je ista kao adresa za naplatu',

@@ -553,43 +553,9 @@ export function SettingsPage() {
 
   // ── Danger zone ─────────────────────────────────────────────────────────────
   // ── Billing ─────────────────────────────────────────────────────────────────
-  const [settingsTab,       setSettingsTab]       = useState('general')
-  const [checkoutLoading,   setCheckoutLoading]   = useState<string | null>(null)
-  const [portalLoading,     setPortalLoading]     = useState(false)
-
-  async function handleUpgrade(plan: string, interval: 'monthly' | 'annual') {
-    setCheckoutLoading(`${plan}-${interval}`)
-    try {
-      const { data: { session } } = await supabase.auth.getSession()
-      const res = await supabase.functions.invoke('create-checkout-session', {
-        body: { plan, interval },
-        headers: { Authorization: `Bearer ${session?.access_token}` },
-      })
-      if (res.error) throw new Error(res.error.message)
-      const { url } = res.data as { url: string }
-      window.location.href = url
-    } catch (e) {
-      toast({ title: t('Failed to start checkout'), description: e instanceof Error ? e.message : undefined, variant: 'destructive' })
-      setCheckoutLoading(null)
-    }
-  }
-
-  async function handleManageSubscription() {
-    setPortalLoading(true)
-    try {
-      const { data: { session } } = await supabase.auth.getSession()
-      const res = await supabase.functions.invoke('create-billing-portal-session', {
-        headers: { Authorization: `Bearer ${session?.access_token}` },
-      })
-      if (res.error) throw new Error(res.error.message)
-      const { url } = res.data as { url: string }
-      window.location.href = url
-    } catch (e) {
-      toast({ title: t('Failed to open billing portal'), description: e instanceof Error ? e.message : undefined, variant: 'destructive' })
-    } finally {
-      setPortalLoading(false)
-    }
-  }
+  // Plan changes are sales-led for now: no Stripe checkout / portal in-product.
+  // The Billing tab shows the current plan + usage and a contact-sales callout.
+  const [settingsTab, setSettingsTab] = useState('general')
 
   // ── Authorizations ──────────────────────────────────────────────────────────
   const [rolePerms, setRolePerms] = useState<RolePermission[]>([])
@@ -1441,6 +1407,18 @@ export function SettingsPage() {
           {/* ── Billing tab ─────────────────────────────────────────────────── */}
           <TabsContent value="billing" className="mt-4 max-w-2xl space-y-4">
 
+            {/* Contact sales callout */}
+            <div className="rounded-md border border-primary/40 bg-primary/5 px-4 py-3 text-sm">
+              <p className="font-medium">{t('To change your plan, reach out to sales.')}</p>
+              <p className="text-muted-foreground mt-1">
+                {t('Email')}{' '}
+                <a href="mailto:sales@configureout.com" className="text-primary underline underline-offset-2 font-medium">
+                  sales@configureout.com
+                </a>
+                {' '}{t('and we\'ll set you up.')}
+              </p>
+            </div>
+
             {/* Current plan + usage */}
             <Card>
               <CardHeader>
@@ -1464,11 +1442,6 @@ export function SettingsPage() {
                     <UsageRow label={t('Team members')}       used={members.length}    max={planLimits.team_members_max} />
                     <UsageRow label={t('AI setups this month')} used={monthlyUsage?.ai_setup_count ?? 0} max={planLimits.ai_setup_per_month} />
                   </div>
-                  {(tenant as any)?.stripe_subscription_id && (
-                    <Button size="sm" variant="outline" loading={portalLoading} onClick={handleManageSubscription}>
-                      {t('Manage subscription & invoices')}
-                    </Button>
-                  )}
                   {(tenant as any)?.grace_period_ends_at && (
                     <div className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
                       {t('Payment failed. Service continues until')} {new Date((tenant as any).grace_period_ends_at).toLocaleDateString()}.
@@ -1510,25 +1483,8 @@ export function SettingsPage() {
                           </li>
                         ))}
                       </ul>
-                      {isCurrent ? (
+                      {isCurrent && (
                         <Badge variant="secondary" className="w-full justify-center">{t('Current plan')}</Badge>
-                      ) : (
-                        <div className="flex flex-col gap-1.5">
-                          <Button
-                            size="sm" className="w-full"
-                            loading={checkoutLoading === `${plan}-monthly`}
-                            onClick={() => handleUpgrade(plan, 'monthly')}
-                          >
-                            {t('Monthly')}
-                          </Button>
-                          <Button
-                            size="sm" variant="outline" className="w-full"
-                            loading={checkoutLoading === `${plan}-annual`}
-                            onClick={() => handleUpgrade(plan, 'annual')}
-                          >
-                            {t('Annual')} (−17%)
-                          </Button>
-                        </div>
                       )}
                     </CardContent>
                   </Card>
