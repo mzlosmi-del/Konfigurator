@@ -218,10 +218,15 @@ export function NewProductPage() {
               {t('From template')}
             </TabsTrigger>
             <TabsTrigger value="scratch">{t('From scratch')}</TabsTrigger>
+            {/* AI product setup — hidden until re-enabled. The TabsContent
+                below is left in place so flipping this back on (and the
+                `false &&` gate further down) restores the full flow. */}
+            {/*
             <TabsTrigger value="ai">
               <Sparkles className="h-3.5 w-3.5 mr-1.5" />
               {t('From description')}
             </TabsTrigger>
+            */}
           </TabsList>
 
           {/* ── Template picker ─────────────────────────────────────────────── */}
