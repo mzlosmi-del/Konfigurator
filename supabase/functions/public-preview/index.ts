@@ -36,19 +36,20 @@ Deno.serve(async (req: Request) => {
 
   const { data: tenant } = await supabase
     .from('tenants')
-    .select('name, plan, logo_url')
+    .select('name, plan, logo_url, favicon_url, public_page_title')
     .eq('id', product.tenant_id)
     .single()
 
   const { data: limits } = await supabase
     .from('plan_limits')
-    .select('remove_branding')
+    .select('remove_branding, white_label')
     .eq('plan', tenant?.plan ?? 'free')
     .single()
 
   const showBranding = !(limits?.remove_branding ?? false)
+  const whiteLabel   = limits?.white_label ?? false
 
-  return new Response(buildPage(product, tenant, showBranding), {
+  return new Response(buildPage(product, tenant, showBranding, whiteLabel), {
     headers: { ...CORS, 'Content-Type': 'text/html; charset=utf-8' },
   })
 })
@@ -57,11 +58,18 @@ Deno.serve(async (req: Request) => {
 
 function buildPage(
   product: { id: string; tenant_id: string; name: string; description: string | null },
-  tenant:  { name: string; logo_url: string | null } | null,
+  tenant:  { name: string; logo_url: string | null; favicon_url: string | null; public_page_title: string | null } | null,
   showBranding: boolean,
+  whiteLabel:   boolean,
 ): string {
-  const pageTitle = tenant ? `${h(product.name)} — ${h(tenant.name)}` : h(product.name)
-  const branding  = showBranding
+  const customTitle = whiteLabel && tenant?.public_page_title?.trim()
+  const pageTitle   = customTitle
+    ? h(tenant!.public_page_title!)
+    : (tenant ? `${h(product.name)} — ${h(tenant.name)}` : h(product.name))
+  const faviconTag  = whiteLabel && tenant?.favicon_url
+    ? `<link rel="icon" href="${h(tenant.favicon_url)}">`
+    : ''
+  const branding    = showBranding
     ? `<p class="branding">Powered by <a href="https://konfigurator.app" target="_blank" rel="noopener noreferrer">Konfigurator</a></p>`
     : ''
 
@@ -71,6 +79,7 @@ function buildPage(
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${pageTitle}</title>
+  ${faviconTag}
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: system-ui, -apple-system, sans-serif; background: #f9fafb; color: #111; min-height: 100vh; }

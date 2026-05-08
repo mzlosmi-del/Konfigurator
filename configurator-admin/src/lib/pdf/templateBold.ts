@@ -2,7 +2,7 @@ import { PDFDocument, PDFPage, PDFFont, rgb, degrees } from 'pdf-lib'
 import type { QuotationLineItem, QuotationAdjustment, ProductText } from '@/types/database'
 import { calcLineTotal } from '@/lib/quotations'
 import {
-  C, wrapText, PDF_LABELS, loadFonts, loadLogo,
+  C, wrapText, PDF_LABELS, loadFonts, loadLogo, getFooterLabel,
   isSectionVisible, buildOrderedSections,
   type PdfBuildArgs,
 } from './shared'
@@ -83,7 +83,7 @@ export async function renderBold(args: PdfBuildArgs): Promise<Uint8Array> {
       ? L.validityText(new Date(quotation.valid_until).toLocaleDateString(L.dateLocale, { dateStyle: 'long' }))
       : L.contactText
     text(validStr, MX_L, fy, 7.5, fontR, C.muted)
-    rText(L.footer, W - MX_R, fy, 7.5, fontB, ACCENT)
+    rText(getFooterLabel(tenant, L.footer), W - MX_R, fy, 7.5, fontB, ACCENT)
   }
 
   drawAccentStripe()

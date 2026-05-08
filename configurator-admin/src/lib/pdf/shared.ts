@@ -13,6 +13,17 @@ export interface TenantProfile {
   contact_person?:     string | null
   vat_number?:         string | null
   company_reg_number?: string | null
+  /** Optional white-label override for the footer attribution. */
+  pdf_footer?:         string | null
+}
+
+/**
+ * Returns the tenant-configured footer when set, else the i18n default.
+ * Templates use this in place of `L.footer`.
+ */
+export function getFooterLabel(tenant: TenantProfile, defaultLabel: string): string {
+  const t = (tenant.pdf_footer ?? '').trim()
+  return t.length > 0 ? t : defaultLabel
 }
 
 export type PdfTemplate = 'modern' | 'classic' | 'compact' | 'bold'

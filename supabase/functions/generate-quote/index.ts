@@ -1,6 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { PDFDocument, rgb, StandardFonts } from 'npm:pdf-lib@1.17.1'
 import { loadPlanLimits, assertFeature } from '../_shared/planGate.ts'
+import { getFromAddress } from '../_shared/emailSender.ts'
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -47,7 +48,6 @@ Deno.serve(async (req: Request) => {
   const supabaseUrl    = Deno.env.get('SUPABASE_URL')!
   const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
   const resendApiKey   = Deno.env.get('RESEND_API_KEY')!
-  const fromEmail      = Deno.env.get('NOTIFY_FROM_EMAIL') ?? 'notifications@konfigurator.app'
 
   // ── 1. Verify caller is an authenticated admin ──────────────────────────
   const authHeader = req.headers.get('Authorization')
@@ -169,7 +169,7 @@ Deno.serve(async (req: Request) => {
         'Content-Type':  'application/json',
       },
       body: JSON.stringify({
-        from:    fromEmail,
+        from:    await getFromAddress(sb, inq.tenant_id),
         to:      [inq.customer_email],
         subject: `Your quote for ${productName}`,
         html,

@@ -9,13 +9,19 @@ const WIDGET_CDN_URL    = import.meta.env.VITE_WIDGET_CDN_URL    ?? '/widget.js'
 const anonClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
 
 interface Product { id: string; tenant_id: string; name: string; description: string | null }
-interface Tenant  { name: string; plan: string }
+interface Tenant  {
+  name: string
+  plan: string
+  favicon_url:       string | null
+  public_page_title: string | null
+}
 
 export function PublicPreviewPage() {
   const { slug } = useParams<{ slug: string }>()
   const [product, setProduct] = useState<Product | null>(null)
   const [tenant,  setTenant]  = useState<Tenant  | null>(null)
   const [showBranding, setShowBranding] = useState(true)
+  const [whiteLabel,   setWhiteLabel]   = useState(false)
   const [notFound, setNotFound] = useState(false)
   const widgetRef = useRef<HTMLDivElement>(null)
   const scriptMounted = useRef(false)
@@ -35,23 +41,42 @@ export function PublicPreviewPage() {
         setProduct(prod as Product)
 
         const [{ data: ten }, { data: limits }] = await Promise.all([
-          anonClient.from('tenants').select('name, plan').eq('id', prod.tenant_id).single(),
-          anonClient.from('plan_limits').select('remove_branding').eq('plan', 'free').single(),
+          anonClient.from('tenants').select('name, plan, favicon_url, public_page_title').eq('id', prod.tenant_id).single(),
+          anonClient.from('plan_limits').select('remove_branding, white_label').eq('plan', 'free').single(),
         ])
         setTenant(ten as Tenant | null)
 
         if (ten) {
           const { data: lim } = await anonClient
             .from('plan_limits')
-            .select('remove_branding')
+            .select('remove_branding, white_label')
             .eq('plan', (ten as Tenant).plan)
             .single()
-          setShowBranding(!(lim?.remove_branding ?? false))
+          const planLim = lim as { remove_branding: boolean; white_label: boolean } | null
+          setShowBranding(!(planLim?.remove_branding ?? false))
+          setWhiteLabel(planLim?.white_label ?? false)
         } else {
           setShowBranding(!(limits?.remove_branding ?? false))
         }
       })
   }, [slug])
+
+  // White-label customisation: tenant-controlled favicon and tab title.
+  useEffect(() => {
+    if (!tenant || !whiteLabel) return
+    if (tenant.public_page_title) {
+      document.title = tenant.public_page_title
+    }
+    if (tenant.favicon_url) {
+      let link = document.querySelector<HTMLLinkElement>('link[rel="icon"]')
+      if (!link) {
+        link = document.createElement('link')
+        link.rel = 'icon'
+        document.head.appendChild(link)
+      }
+      link.href = tenant.favicon_url
+    }
+  }, [tenant, whiteLabel])
 
   // Inject widget script once product is known
   useEffect(() => {

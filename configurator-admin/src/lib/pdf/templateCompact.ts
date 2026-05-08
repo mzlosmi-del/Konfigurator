@@ -2,7 +2,7 @@ import { PDFDocument, PDFPage, PDFFont, rgb, degrees } from 'pdf-lib'
 import type { QuotationLineItem, QuotationAdjustment, ProductText } from '@/types/database'
 import { calcLineTotal } from '@/lib/quotations'
 import {
-  C, wrapText, PDF_LABELS, loadFonts, loadLogo,
+  C, wrapText, PDF_LABELS, loadFonts, loadLogo, getFooterLabel,
   isSectionVisible, buildOrderedSections,
   type PdfBuildArgs,
 } from './shared'
@@ -71,7 +71,7 @@ export async function renderCompact(args: PdfBuildArgs): Promise<Uint8Array> {
       ? L.validityText(new Date(quotation.valid_until).toLocaleDateString(L.dateLocale, { dateStyle: 'short' }))
       : L.contactText
     text(validStr, MX, fy, 7, fontR, C.muted)
-    rText(L.footer, W - MX, fy, 7, fontR, C.faint)
+    rText(getFooterLabel(tenant, L.footer), W - MX, fy, 7, fontR, C.faint)
   }
 
   const logoImg = await loadLogo(pdfDoc, tenant.logo_url)
