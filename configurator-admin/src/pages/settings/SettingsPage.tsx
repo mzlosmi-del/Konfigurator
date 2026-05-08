@@ -1436,6 +1436,25 @@ export function SettingsPage() {
               </CardHeader>
               {planLimits && (
                 <CardContent className="space-y-3">
+                  {(() => {
+                    const tn          = tenant as { paid_until?: string | null; current_period_end?: string | null; cancel_at_period_end?: boolean } | null
+                    const paidUntil   = tn?.paid_until ?? null
+                    const periodEnd   = tn?.current_period_end ?? null
+                    const willCancel  = tn?.cancel_at_period_end === true
+                    const dateIso     = paidUntil ?? periodEnd
+                    if (!dateIso) return null
+                    const dateLabel   = new Date(dateIso).toLocaleDateString()
+                    const isExpired   = new Date(dateIso).getTime() < Date.now()
+                    const headline    = paidUntil
+                      ? t('Paid until')
+                      : willCancel ? t('Cancels on') : t('Renews on')
+                    return (
+                      <div className={`text-sm ${isExpired ? 'text-destructive' : 'text-muted-foreground'}`}>
+                        <span className="font-medium">{headline}:</span> {dateLabel}
+                        {isExpired && ` — ${t('expired')}`}
+                      </div>
+                    )
+                  })()}
                   <div className="grid grid-cols-2 gap-3 text-sm">
                     <UsageRow label={t('Products')}           used={productCount ?? 0} max={planLimits.products_max} />
                     <UsageRow label={t('Inquiries this month')} used={monthlyUsage?.inquiries_count ?? 0} max={planLimits.inquiries_per_month} />
