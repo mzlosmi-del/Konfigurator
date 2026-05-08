@@ -95,7 +95,11 @@ export async function fetchQuotation(id: string): Promise<Quotation> {
 }
 
 export async function createQuotation(
-  input: Omit<Quotation, 'id' | 'tenant_id' | 'created_at' | 'updated_at'>
+  input: Omit<
+    Quotation,
+    'id' | 'tenant_id' | 'created_at' | 'updated_at'
+    | 'public_token' | 'responded_at' | 'responded_ip' | 'responded_user_agent'
+  >,
 ): Promise<Quotation> {
   const { data, error } = await supabase
     .from('quotations')

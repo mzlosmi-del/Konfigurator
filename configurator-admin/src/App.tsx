@@ -28,6 +28,7 @@ import { TextsPage } from '@/pages/texts/TextsPage'
 import { AnalyticsPage } from '@/pages/analytics/AnalyticsPage'
 import { EmbedDocsPage } from '@/pages/embed-docs/EmbedDocsPage'
 import { PublicPreviewPage } from '@/pages/public/PublicPreviewPage'
+import { PublicQuotationPage } from '@/pages/public/PublicQuotationPage'
 import { AuditLogPage } from '@/pages/admin/AuditLogPage'
 
 export function App() {
@@ -52,6 +53,7 @@ export function App() {
           <Route path="/invite/:token" element={<InvitePage />} />
           <Route path="/preview/:productId" element={<PreviewPage />} />
           <Route path="/p/:slug" element={<PublicPreviewPage />} />
+          <Route path="/q/:token" element={<PublicQuotationPage />} />
 
           {/* Protected routes — require auth */}
           <Route element={<ProtectedRoute />}>

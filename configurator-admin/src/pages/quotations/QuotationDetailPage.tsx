@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams, Link } from 'react-router-dom'
-import { AlertCircle, ArrowLeft, CloudUpload, Download, Pencil, FileText, Trash2 } from 'lucide-react'
+import { AlertCircle, ArrowLeft, CloudUpload, Download, Pencil, FileText, Mail, Trash2 } from 'lucide-react'
 import {
   fetchQuotation, updateQuotation, uploadQuotationPdf,
   fetchRejectionReasons, calcSubtotal, calcTotal, deleteQuotation,
@@ -47,6 +47,7 @@ export function QuotationDetailPage() {
   const [loading,        setLoading]        = useState(true)
   const [updatingStatus, setUpdatingStatus] = useState(false)
   const [generatingPdf,    setGeneratingPdf]    = useState(false)
+  const [sendingEmail,     setSendingEmail]     = useState(false)
   const [pdfMode,          setPdfMode]          = useState<'preview' | 'confirm'>('preview')
   const [layoutOpen,       setLayoutOpen]       = useState(false)
   const [pdfProductTexts,  setPdfProductTexts]  = useState<Record<string, ProductText[]>>({})
@@ -240,6 +241,35 @@ export function QuotationDetailPage() {
     }
   }
 
+  async function handleSendToCustomer() {
+    if (!id || !quotation) return
+    if (!quotation.customer_email) {
+      toast({ title: t('No customer email on this quotation'), variant: 'destructive' })
+      return
+    }
+    if (quotation.status !== 'confirmed_sent') {
+      toast({ title: t('Confirm the quotation first'), variant: 'destructive' })
+      return
+    }
+    setSendingEmail(true)
+    try {
+      const { data, error } = await supabase.functions.invoke('send-quotation-email', {
+        body: { quotation_id: id, lang: 'en' },
+      })
+      if (error) throw error
+      const sentTo = (data as { sent_to?: string } | null)?.sent_to
+      toast({ title: t('Quotation sent'), description: sentTo ? `${t('To')}: ${sentTo}` : undefined })
+    } catch (err) {
+      toast({
+        title:       t('Failed to send'),
+        description: err instanceof Error ? err.message : undefined,
+        variant:     'destructive',
+      })
+    } finally {
+      setSendingEmail(false)
+    }
+  }
+
   if (loading) {
     return (
       <div className="animate-fade-in">
@@ -302,6 +332,18 @@ export function QuotationDetailPage() {
                   <Download className="h-4 w-4 mr-1.5" />
                   {t('Download PDF')}
                 </a>
+              </Button>
+            )}
+            {canEdit && quotation.status === 'confirmed_sent' && quotation.pdf_url && (
+              <Button
+                variant="outline"
+                onClick={handleSendToCustomer}
+                loading={sendingEmail}
+                disabled={!quotation.customer_email}
+                title={!quotation.customer_email ? t('No customer email on this quotation') : undefined}
+              >
+                <Mail className="h-4 w-4 mr-1.5" />
+                {quotation.responded_at ? t('Resend to customer') : t('Send to customer')}
               </Button>
             )}
             {canEdit && quotation.status === 'in_preparation' && (
