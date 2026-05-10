@@ -1,7 +1,106 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { PDFDocument, rgb, StandardFonts } from 'npm:pdf-lib@1.17.1'
-import { loadPlanLimits, assertFeature } from '../_shared/planGate.ts'
-import { getFromAddress } from '../_shared/emailSender.ts'
+
+// ── Inlined plan-gate + email-sender helpers ───────────────────────────────
+// (Originally in supabase/functions/_shared/. Inlined so this function can be
+// pasted directly into the Supabase dashboard without external file deps.)
+
+interface PlanLimits {
+  plan:                string
+  products_max:        number
+  inquiries_per_month: number
+  team_members_max:    number
+  three_d:             boolean
+  quotations:          boolean
+  webhooks:            boolean
+  remove_branding:     boolean
+  white_label:         boolean
+  ai_setup_per_month:  number
+  analytics:           string
+}
+
+interface PlanLimitError {
+  code:       'PLAN_LIMIT_EXCEEDED'
+  dimension:  string
+  current?:   number
+  limit?:     number
+  plan:       string
+  upgrade_to: string
+}
+
+const NEXT_PLAN: Record<string, string> = {
+  free: 'starter', starter: 'growth', growth: 'scale', scale: 'scale',
+}
+
+function makePlanError(
+  dimension: string,
+  plan: string,
+  current?: number,
+  limit?: number,
+): PlanLimitError {
+  return {
+    code: 'PLAN_LIMIT_EXCEEDED',
+    dimension,
+    ...(current !== undefined && { current }),
+    ...(limit   !== undefined && { limit }),
+    plan,
+    upgrade_to: NEXT_PLAN[plan] ?? 'scale',
+  }
+}
+
+async function loadPlanLimits(
+  sb: ReturnType<typeof createClient>,
+  tenantId: string,
+): Promise<PlanLimits | null> {
+  const { data } = await sb
+    .from('tenants')
+    .select('plan, plan_limits!inner(*)')
+    .eq('id', tenantId)
+    .single()
+  if (!data) return null
+  const row = (data as Record<string, unknown>)
+  const limits = (row.plan_limits as PlanLimits[] | PlanLimits | null)
+  if (!limits) return null
+  return Array.isArray(limits) ? limits[0] : limits
+}
+
+function gateForbidden(err: PlanLimitError, cors: Record<string, string> = {}): Response {
+  return new Response(JSON.stringify(err), {
+    status:  403,
+    headers: { ...cors, 'Content-Type': 'application/json' },
+  })
+}
+
+function assertFeature(
+  feature: keyof Pick<PlanLimits, 'three_d' | 'quotations' | 'webhooks' | 'white_label'>,
+  limits: PlanLimits,
+  cors: Record<string, string> = {},
+): Response | null {
+  if (!limits[feature]) {
+    return gateForbidden(makePlanError(feature, limits.plan), cors)
+  }
+  return null
+}
+
+const DEFAULT_FROM = 'notifications@konfigurator.app'
+
+async function getFromAddress(
+  sb: ReturnType<typeof createClient>,
+  tenantId: string,
+): Promise<string> {
+  const fallback = Deno.env.get('NOTIFY_FROM_EMAIL') ?? DEFAULT_FROM
+  const [{ data: tenant }, { data: hasFeature }] = await Promise.all([
+    sb.from('tenants')
+      .select('email_from_address, email_from_verified')
+      .eq('id', tenantId)
+      .maybeSingle(),
+    sb.rpc('tenant_has_feature', { p_tenant_id: tenantId, p_feature: 'white_label' }),
+  ])
+  if (hasFeature !== true) return fallback
+  const t = tenant as { email_from_address: string | null; email_from_verified: boolean } | null
+  if (!t?.email_from_address || !t.email_from_verified) return fallback
+  return t.email_from_address
+}
 
 // ── Types ──────────────────────────────────────────────────────────────────
 

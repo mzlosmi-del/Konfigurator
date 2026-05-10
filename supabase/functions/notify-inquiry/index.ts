@@ -1,5 +1,28 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { getFromAddress } from '../_shared/emailSender.ts'
+
+// ── Inlined email-sender helper ────────────────────────────────────────────
+// (Originally in supabase/functions/_shared/emailSender.ts. Inlined so this
+// function can be pasted directly into the Supabase dashboard.)
+
+const DEFAULT_FROM = 'notifications@konfigurator.app'
+
+async function getFromAddress(
+  sb: ReturnType<typeof createClient>,
+  tenantId: string,
+): Promise<string> {
+  const fallback = Deno.env.get('NOTIFY_FROM_EMAIL') ?? DEFAULT_FROM
+  const [{ data: tenant }, { data: hasFeature }] = await Promise.all([
+    sb.from('tenants')
+      .select('email_from_address, email_from_verified')
+      .eq('id', tenantId)
+      .maybeSingle(),
+    sb.rpc('tenant_has_feature', { p_tenant_id: tenantId, p_feature: 'white_label' }),
+  ])
+  if (hasFeature !== true) return fallback
+  const t = tenant as { email_from_address: string | null; email_from_verified: boolean } | null
+  if (!t?.email_from_address || !t.email_from_verified) return fallback
+  return t.email_from_address
+}
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -127,7 +150,7 @@ Deno.serve(async (req: Request) => {
         'Content-Type':  'application/json',
       },
       body: JSON.stringify({
-        from:    await getFromAddress(supabase, inq.tenant_id),
+        from:    await getFromAddress(sb, inq.tenant_id),
         to:      [toEmail],
         subject: `New inquiry: ${productName} from ${inq.customer_name}`,
         html,
