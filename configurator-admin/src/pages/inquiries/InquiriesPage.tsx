@@ -1,64 +1,181 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Inbox, Circle } from 'lucide-react'
-import { fetchInquiries } from '@/lib/inquiries'
+import { fetchInquiries, timeAgo } from '@/lib/inquiries'
 import type { Inquiry, InquiryStatus } from '@/types/database'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Badge } from '@/components/ui/badge'
-import { Card, CardContent } from '@/components/ui/card'
-import { Spinner } from '@/components/ui/spinner'
+import { Input } from '@/components/ui/input'
+import { Select } from '@/components/ui/select'
 import { useToast } from '@/hooks/useToast'
 import { Toaster } from '@/components/ui/toast'
+import { DataTable, type DataTableColumn } from '@/components/data-table/DataTable'
+import { QuickFilterChips, type QuickFilter } from '@/components/data-table/QuickFilterChips'
+import type { TableLayout } from '@/lib/uiPreferences'
 import { t } from '@/i18n'
 
-type FilterStatus = InquiryStatus | 'all'
-
-const FILTERS: { label: string; value: FilterStatus }[] = [
-  { label: 'All', value: 'all' },
-  { label: 'New', value: 'new' },
-  { label: 'Read', value: 'read' },
-  { label: 'Replied', value: 'replied' },
-  { label: 'Closed', value: 'closed' },
-]
+type InquiryRow = Inquiry & { product: { name: string } | null }
+type StatusFilter = InquiryStatus | 'all'
 
 const statusVariant: Record<InquiryStatus, 'destructive' | 'warning' | 'success' | 'secondary'> = {
-  new: 'destructive',
-  read: 'warning',
+  new:     'destructive',
+  read:    'warning',
   replied: 'success',
-  closed: 'secondary',
+  closed:  'secondary',
 }
 
-function timeAgo(dateStr: string): string {
-  const diff = Date.now() - new Date(dateStr).getTime()
-  const mins = Math.floor(diff / 60000)
-  if (mins < 1) return t('just now')
-  if (mins < 60) return `${mins}${t('m ago')}`
-  const hours = Math.floor(mins / 60)
-  if (hours < 24) return `${hours}${t('h ago')}`
-  const days = Math.floor(hours / 24)
-  if (days < 30) return `${days}${t('d ago')}`
-  return new Date(dateStr).toLocaleDateString()
+const QUICK_FILTERS: QuickFilter[] = [
+  { id: 'unread',  label: 'Unread' },
+  { id: 'today',   label: 'Today' },
+  { id: 'last7',   label: 'Last 7 days' },
+  { id: 'priced',  label: 'Has price' },
+]
+
+const DEFAULT_LAYOUT: TableLayout = {
+  columns: [
+    { id: 'dot',             visible: true  },
+    { id: 'customer_name',   visible: true  },
+    { id: 'customer_email',  visible: false },
+    { id: 'product',         visible: true  },
+    { id: 'total_price',     visible: true  },
+    { id: 'currency',        visible: false },
+    { id: 'config_count',    visible: false },
+    { id: 'message_preview', visible: false },
+    { id: 'status',          visible: true  },
+    { id: 'created_at',      visible: true  },
+    { id: 'created_at_abs',  visible: false },
+  ],
+  sortBy:  'created_at',
+  sortDir: 'desc',
 }
 
 export function InquiriesPage() {
   const navigate = useNavigate()
   const { toasts, toast, dismiss } = useToast()
-  const [inquiries, setInquiries] = useState<(Inquiry & { product: { name: string } | null })[]>([])
-  const [loading, setLoading] = useState(true)
-  const [filter, setFilter] = useState<FilterStatus>('all')
 
-  useEffect(() => { load(filter) }, [filter])
+  const [inquiries, setInquiries]     = useState<InquiryRow[]>([])
+  const [loading, setLoading]         = useState(true)
+  const [status, setStatus]           = useState<StatusFilter>('all')
+  const [search, setSearch]           = useState('')
+  const [quick, setQuick]             = useState<string[]>([])
 
-  async function load(status: FilterStatus) {
+  useEffect(() => { load() }, [])
+
+  async function load() {
     setLoading(true)
     try {
-      setInquiries(await fetchInquiries(status) as any)
+      setInquiries(await fetchInquiries() as unknown as InquiryRow[])
     } catch {
       toast({ title: t('Failed to load inquiries'), variant: 'destructive' })
     } finally {
       setLoading(false)
     }
   }
+
+  function toggleQuick(id: string) {
+    setQuick(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
+  }
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    const startOfDay = new Date(); startOfDay.setHours(0, 0, 0, 0)
+    const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000
+    return inquiries.filter(row => {
+      if (status !== 'all' && row.status !== status) return false
+      if (q) {
+        const hay = `${row.customer_name} ${row.customer_email} ${row.product?.name ?? ''}`.toLowerCase()
+        if (!hay.includes(q)) return false
+      }
+      if (quick.includes('unread') && row.status !== 'new') return false
+      if (quick.includes('today')  && new Date(row.created_at).getTime() < startOfDay.getTime()) return false
+      if (quick.includes('last7')  && new Date(row.created_at).getTime() < sevenDaysAgo) return false
+      if (quick.includes('priced') && row.total_price == null) return false
+      return true
+    })
+  }, [inquiries, status, search, quick])
+
+  const columns: DataTableColumn<InquiryRow>[] = [
+    {
+      id: 'dot', label: '', width: '32px',
+      render: row => row.status === 'new'
+        ? <Circle className="h-2 w-2 fill-destructive text-destructive" />
+        : null,
+    },
+    {
+      id: 'customer_name', label: t('Customer'), sortable: true,
+      sortValue: r => r.customer_name,
+      render: row => (
+        <div>
+          <p className={`font-medium ${row.status === 'new' ? '' : 'font-normal'}`}>{row.customer_name}</p>
+          <p className="text-xs text-muted-foreground">{row.customer_email}</p>
+        </div>
+      ),
+    },
+    {
+      id: 'customer_email', label: t('Email'), sortable: true,
+      sortValue: r => r.customer_email,
+      render: row => <span className="text-muted-foreground">{row.customer_email}</span>,
+    },
+    {
+      id: 'product', label: t('Product'), sortable: true,
+      sortValue: r => r.product?.name ?? '',
+      render: row => <span className="text-muted-foreground">{row.product?.name ?? '—'}</span>,
+    },
+    {
+      id: 'total_price', label: t('Total'), align: 'right', sortable: true,
+      sortValue: r => r.total_price ?? null,
+      render: row => row.total_price != null
+        ? <span className="tabular-nums">{row.total_price.toFixed(2)} {row.currency}</span>
+        : <span className="text-muted-foreground">—</span>,
+    },
+    {
+      id: 'currency', label: t('Currency'), sortable: true,
+      sortValue: r => r.currency,
+      render: row => <span className="text-xs text-muted-foreground">{row.currency}</span>,
+    },
+    {
+      id: 'config_count', label: t('Options'), align: 'right', sortable: true,
+      sortValue: r => Array.isArray(r.configuration) ? (r.configuration as unknown[]).length : 0,
+      render: row => (
+        <span className="text-muted-foreground tabular-nums">
+          {Array.isArray(row.configuration) ? (row.configuration as unknown[]).length : 0}
+        </span>
+      ),
+    },
+    {
+      id: 'message_preview', label: t('Message'),
+      render: row => (
+        <span className="text-muted-foreground text-xs truncate inline-block max-w-[16rem]">
+          {row.message?.slice(0, 80) ?? '—'}
+        </span>
+      ),
+    },
+    {
+      id: 'status', label: t('Status'), sortable: true,
+      sortValue: r => r.status,
+      render: row => (
+        <Badge variant={statusVariant[row.status]} className="capitalize">
+          {t(row.status)}
+        </Badge>
+      ),
+    },
+    {
+      id: 'created_at', label: t('Received'), align: 'right', sortable: true,
+      sortValue: r => r.created_at,
+      render: row => (
+        <span className="text-right text-muted-foreground text-xs">{timeAgo(row.created_at)}</span>
+      ),
+    },
+    {
+      id: 'created_at_abs', label: t('Date'), align: 'right', sortable: true,
+      sortValue: r => r.created_at,
+      render: row => (
+        <span className="text-right text-muted-foreground text-xs">
+          {new Date(row.created_at).toLocaleDateString()}
+        </span>
+      ),
+    },
+  ]
 
   return (
     <div className="animate-fade-in">
@@ -67,96 +184,41 @@ export function InquiriesPage() {
         description={t('Quote requests submitted by your customers.')}
       />
 
-      {/* Filter tabs */}
-      <div className="px-4 pt-4 sm:px-6">
-        <div className="flex gap-1 border-b">
-          {FILTERS.map(f => (
-            <button
-              key={f.value}
-              onClick={() => setFilter(f.value)}
-              className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
-                filter === f.value
-                  ? 'border-primary text-foreground'
-                  : 'border-transparent text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              {t(f.label)}
-            </button>
-          ))}
-        </div>
-      </div>
-
       <div className="p-4 md:p-6">
-        {loading ? (
-          <div className="flex justify-center py-16"><Spinner /></div>
-        ) : inquiries.length === 0 ? (
-          <Card>
-            <CardContent className="flex flex-col items-center justify-center py-16 text-center">
-              <Inbox className="h-10 w-10 text-muted-foreground/40 mb-3" />
-              <p className="font-medium text-sm">{t('No inquiries yet')}</p>
-              <p className="text-sm text-muted-foreground mt-1">
-                {filter === 'all'
-                  ? t('When customers submit quote requests, they will appear here.')
-                  : t(`No ${filter} inquiries.`)}
-              </p>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="rounded-lg border bg-card overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b bg-muted/40">
-                    <th className="px-4 py-3 text-left font-medium text-muted-foreground w-6" />
-                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">{t('Customer')}</th>
-                    <th className="px-4 py-3 text-left font-medium text-muted-foreground hidden sm:table-cell">{t('Product')}</th>
-                    <th className="px-4 py-3 text-right font-medium text-muted-foreground hidden sm:table-cell">{t('Total')}</th>
-                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">{t('Status')}</th>
-                    <th className="px-4 py-3 text-right font-medium text-muted-foreground hidden sm:table-cell">{t('Received')}</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {inquiries.map(inq => (
-                    <tr
-                      key={inq.id}
-                      className="hover:bg-muted/20 transition-colors cursor-pointer"
-                      onClick={() => navigate(`/inquiries/${inq.id}`)}
-                    >
-                      {/* Unread dot */}
-                      <td className="px-4 py-3">
-                        {inq.status === 'new' && (
-                          <Circle className="h-2 w-2 fill-destructive text-destructive" />
-                        )}
-                      </td>
-                      <td className="px-4 py-3">
-                        <p className={`font-medium ${inq.status === 'new' ? '' : 'font-normal'}`}>
-                          {inq.customer_name}
-                        </p>
-                        <p className="text-xs text-muted-foreground">{inq.customer_email}</p>
-                      </td>
-                      <td className="px-4 py-3 text-muted-foreground hidden sm:table-cell">
-                        {inq.product?.name ?? '—'}
-                      </td>
-                      <td className="px-4 py-3 text-right tabular-nums hidden sm:table-cell">
-                        {inq.total_price != null
-                          ? `${inq.total_price.toFixed(2)} ${inq.currency}`
-                          : '—'}
-                      </td>
-                      <td className="px-4 py-3">
-                        <Badge variant={statusVariant[inq.status]} className="capitalize">
-                          {t(inq.status)}
-                        </Badge>
-                      </td>
-                      <td className="px-4 py-3 text-right text-muted-foreground text-xs hidden sm:table-cell">
-                        {timeAgo(inq.created_at)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
+        <DataTable<InquiryRow>
+          tableKey="inquiries"
+          rows={filtered}
+          columns={columns}
+          defaultLayout={DEFAULT_LAYOUT}
+          loading={loading}
+          emptyIcon={Inbox}
+          emptyTitle={t('No inquiries match the current filters.')}
+          emptyHint={t('When customers submit quote requests, they will appear here.')}
+          rowKey={row => row.id}
+          onRowOpen={row => navigate(`/inquiries/${row.id}`)}
+          toolbarStart={
+            <>
+              <Input
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                placeholder={t('Search customer, email or product…')}
+                className="w-64"
+              />
+              <Select
+                value={status}
+                onChange={e => setStatus(e.target.value as StatusFilter)}
+                className="w-36"
+              >
+                <option value="all">{t('All statuses')}</option>
+                <option value="new">{t('New')}</option>
+                <option value="read">{t('Read')}</option>
+                <option value="replied">{t('Replied')}</option>
+                <option value="closed">{t('Closed')}</option>
+              </Select>
+              <QuickFilterChips filters={QUICK_FILTERS} active={quick} onToggle={toggleQuick} />
+            </>
+          }
+        />
       </div>
 
       <Toaster toasts={toasts} onDismiss={dismiss} />
