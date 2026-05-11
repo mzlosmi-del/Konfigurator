@@ -183,7 +183,7 @@ export function PublicQuotationPage() {
       const tenant = (tenantRow as Tenant | null) ?? null
       const q      = quotation as Quotation
       const expired = !!q.valid_until && new Date(q.valid_until) < new Date()
-      const respondedTerminal = q.status !== 'confirmed_sent' && (
+      const respondedTerminal = q.status !== 'sent' && q.status !== 'confirmed' && (
         ACCEPT_STATUSES.has(q.status) || q.status === 'rejected' || q.status === 'expired'
       )
 
@@ -191,7 +191,7 @@ export function PublicQuotationPage() {
         setView({ kind: 'responded', quotation: q, tenant })
       } else if (expired) {
         setView({ kind: 'expired', quotation: q, tenant })
-      } else if (q.status === 'confirmed_sent') {
+      } else if (q.status === 'sent') {
         setView({ kind: 'active', quotation: q, tenant })
         if (initialAction === 'accept' || initialAction === 'reject') {
           setConfirmAction(initialAction)

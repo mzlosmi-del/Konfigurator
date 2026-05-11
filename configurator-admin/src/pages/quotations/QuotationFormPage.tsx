@@ -391,7 +391,7 @@ export function QuotationFormPage() {
     return true
   }
 
-  async function doSave(status: 'in_preparation' | 'confirmed_sent' = 'in_preparation'): Promise<string | null> {
+  async function doSave(status: 'in_preparation' | 'confirmed' = 'in_preparation'): Promise<string | null> {
     if (!validate()) return null
     setSaving(true)
     try {

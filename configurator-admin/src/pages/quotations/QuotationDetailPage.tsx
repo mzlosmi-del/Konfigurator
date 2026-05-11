@@ -12,6 +12,7 @@ import { supabase } from '@/lib/supabase'
 import type { Quotation, QuotationStatus, QuotationLineItem, QuotationAdjustment, QuotationRejectionReason, ProductText } from '@/types/database'
 import { PdfLayoutDialog, type PdfSection, type ProductTextGroup } from './PdfLayoutDialog'
 import { SendEmailDialog } from './SendEmailDialog'
+import { AttachmentsPanel } from '@/components/quotations/AttachmentsPanel'
 import { STATUS_LABELS, statusVariant, STATUS_TRANSITIONS } from './quotationStatusConfig'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Button } from '@/components/ui/button'
@@ -223,13 +224,13 @@ export function QuotationDetailPage() {
         // Confirm path: upload PDF AND flip status atomically. From here the
         // quotation is locked — the saved PDF is the only one that can be reprinted.
         const url     = await uploadQuotationPdf(id, quotation.tenant_id, bytes)
-        const updated = await updateQuotation(id, { pdf_url: url, status: 'confirmed_sent', lang })
+        const updated = await updateQuotation(id, { pdf_url: url, status: 'confirmed', lang })
         logChange({
           entityType: 'quotation',
           entityId:   updated.id,
           entityName: updated.reference_number,
           changeType: 'update',
-          diff: { [t('Status')]: { old: quotation.status, new: 'confirmed_sent' } },
+          diff: { [t('Status')]: { old: quotation.status, new: 'confirmed' } },
           changedByName: userName,
         })
         setQuotation(updated)
@@ -248,7 +249,7 @@ export function QuotationDetailPage() {
       toast({ title: t('No customer email on this quotation'), variant: 'destructive' })
       return
     }
-    if (quotation.status !== 'confirmed_sent') {
+    if (quotation.status !== 'confirmed' && quotation.status !== 'sent') {
       toast({ title: t('Confirm the quotation first'), variant: 'destructive' })
       return
     }
@@ -319,7 +320,7 @@ export function QuotationDetailPage() {
                 </a>
               </Button>
             )}
-            {canEdit && quotation.status === 'confirmed_sent' && quotation.pdf_url && (
+            {canEdit && (quotation.status === 'confirmed' || quotation.status === 'sent') && quotation.pdf_url && (
               <Button
                 variant="outline"
                 onClick={handleSendToCustomer}
@@ -327,7 +328,7 @@ export function QuotationDetailPage() {
                 title={!quotation.customer_email ? t('No customer email on this quotation') : undefined}
               >
                 <Mail className="h-4 w-4 mr-1.5" />
-                {quotation.responded_at ? t('Resend to customer') : t('Send to customer')}
+                {quotation.status === 'sent' ? t('Resend to customer') : t('Send to customer')}
               </Button>
             )}
             {canEdit && quotation.status === 'in_preparation' && (
@@ -447,6 +448,17 @@ export function QuotationDetailPage() {
             )}
           </CardContent>
         </Card>
+
+        {/* ── Attachments (extra files bundled into the customer email) ─── */}
+        <AttachmentsPanel
+          quotationId={quotation.id}
+          tenantId={quotation.tenant_id}
+          referenceNumber={quotation.reference_number}
+          canEdit={canEdit && quotation.status !== 'accepted_no_changes'
+            && quotation.status !== 'accepted_with_changes'
+            && quotation.status !== 'rejected'
+            && quotation.status !== 'expired'}
+        />
 
         {/* ── Line items ─────────────────────────────────────────────────── */}
         <Card>
@@ -642,6 +654,9 @@ export function QuotationDetailPage() {
           onSent={sentTo => {
             setShowSendDialog(false)
             toast({ title: t('Quotation sent'), description: sentTo ? `${t('To')}: ${sentTo}` : undefined })
+            // Edge function flips status to 'sent' after a successful Resend
+            // call; refresh so the badge and button label update immediately.
+            if (id) fetchQuotation(id).then(setQuotation).catch(() => {})
           }}
           onError={msg => toast({ title: t('Failed to send'), description: msg, variant: 'destructive' })}
           quotationId={quotation.id}

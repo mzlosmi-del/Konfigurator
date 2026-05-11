@@ -80,12 +80,12 @@ export function QuotationsReportPage() {
         if (!hay.includes(q)) return false
       }
       if (quick.includes('draft')    && r.status !== 'in_preparation') return false
-      if (quick.includes('awaiting') && !(r.status === 'confirmed_sent' && !r.responded_at)) return false
+      if (quick.includes('awaiting') && !(r.status === 'sent' && !r.responded_at)) return false
       if (quick.includes('won')      && !(r.status === 'accepted_no_changes' || r.status === 'accepted_with_changes')) return false
       if (quick.includes('expiring')) {
         if (!r.valid_until) return false
         const vu = new Date(r.valid_until).getTime()
-        if (vu < Date.now() || vu > in7d || r.status !== 'confirmed_sent') return false
+        if (vu < Date.now() || vu > in7d || (r.status !== 'confirmed' && r.status !== 'sent')) return false
       }
       if (quick.includes('this_mo')  && new Date(r.created_at).getTime() < startOfMonth.getTime()) return false
       return true

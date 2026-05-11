@@ -12,7 +12,8 @@ export type RuleType = 'hide_value' | 'disable_value' | 'price_override' | 'set_
 export type InquiryStatus = 'new' | 'read' | 'replied' | 'closed'
 export type QuotationStatus =
   | 'in_preparation'
-  | 'confirmed_sent'
+  | 'confirmed'
+  | 'sent'
   | 'accepted_no_changes'
   | 'accepted_with_changes'
   | 'rejected'
@@ -322,6 +323,20 @@ export interface Database {
         Insert: Omit<Database['public']['Tables']['pricing_formulas']['Row'], 'id' | 'created_at' | 'updated_at'> & { id?: string }
         Update: Partial<Database['public']['Tables']['pricing_formulas']['Insert']>
       }
+      quotation_attachments: {
+        Row: {
+          id:           string
+          tenant_id:    string
+          quotation_id: string
+          storage_path: string
+          filename:     string
+          mime_type:    string
+          size_bytes:   number
+          created_at:   string
+        }
+        Insert: Omit<Database['public']['Tables']['quotation_attachments']['Row'], 'id' | 'created_at'> & { id?: string }
+        Update: Partial<Database['public']['Tables']['quotation_attachments']['Insert']>
+      }
       quotation_rejection_reasons: {
         Row: {
           id:         string
@@ -540,6 +555,7 @@ export type Quotation                  = Database['public']['Tables']['quotation
 export type ProductText                = Database['public']['Tables']['product_texts']['Row']
 export type ProductTextType            = 'product' | 'specification' | 'note' | 'terms'
 export type QuotationRejectionReason   = Database['public']['Tables']['quotation_rejection_reasons']['Row']
+export type QuotationAttachment        = Database['public']['Tables']['quotation_attachments']['Row']
 export type RolePermission             = Database['public']['Tables']['role_permissions']['Row']
 export type PermLevel                  = 'none' | 'view' | 'edit'
 export type AuditLog                   = Database['public']['Tables']['audit_log']['Row']

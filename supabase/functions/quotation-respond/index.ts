@@ -4,10 +4,9 @@
 // click on /q/:token. Body: { token: string, action: 'accept' | 'reject' }.
 //
 // Validates the token, the quotation's current status (must be
-// confirmed_sent), and its valid_until window. Then atomically flips the
-// status to accepted_no_changes / rejected — the WHERE status =
-// 'confirmed_sent' guard makes the update idempotent against duplicate
-// clicks.
+// 'sent'), and its valid_until window. Then atomically flips the
+// status to accepted_no_changes / rejected — the WHERE status = 'sent'
+// guard makes the update idempotent against duplicate clicks.
 //
 // Self-contained — no _shared/ imports — so it bundles cleanly when
 // deployed via the Supabase dashboard editor.
@@ -62,7 +61,7 @@ Deno.serve(async (req: Request) => {
       valid_until: quotation.valid_until,
     }, 410)
   }
-  if (quotation.status !== 'confirmed_sent') {
+  if (quotation.status !== 'sent') {
     return json({
       error:        'Already responded',
       status:       quotation.status,
@@ -87,7 +86,7 @@ Deno.serve(async (req: Request) => {
       responded_user_agent: ua,
     } as never)
     .eq('id', quotation.id)
-    .eq('status', 'confirmed_sent')   // race guard
+    .eq('status', 'sent')   // race guard
     .select('id, status, responded_at')
     .single()
 
@@ -114,7 +113,7 @@ Deno.serve(async (req: Request) => {
     change_type:     'update',
     changed_by:      null,
     changed_by_name: `${quotation.customer_name} (customer)`,
-    diff:            { Status: { old: 'confirmed_sent', new: newStatus } },
+    diff:            { Status: { old: 'sent', new: newStatus } },
   } as never)
 
   return json({
