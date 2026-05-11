@@ -110,10 +110,11 @@ export interface Database {
           tenant_id: string
           role: 'admin' | 'member' | 'viewer'
           email: string | null
+          ui_preferences: Json
           created_at: string
           updated_at: string
         }
-        Insert: Omit<Database['public']['Tables']['profiles']['Row'], 'created_at' | 'updated_at'>
+        Insert: Omit<Database['public']['Tables']['profiles']['Row'], 'created_at' | 'updated_at' | 'ui_preferences'> & { ui_preferences?: Json }
         Update: Partial<Database['public']['Tables']['profiles']['Insert']>
       }
       role_permissions: {
