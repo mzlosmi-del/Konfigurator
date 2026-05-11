@@ -263,7 +263,9 @@ export async function renderClassic(args: PdfBuildArgs): Promise<Uint8Array> {
     text(L.uom,        C_UOM,  hbY, 8, fontB, C.white)
     rText(L.unitPrice, C_UPR,  hbY, 8, fontB, C.white)
     rText(L.total,     C_TR,   hbY, 8, fontB, C.white)
-    y -= HDR_H_ROW + 6
+    // Leave breathing room between the filled header bar and the first
+    // item's product name (size 10 text extends ~10pt above its baseline).
+    y -= HDR_H_ROW + 16
 
     for (let i = 0; i < items.length; i++) {
       const item         = items[i]
