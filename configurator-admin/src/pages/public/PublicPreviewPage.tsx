@@ -6,7 +6,17 @@ const SUPABASE_URL      = import.meta.env.VITE_SUPABASE_URL      ?? ''
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY ?? ''
 const WIDGET_CDN_URL    = import.meta.env.VITE_WIDGET_CDN_URL    ?? '/widget.js'
 
-const anonClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+// Anon client for the public /p/:slug route. Distinct storageKey + no
+// session persistence so the GoTrueClient doesn't clash with the admin
+// app's main client when both modules end up in the same bundle.
+const anonClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: {
+    persistSession:     false,
+    autoRefreshToken:   false,
+    detectSessionInUrl: false,
+    storageKey:         'sb-anon-public-preview',
+  },
+})
 
 interface Product { id: string; tenant_id: string; name: string; description: string | null }
 interface Tenant  {
