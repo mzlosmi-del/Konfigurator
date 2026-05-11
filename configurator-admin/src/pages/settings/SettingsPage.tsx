@@ -1062,11 +1062,21 @@ export function SettingsPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <label className="text-xs text-muted-foreground">{t('English')}</label>
-                  <Textarea rows={3} value={emailIntroEn} onChange={e => setEmailIntroEn(e.target.value)} />
+                  <Textarea
+                    rows={3}
+                    value={emailIntroEn}
+                    onChange={e => setEmailIntroEn(e.target.value)}
+                    placeholder={t("e.g. We're delighted to share this quote. Please don't hesitate to reach out with any questions.")}
+                  />
                 </div>
                 <div className="space-y-1">
                   <label className="text-xs text-muted-foreground">{t('Serbian')}</label>
-                  <Textarea rows={3} value={emailIntroSr} onChange={e => setEmailIntroSr(e.target.value)} />
+                  <Textarea
+                    rows={3}
+                    value={emailIntroSr}
+                    onChange={e => setEmailIntroSr(e.target.value)}
+                    placeholder={t("npr. Sa zadovoljstvom vam šaljemo ovu ponudu. Slobodno nas kontaktirajte za sva pitanja.")}
+                  />
                 </div>
               </div>
             </div>
@@ -1081,11 +1091,21 @@ export function SettingsPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <label className="text-xs text-muted-foreground">{t('English')}</label>
-                  <Textarea rows={3} value={acceptMsgEn} onChange={e => setAcceptMsgEn(e.target.value)} />
+                  <Textarea
+                    rows={3}
+                    value={acceptMsgEn}
+                    onChange={e => setAcceptMsgEn(e.target.value)}
+                    placeholder={t("e.g. Thank you! We've received your acceptance and will follow up within 1 business day.")}
+                  />
                 </div>
                 <div className="space-y-1">
                   <label className="text-xs text-muted-foreground">{t('Serbian')}</label>
-                  <Textarea rows={3} value={acceptMsgSr} onChange={e => setAcceptMsgSr(e.target.value)} />
+                  <Textarea
+                    rows={3}
+                    value={acceptMsgSr}
+                    onChange={e => setAcceptMsgSr(e.target.value)}
+                    placeholder={t("npr. Hvala! Primili smo vaše prihvatanje i javićemo vam se u roku od 1 radnog dana.")}
+                  />
                 </div>
               </div>
             </div>
@@ -1100,11 +1120,21 @@ export function SettingsPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <label className="text-xs text-muted-foreground">{t('English')}</label>
-                  <Textarea rows={3} value={rejectMsgEn} onChange={e => setRejectMsgEn(e.target.value)} />
+                  <Textarea
+                    rows={3}
+                    value={rejectMsgEn}
+                    onChange={e => setRejectMsgEn(e.target.value)}
+                    placeholder={t("e.g. Thank you for letting us know. We'd appreciate any feedback to help us improve.")}
+                  />
                 </div>
                 <div className="space-y-1">
                   <label className="text-xs text-muted-foreground">{t('Serbian')}</label>
-                  <Textarea rows={3} value={rejectMsgSr} onChange={e => setRejectMsgSr(e.target.value)} />
+                  <Textarea
+                    rows={3}
+                    value={rejectMsgSr}
+                    onChange={e => setRejectMsgSr(e.target.value)}
+                    placeholder={t("npr. Hvala što ste nas obavestili. Bili bismo zahvalni za povratnu informaciju kako bismo se poboljšali.")}
+                  />
                 </div>
               </div>
             </div>
