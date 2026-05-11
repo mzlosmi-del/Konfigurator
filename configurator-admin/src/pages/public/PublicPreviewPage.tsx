@@ -18,7 +18,7 @@ const anonClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   },
 })
 
-interface Product { id: string; tenant_id: string; name: string; description: string | null }
+interface Product { id: string; tenant_id: string; name: string; description: string | null; widget_theme: string | null }
 interface Tenant  {
   name: string
   plan: string
@@ -41,7 +41,7 @@ export function PublicPreviewPage() {
 
     anonClient
       .from('products')
-      .select('id, tenant_id, name, description')
+      .select('id, tenant_id, name, description, widget_theme')
       .eq('public_slug', slug)
       .eq('status', 'published')
       .eq('public_preview_enabled', true)
@@ -129,6 +129,10 @@ export function PublicPreviewPage() {
           data-supabase-anon-key={SUPABASE_ANON_KEY}
           data-product-id={product.id}
           data-tenant-id={product.tenant_id}
+          // Carry the product's chosen widget theme so the public link
+          // matches the experience the operator configured on the
+          // product's Embed panel.
+          {...(product.widget_theme ? { 'data-style': product.widget_theme } : {})}
         />
 
         {showBranding && (

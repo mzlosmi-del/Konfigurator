@@ -218,6 +218,11 @@ export function Widget({ config, track, onThemeLoad }: Props) {
             </a>
           </div>
         )}
+        {state.data.removeBranding && (
+          <div class="cw-branding cw-branding--lang-only">
+            <LangSwitcher />
+          </div>
+        )}
       </div>
     )
   }
@@ -345,6 +350,11 @@ export function Widget({ config, track, onThemeLoad }: Props) {
           <a href="https://konfigurator.app" target="_blank" rel="noopener">
             {t('Powered by Konfigurator')}
           </a>
+        </div>
+      )}
+      {removeBranding && (
+        <div class="cw-branding cw-branding--lang-only">
+          <LangSwitcher />
         </div>
       )}
     </div>
