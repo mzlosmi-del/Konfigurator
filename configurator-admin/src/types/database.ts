@@ -95,6 +95,9 @@ export interface Database {
           paid_until:          string | null
           current_period_end:  string | null
           cancel_at_period_end: boolean
+          quotation_email_intro_i18n:    Json
+          quotation_accept_message_i18n: Json
+          quotation_reject_message_i18n: Json
           created_at: string
           updated_at: string
         }
@@ -420,18 +423,20 @@ export interface Database {
           responded_at:        string | null
           responded_ip:        string | null
           responded_user_agent: string | null
+          lang:                'en' | 'sr'
           created_at: string
           updated_at: string
         }
         Insert: Omit<
           Database['public']['Tables']['quotations']['Row'],
-          'id' | 'created_at' | 'updated_at' | 'public_token' | 'responded_at' | 'responded_ip' | 'responded_user_agent'
+          'id' | 'created_at' | 'updated_at' | 'public_token' | 'responded_at' | 'responded_ip' | 'responded_user_agent' | 'lang'
         > & {
           id?:                   string
           public_token?:         string | null
           responded_at?:         string | null
           responded_ip?:         string | null
           responded_user_agent?: string | null
+          lang?:                 'en' | 'sr'
         }
         Update: Partial<Database['public']['Tables']['quotations']['Insert']>
       }

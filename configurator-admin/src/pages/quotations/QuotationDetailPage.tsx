@@ -222,7 +222,7 @@ export function QuotationDetailPage() {
         // Confirm path: upload PDF AND flip status atomically. From here the
         // quotation is locked — the saved PDF is the only one that can be reprinted.
         const url     = await uploadQuotationPdf(id, quotation.tenant_id, bytes)
-        const updated = await updateQuotation(id, { pdf_url: url, status: 'confirmed_sent' })
+        const updated = await updateQuotation(id, { pdf_url: url, status: 'confirmed_sent', lang })
         logChange({
           entityType: 'quotation',
           entityId:   updated.id,
@@ -254,7 +254,7 @@ export function QuotationDetailPage() {
     setSendingEmail(true)
     try {
       const { data, error } = await supabase.functions.invoke('send-quotation-email', {
-        body: { quotation_id: id, lang: 'en' },
+        body: { quotation_id: id },
       })
       if (error) throw error
       const sentTo = (data as { sent_to?: string } | null)?.sent_to

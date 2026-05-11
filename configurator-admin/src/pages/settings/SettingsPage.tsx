@@ -112,6 +112,20 @@ export function SettingsPage() {
   const [faviconUrl,       setFaviconUrl]       = useState(tenant?.favicon_url ?? '')
   const [publicPageTitle,  setPublicPageTitle]  = useState(tenant?.public_page_title ?? '')
   const [savingPublicBrand, setSavingPublicBrand] = useState(false)
+
+  // Quotation messages (per-language). Backing stores are JSONB maps keyed by 'en' | 'sr'.
+  const readI18nString = (m: unknown, l: 'en' | 'sr'): string => {
+    if (!m || typeof m !== 'object') return ''
+    const v = (m as Record<string, unknown>)[l]
+    return typeof v === 'string' ? v : ''
+  }
+  const [emailIntroEn,    setEmailIntroEn]    = useState(readI18nString(tenant?.quotation_email_intro_i18n,    'en'))
+  const [emailIntroSr,    setEmailIntroSr]    = useState(readI18nString(tenant?.quotation_email_intro_i18n,    'sr'))
+  const [acceptMsgEn,     setAcceptMsgEn]     = useState(readI18nString(tenant?.quotation_accept_message_i18n, 'en'))
+  const [acceptMsgSr,     setAcceptMsgSr]     = useState(readI18nString(tenant?.quotation_accept_message_i18n, 'sr'))
+  const [rejectMsgEn,     setRejectMsgEn]     = useState(readI18nString(tenant?.quotation_reject_message_i18n, 'en'))
+  const [rejectMsgSr,     setRejectMsgSr]     = useState(readI18nString(tenant?.quotation_reject_message_i18n, 'sr'))
+  const [savingQuotationMsgs, setSavingQuotationMsgs] = useState(false)
   const [emailFromAddress, setEmailFromAddress] = useState(tenant?.email_from_address ?? '')
   const [emailFromVerified, setEmailFromVerified] = useState(tenant?.email_from_verified ?? false)
   const [emailDomain, setEmailDomain] = useState(
@@ -293,6 +307,42 @@ export function SettingsPage() {
       })
     } finally {
       setSavingPublicBrand(false)
+    }
+  }
+
+  async function handleSaveQuotationMessages() {
+    if (!tenant) return
+    const trimOrNull = (s: string) => {
+      const t = s.trim()
+      return t.length > 0 ? t : null
+    }
+    const intro  = { en: trimOrNull(emailIntroEn), sr: trimOrNull(emailIntroSr) }
+    const accept = { en: trimOrNull(acceptMsgEn),  sr: trimOrNull(acceptMsgSr)  }
+    const reject = { en: trimOrNull(rejectMsgEn),  sr: trimOrNull(rejectMsgSr)  }
+    // Strip null keys so the JSONB stays compact ({} when nothing is set).
+    const compact = (o: Record<string, string | null>) =>
+      Object.fromEntries(Object.entries(o).filter(([, v]) => v !== null))
+
+    setSavingQuotationMsgs(true)
+    try {
+      const { error } = await supabase
+        .from('tenants')
+        .update({
+          quotation_email_intro_i18n:    compact(intro),
+          quotation_accept_message_i18n: compact(accept),
+          quotation_reject_message_i18n: compact(reject),
+        } as unknown as never)
+        .eq('id', tenant.id)
+      if (error) throw error
+      toast({ title: t('Quotation messages saved') })
+    } catch (e) {
+      toast({
+        title: t('Failed to save'),
+        description: e instanceof Error ? e.message : undefined,
+        variant: 'destructive',
+      })
+    } finally {
+      setSavingQuotationMsgs(false)
     }
   }
 
@@ -989,6 +1039,107 @@ export function SettingsPage() {
               />
             </FormField>
             <Button size="sm" onClick={handleSaveNotifyEmail} loading={saving}>
+              {t('Save')}
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">{t('Quotation messages')}</CardTitle>
+            <CardDescription>
+              {t('Custom email intro and after-response messages, per language. Leave blank to use the default copy. The customer sees these in the language the quotation was generated in.')}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            <div className="space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                {t('Email intro')}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {t('Inserted into the quotation email body, after the greeting.')}
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs text-muted-foreground">{t('English')}</label>
+                  <Textarea
+                    rows={3}
+                    value={emailIntroEn}
+                    onChange={e => setEmailIntroEn(e.target.value)}
+                    placeholder={t("e.g. We're delighted to share this quote. Please don't hesitate to reach out with any questions.")}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs text-muted-foreground">{t('Serbian')}</label>
+                  <Textarea
+                    rows={3}
+                    value={emailIntroSr}
+                    onChange={e => setEmailIntroSr(e.target.value)}
+                    placeholder={t("npr. Sa zadovoljstvom vam šaljemo ovu ponudu. Slobodno nas kontaktirajte za sva pitanja.")}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                {t('After accept')}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {t('Shown on the public quotation page once the customer accepts.')}
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs text-muted-foreground">{t('English')}</label>
+                  <Textarea
+                    rows={3}
+                    value={acceptMsgEn}
+                    onChange={e => setAcceptMsgEn(e.target.value)}
+                    placeholder={t("e.g. Thank you! We've received your acceptance and will follow up within 1 business day.")}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs text-muted-foreground">{t('Serbian')}</label>
+                  <Textarea
+                    rows={3}
+                    value={acceptMsgSr}
+                    onChange={e => setAcceptMsgSr(e.target.value)}
+                    placeholder={t("npr. Hvala! Primili smo vaše prihvatanje i javićemo vam se u roku od 1 radnog dana.")}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                {t('After reject')}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {t('Shown on the public quotation page once the customer rejects.')}
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs text-muted-foreground">{t('English')}</label>
+                  <Textarea
+                    rows={3}
+                    value={rejectMsgEn}
+                    onChange={e => setRejectMsgEn(e.target.value)}
+                    placeholder={t("e.g. Thank you for letting us know. We'd appreciate any feedback to help us improve.")}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs text-muted-foreground">{t('Serbian')}</label>
+                  <Textarea
+                    rows={3}
+                    value={rejectMsgSr}
+                    onChange={e => setRejectMsgSr(e.target.value)}
+                    placeholder={t("npr. Hvala što ste nas obavestili. Bili bismo zahvalni za povratnu informaciju kako bismo se poboljšali.")}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <Button size="sm" onClick={handleSaveQuotationMessages} loading={savingQuotationMsgs}>
               {t('Save')}
             </Button>
           </CardContent>

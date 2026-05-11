@@ -84,6 +84,7 @@ interface EmailArgs {
   validUntil:      string | null
   publicUrl:       string
   lang:            'en' | 'sr'
+  customIntro:     string | null
 }
 
 const COPY = {
@@ -118,6 +119,9 @@ function buildEmailHtml(args: EmailArgs): string {
   const validityRow = args.validUntil
     ? `<p style="margin:8px 0 0;font-size:13px;color:#6b7280;">${escHtml(c.validUntil(new Date(args.validUntil).toLocaleDateString(args.lang === 'sr' ? 'sr-Latn-RS' : 'en-GB', { dateStyle: 'long' })))}</p>`
     : ''
+  const introRow    = args.customIntro && args.customIntro.trim().length > 0
+    ? `<p style="margin:12px 0 0;font-size:14px;color:#374151;line-height:1.55;white-space:pre-line;">${escHtml(args.customIntro.trim())}</p>`
+    : ''
 
   return `<!DOCTYPE html>
 <html lang="${args.lang}">
@@ -129,6 +133,7 @@ function buildEmailHtml(args: EmailArgs): string {
           <p style="margin:0;font-size:11px;color:#6b7280;text-transform:uppercase;letter-spacing:.08em;font-weight:600;">${escHtml(args.tenantName)}</p>
           <h1 style="margin:8px 0 0;font-size:22px;font-weight:700;color:#111827;line-height:1.3;">${escHtml(c.yourQuoteIs)}</h1>
           <p style="margin:16px 0 0;font-size:14px;color:#374151;">${escHtml(c.hi(args.customerName))}</p>
+          ${introRow}
           <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:18px 0 0;width:100%;border-top:1px solid #e5e7eb;">
             <tr>
               <td style="padding:12px 0;font-size:13px;color:#6b7280;width:100px;">${escHtml(c.reference)}</td>
@@ -189,15 +194,18 @@ Deno.serve(async (req: Request) => {
   try { body = await req.json() } catch { return json({ error: 'Bad request' }, 400) }
   const quotationId = String(body?.quotation_id ?? '').trim()
   if (!quotationId) return json({ error: 'quotation_id required' }, 400)
-  const lang: 'en' | 'sr' = body?.lang === 'sr' ? 'sr' : 'en'
 
   // ── Load quotation through user client (RLS enforces tenancy) ─────────────
   const { data: quotation, error: qErr } = await userClient
     .from('quotations')
-    .select('id, tenant_id, reference_number, customer_name, customer_email, currency, total_price, valid_until, status, pdf_url, public_token')
+    .select('id, tenant_id, reference_number, customer_name, customer_email, currency, total_price, valid_until, status, pdf_url, public_token, lang')
     .eq('id', quotationId)
     .single()
   if (qErr || !quotation) return json({ error: 'Quotation not found' }, 404)
+
+  // Lang lives on the quotation (set during Confirm & Generate PDF). Body
+  // override is accepted for backwards compat with old callers.
+  const lang: 'en' | 'sr' = body?.lang === 'sr' || quotation.lang === 'sr' ? 'sr' : 'en'
 
   if (!quotation.customer_email) {
     return json({ error: 'Quotation has no customer email' }, 400)
@@ -217,8 +225,15 @@ Deno.serve(async (req: Request) => {
   const fromEmail = await getFromAddress(sb, quotation.tenant_id)
 
   const { data: tenant } = await sb
-    .from('tenants').select('name').eq('id', quotation.tenant_id).single()
-  const tenantName = (tenant as { name: string } | null)?.name ?? 'Your store'
+    .from('tenants')
+    .select('name, quotation_email_intro_i18n')
+    .eq('id', quotation.tenant_id)
+    .single()
+  const tenantRow = tenant as { name: string; quotation_email_intro_i18n: Record<string, unknown> | null } | null
+  const tenantName  = tenantRow?.name ?? 'Your store'
+  const introMap    = (tenantRow?.quotation_email_intro_i18n ?? {}) as Record<string, unknown>
+  const rawIntro    = introMap[lang]
+  const customIntro = typeof rawIntro === 'string' ? rawIntro : null
 
   // ── Fetch PDF bytes ───────────────────────────────────────────────────────
   let pdfBase64: string
@@ -243,6 +258,7 @@ Deno.serve(async (req: Request) => {
     validUntil:      quotation.valid_until,
     publicUrl,
     lang,
+    customIntro,
   })
   const subject   = COPY[lang].subject(quotation.reference_number, tenantName)
 
