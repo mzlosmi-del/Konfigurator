@@ -158,12 +158,13 @@ export interface Database {
           ar_placement: 'floor' | 'wall'
           form_config: Json
           widget_theme: string
+          show_price_breakdown: boolean
           name_i18n: Json
           description_i18n: Json
           created_at: string
           updated_at: string
         }
-        Insert: Omit<Database['public']['Tables']['products']['Row'], 'id' | 'created_at' | 'updated_at'> & { id?: string }
+        Insert: Omit<Database['public']['Tables']['products']['Row'], 'id' | 'created_at' | 'updated_at' | 'show_price_breakdown'> & { id?: string; show_price_breakdown?: boolean }
         Update: Partial<Database['public']['Tables']['products']['Insert']>
       }
       product_texts: {

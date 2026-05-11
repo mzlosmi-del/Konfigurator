@@ -26,6 +26,7 @@ export interface ProductData {
   ar_placement: 'floor' | 'wall'
   form_config: FormConfig
   widget_theme: string
+  show_price_breakdown: boolean
 }
 
 export interface CharacteristicValue {

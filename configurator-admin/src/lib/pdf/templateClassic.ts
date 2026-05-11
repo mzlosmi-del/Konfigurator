@@ -288,7 +288,8 @@ export async function renderClassic(args: PdfBuildArgs): Promise<Uint8Array> {
       const ptexts          = (productTexts?.[item.product_id] ?? []).filter(pt => pt.language === lang)
       const modifierSum     = cfg.reduce((s, c) => s + (Number(c.price_modifier) || 0), 0)
       const derivedBase     = item.unit_price - modifierSum - formulaSum
-      const showBreakdown   = cfg.length > 0 || formulas.length > 0
+      const showBreakdown   = (cfg.length > 0 || formulas.length > 0)
+        && isSectionVisible(layoutSections, 'price-breakdown')
 
       const nameLines = wrapText(item.product_name, fontB, 10, PROD_W)
       let rh = nameLines.length * 13
