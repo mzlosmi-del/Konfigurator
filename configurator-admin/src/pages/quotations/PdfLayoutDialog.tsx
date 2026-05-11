@@ -23,6 +23,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { t } from '@/i18n'
@@ -522,6 +523,12 @@ export function PdfLayoutDialog({
             <FileText className="h-4 w-4 text-muted-foreground" />
             {t('PDF Preview')}
           </DialogTitle>
+          {/* Visually-hidden description — Radix expects every Dialog to
+              have one for screen readers; the surrounding UI already
+              communicates intent visually. */}
+          <DialogDescription className="sr-only">
+            {t('Reorder, show or hide sections of the quotation PDF and choose the language before generating it.')}
+          </DialogDescription>
           {/* Language toggle */}
           <div className="flex items-center gap-2 mr-6">
             <span className="text-xs text-muted-foreground">{t('Language')}:</span>
