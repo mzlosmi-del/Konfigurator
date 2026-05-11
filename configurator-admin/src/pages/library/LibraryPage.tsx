@@ -37,6 +37,7 @@ import { useAuthContext } from '@/components/auth/AuthContext'
 import { t } from '@/i18n'
 import { computeDiff, logChange } from '@/lib/auditLog'
 import { CHARACTERISTIC_LABELS, CLASS_LABELS } from '@/lib/auditLabels'
+import { AssignAutocomplete } from '@/components/library/AssignAutocomplete'
 
 // ─── DroppableClass card ─────────────────────────────────────────────────────
 
@@ -44,13 +45,14 @@ interface DroppableClassProps {
   cls: CharacteristicClass
   memberIds: string[]
   characteristics: Characteristic[]
+  onAssign: (classId: string, charId: string) => void
   onRemoveMember: (classId: string, charId: string) => void
   onDeleteClass: (cls: CharacteristicClass) => void
   onRenameClass: (id: string, name: string) => void
   onUpdateClassI18n: (id: string, i18n: Record<string, string>) => void
 }
 
-function DroppableClass({ cls, memberIds, characteristics, onRemoveMember, onDeleteClass, onRenameClass, onUpdateClassI18n }: DroppableClassProps) {
+function DroppableClass({ cls, memberIds, characteristics, onAssign, onRemoveMember, onDeleteClass, onRenameClass, onUpdateClassI18n }: DroppableClassProps) {
   const { setNodeRef, isOver } = useDroppable({ id: cls.id })
   const [editing, setEditing] = useState(false)
   const i18n = (cls.name_i18n as Record<string, string> | null) ?? {}
@@ -152,6 +154,15 @@ function DroppableClass({ cls, memberIds, characteristics, onRemoveMember, onDel
           )}
         </div>
       )}
+
+      {/* Type-to-assign: alternative to drag-and-drop */}
+      <AssignAutocomplete
+        placeholder={t('Type characteristic name to add…')}
+        options={characteristics
+          .filter(c => !memberIds.includes(c.id))
+          .map(c => ({ id: c.id, label: c.name }))}
+        onSelect={charId => onAssign(cls.id, charId)}
+      />
     </div>
   )
 }
@@ -161,6 +172,7 @@ function DroppableClass({ cls, memberIds, characteristics, onRemoveMember, onDel
 interface DraggableCharProps {
   char: Characteristic
   classesForChar: CharacteristicClass[]
+  allClasses: CharacteristicClass[]
   values: CharacteristicValue[]
   expanded: boolean
   onToggleExpand: () => void
@@ -168,6 +180,7 @@ interface DraggableCharProps {
   onUpdateI18n: (i18n: Record<string, string>) => void
   onChangeType: (type: Characteristic['display_type']) => void
   onDelete: () => void
+  onAssignToClass: (classId: string) => void
   tenantId: string
   onValuesChange: (updated: CharacteristicValue[]) => void
 }
@@ -175,6 +188,7 @@ interface DraggableCharProps {
 function DraggableChar({
   char,
   classesForChar,
+  allClasses,
   values,
   expanded,
   onToggleExpand,
@@ -182,6 +196,7 @@ function DraggableChar({
   onUpdateI18n,
   onChangeType,
   onDelete,
+  onAssignToClass,
   tenantId,
   onValuesChange,
 }: DraggableCharProps) {
@@ -243,20 +258,24 @@ function DraggableChar({
           <option value="number">{t('Number')}</option>
         </Select>
 
-        {/* Class membership tags */}
-        <div className="flex gap-1 flex-wrap max-w-[160px] shrink-0">
-          {classesForChar.length === 0 ? (
-            <span className="text-xs text-muted-foreground italic">{t('no class')}</span>
-          ) : (
-            classesForChar.map(cls => (
-              <span
-                key={cls.id}
-                className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-muted text-muted-foreground"
-              >
-                {cls.name}
-              </span>
-            ))
-          )}
+        {/* Class membership tags + type-to-assign input */}
+        <div className="flex gap-1 flex-wrap items-center max-w-[280px] shrink-0">
+          {classesForChar.map(cls => (
+            <span
+              key={cls.id}
+              className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-muted text-muted-foreground"
+            >
+              {cls.name}
+            </span>
+          ))}
+          <AssignAutocomplete
+            className="w-40"
+            placeholder={t('Type class name…')}
+            options={allClasses
+              .filter(c => !classesForChar.some(x => x.id === c.id))
+              .map(c => ({ id: c.id, label: c.name }))}
+            onSelect={classId => onAssignToClass(classId)}
+          />
         </div>
 
         {/* Value count */}
@@ -377,11 +396,7 @@ export function LibraryPage() {
     setActiveCharId(active.id as string)
   }
 
-  async function handleDragEnd({ active, over }: DragEndEvent) {
-    setActiveCharId(null)
-    if (!over) return
-    const charId  = active.id as string
-    const classId = over.id as string
+  async function handleAssign(classId: string, charId: string) {
     if (memberships[classId]?.includes(charId)) return
     try {
       await addCharacteristicToClass(classId, charId)
@@ -392,6 +407,12 @@ export function LibraryPage() {
     } catch {
       toast({ title: t('Failed to add characteristic to class'), variant: 'destructive' })
     }
+  }
+
+  async function handleDragEnd({ active, over }: DragEndEvent) {
+    setActiveCharId(null)
+    if (!over) return
+    await handleAssign(over.id as string, active.id as string)
   }
 
   async function handleRemoveMember(classId: string, charId: string) {
@@ -592,6 +613,7 @@ export function LibraryPage() {
                       cls={cls}
                       memberIds={memberships[cls.id] ?? []}
                       characteristics={characteristics}
+                      onAssign={handleAssign}
                       onRemoveMember={handleRemoveMember}
                       onDeleteClass={setToDeleteClass}
                       onRenameClass={handleRenameClass}
@@ -695,6 +717,7 @@ export function LibraryPage() {
                     key={char.id}
                     char={char}
                     classesForChar={classesForChar(char.id)}
+                    allClasses={classes}
                     values={values[char.id] ?? []}
                     expanded={!!expanded[char.id]}
                     onToggleExpand={() => toggleExpand(char.id)}
@@ -702,6 +725,7 @@ export function LibraryPage() {
                     onUpdateI18n={i18n => handleUpdateCharI18n(char, i18n)}
                     onChangeType={type => handleChangeType(char, type)}
                     onDelete={() => setToDelete(char)}
+                    onAssignToClass={classId => handleAssign(classId, char.id)}
                     tenantId={tenant?.id ?? ''}
                     onValuesChange={updated => setValues(prev => ({ ...prev, [char.id]: updated }))}
                   />
