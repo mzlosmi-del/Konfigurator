@@ -20,7 +20,13 @@ export async function renderCompact(args: PdfBuildArgs): Promise<Uint8Array> {
   const { fontR, fontB } = await loadFonts(pdfDoc)
 
   const W = 595, H = 842
-  const MX = 32, MB = 42
+  const MX = 32
+  // Footer position is absolute (from page bottom). MB is the safe content
+  // threshold and is kept well above the footer rule so long lists never
+  // overlap it.
+  const FOOTER_BASELINE = 20
+  const FOOTER_RULE_Y   = FOOTER_BASELINE + 10
+  const MB              = FOOTER_RULE_Y + 20
   const col = W - MX * 2
 
   let page: PDFPage = pdfDoc.addPage([W, H])
@@ -65,13 +71,12 @@ export async function renderCompact(args: PdfBuildArgs): Promise<Uint8Array> {
   }
 
   function drawFooter() {
-    const fy = MB - 12
-    rule(fy + 10, C.rule)
+    rule(FOOTER_RULE_Y, C.rule)
     const validStr = quotation.valid_until
       ? L.validityText(new Date(quotation.valid_until).toLocaleDateString(L.dateLocale, { dateStyle: 'short' }))
       : L.contactText
-    text(validStr, MX, fy, 7, fontR, C.muted)
-    rText(getFooterLabel(tenant, L.footer), W - MX, fy, 7, fontR, C.faint)
+    text(validStr, MX, FOOTER_BASELINE, 7, fontR, C.muted)
+    rText(getFooterLabel(tenant, L.footer), W - MX, FOOTER_BASELINE, 7, fontR, C.faint)
   }
 
   const logoImg = await loadLogo(pdfDoc, tenant.logo_url)
@@ -223,10 +228,11 @@ export async function renderCompact(args: PdfBuildArgs): Promise<Uint8Array> {
       const itemAdjs    = Array.isArray(item.adjustments) ? item.adjustments : []
       const lineTotal   = calcLineTotal(item)
       const cfg         = Array.isArray(item.configuration) ? item.configuration : []
-      const formulas    = Array.isArray(item.formulas) ? item.formulas : []
+      const allFormulas = Array.isArray(item.formulas) ? item.formulas : []
+      const formulaSum  = allFormulas.reduce((s, f) => s + (Number(f.amount) || 0), 0)
+      const formulas    = allFormulas.filter(f => (Number(f.amount) || 0) !== 0)
       const ptexts      = (productTexts?.[item.product_id] ?? []).filter(pt => pt.language === lang)
       const modifierSum = cfg.reduce((s, c) => s + (Number(c.price_modifier) || 0), 0)
-      const formulaSum  = formulas.reduce((s, f) => s + (Number(f.amount) || 0), 0)
       const derivedBase = item.unit_price - modifierSum - formulaSum
       const showBreakdown = cfg.length > 0 || formulas.length > 0
 

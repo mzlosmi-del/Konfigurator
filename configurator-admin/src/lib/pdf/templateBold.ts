@@ -27,7 +27,12 @@ export async function renderBold(args: PdfBuildArgs): Promise<Uint8Array> {
   const ACCENT_W = 6                  // left accent stripe
   const MX_L     = ACCENT_W + 36      // body left edge
   const MX_R     = 36                 // body right margin from page edge
-  const MB       = 56
+  // Footer position is absolute (from page bottom). MB is the safe content
+  // threshold and is set well above the footer rule so long lists never
+  // overlap the footer line.
+  const FOOTER_BASELINE = 28
+  const FOOTER_RULE_Y   = FOOTER_BASELINE + 12
+  const MB              = FOOTER_RULE_Y + 24
   const col      = W - MX_L - MX_R
 
   let page: PDFPage = pdfDoc.addPage([W, H])
@@ -77,13 +82,12 @@ export async function renderBold(args: PdfBuildArgs): Promise<Uint8Array> {
   }
 
   function drawFooter() {
-    const fy = MB - 16
-    rule(fy + 12, ACCENT, MX_L, W - MX_R, 1)
+    rule(FOOTER_RULE_Y, ACCENT, MX_L, W - MX_R, 1)
     const validStr = quotation.valid_until
       ? L.validityText(new Date(quotation.valid_until).toLocaleDateString(L.dateLocale, { dateStyle: 'long' }))
       : L.contactText
-    text(validStr, MX_L, fy, 7.5, fontR, C.muted)
-    rText(getFooterLabel(tenant, L.footer), W - MX_R, fy, 7.5, fontB, ACCENT)
+    text(validStr, MX_L, FOOTER_BASELINE, 7.5, fontR, C.muted)
+    rText(getFooterLabel(tenant, L.footer), W - MX_R, FOOTER_BASELINE, 7.5, fontB, ACCENT)
   }
 
   drawAccentStripe()
@@ -262,10 +266,11 @@ export async function renderBold(args: PdfBuildArgs): Promise<Uint8Array> {
       const itemAdjs    = Array.isArray(item.adjustments) ? item.adjustments : []
       const lineTotal   = calcLineTotal(item)
       const cfg         = Array.isArray(item.configuration) ? item.configuration : []
-      const formulas    = Array.isArray(item.formulas) ? item.formulas : []
+      const allFormulas = Array.isArray(item.formulas) ? item.formulas : []
+      const formulaSum  = allFormulas.reduce((s, f) => s + (Number(f.amount) || 0), 0)
+      const formulas    = allFormulas.filter(f => (Number(f.amount) || 0) !== 0)
       const ptexts      = (productTexts?.[item.product_id] ?? []).filter(pt => pt.language === lang)
       const modifierSum = cfg.reduce((s, c) => s + (Number(c.price_modifier) || 0), 0)
-      const formulaSum  = formulas.reduce((s, f) => s + (Number(f.amount) || 0), 0)
       const derivedBase = item.unit_price - modifierSum - formulaSum
       const showBreakdown = cfg.length > 0 || formulas.length > 0
 
