@@ -21,7 +21,7 @@ Deno.serve(async (req: Request) => {
   // Anon RLS policy allows this only for published+enabled products
   const { data: product } = await supabase
     .from('products')
-    .select('id, tenant_id, name, description')
+    .select('id, tenant_id, name, description, widget_theme')
     .eq('public_slug', slug)
     .eq('status', 'published')
     .eq('public_preview_enabled', true)
@@ -102,7 +102,8 @@ function buildPage(
       data-supabase-url="${h(SUPABASE_URL)}"
       data-supabase-anon-key="${h(SUPABASE_ANON_KEY)}"
       data-product-id="${h(product.id)}"
-      data-tenant-id="${h(product.tenant_id)}"
+      data-tenant-id="${h(product.tenant_id)}"${product.widget_theme ? `
+      data-style="${h(product.widget_theme)}"` : ''}
     ></div>
     <script src="${h(WIDGET_CDN)}" async></script>
 

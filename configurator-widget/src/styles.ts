@@ -621,6 +621,9 @@ export const WIDGET_STYLES = `
   }
   .cw-branding a { color: var(--cw-branding); text-decoration: none; }
   .cw-branding a:hover { color: var(--cw-text-muted); }
+  /* When the tenant has remove_branding turned on we still render the
+     language switcher so customers can change locale. */
+  .cw-branding--lang-only { justify-content: flex-end; padding: 6px 0; }
 
   /* ── Language switcher ───────────────────────────── */
   .cw-lang-switcher { display: flex; gap: 2px; }
