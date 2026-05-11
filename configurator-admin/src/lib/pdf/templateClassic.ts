@@ -24,7 +24,14 @@ export async function renderClassic(args: PdfBuildArgs): Promise<Uint8Array> {
   const BORDER   = rgb(0.804, 0.812, 0.831)   // #CDCFD4
 
   const W = 595, H = 842
-  const MX = 44, MB = 56
+  const MX = 44
+  // Footer position is now absolute (from page bottom) instead of derived
+  // from MB. MB stays as the safe content threshold and is set well above
+  // the footer rule so long lists never overlap the footer or the
+  // validity / branding line.
+  const FOOTER_BASELINE = 28
+  const FOOTER_RULE_Y   = FOOTER_BASELINE + 12
+  const MB              = FOOTER_RULE_Y + 24
   const col = W - MX * 2
 
   let page: PDFPage = pdfDoc.addPage([W, H])
@@ -69,13 +76,12 @@ export async function renderClassic(args: PdfBuildArgs): Promise<Uint8Array> {
   }
 
   function drawFooter() {
-    const fy = MB - 16
-    rule(fy + 12, BORDER, MX, W - MX, 0.5)
+    rule(FOOTER_RULE_Y, BORDER, MX, W - MX, 0.5)
     const validStr = quotation.valid_until
       ? L.validityText(new Date(quotation.valid_until).toLocaleDateString(L.dateLocale, { dateStyle: 'long' }))
       : L.contactText
-    text(validStr, MX, fy, 7.5, fontR, C.muted)
-    rText(getFooterLabel(tenant, L.footer), W - MX, fy, 7.5, fontR, C.faint)
+    text(validStr, MX, FOOTER_BASELINE, 7.5, fontR, C.muted)
+    rText(getFooterLabel(tenant, L.footer), W - MX, FOOTER_BASELINE, 7.5, fontR, C.faint)
   }
 
   const logoImg = await loadLogo(pdfDoc, tenant.logo_url)
@@ -270,13 +276,17 @@ export async function renderClassic(args: PdfBuildArgs): Promise<Uint8Array> {
       const baseLine     = item.unit_price * item.quantity
       const itemAdjs     = Array.isArray(item.adjustments) ? item.adjustments : []
       const lineTotal    = calcLineTotal(item)
-      const cfg          = Array.isArray(item.configuration) ? item.configuration : []
-      const formulas     = Array.isArray(item.formulas) ? item.formulas : []
-      const ptexts       = (productTexts?.[item.product_id] ?? []).filter(pt => pt.language === lang)
-      const modifierSum  = cfg.reduce((s, c) => s + (Number(c.price_modifier) || 0), 0)
-      const formulaSum   = formulas.reduce((s, f) => s + (Number(f.amount) || 0), 0)
-      const derivedBase  = item.unit_price - modifierSum - formulaSum
-      const showBreakdown = cfg.length > 0 || formulas.length > 0
+      const cfg             = Array.isArray(item.configuration) ? item.configuration : []
+      const allFormulas     = Array.isArray(item.formulas) ? item.formulas : []
+      const formulaSum      = allFormulas.reduce((s, f) => s + (Number(f.amount) || 0), 0)
+      // Zero-amount formulas add no price information for the customer —
+      // skip them entirely so the PDF only shows formulas that actually
+      // contribute to the line total.
+      const formulas        = allFormulas.filter(f => (Number(f.amount) || 0) !== 0)
+      const ptexts          = (productTexts?.[item.product_id] ?? []).filter(pt => pt.language === lang)
+      const modifierSum     = cfg.reduce((s, c) => s + (Number(c.price_modifier) || 0), 0)
+      const derivedBase     = item.unit_price - modifierSum - formulaSum
+      const showBreakdown   = cfg.length > 0 || formulas.length > 0
 
       const nameLines = wrapText(item.product_name, fontB, 10, PROD_W)
       let rh = nameLines.length * 13
