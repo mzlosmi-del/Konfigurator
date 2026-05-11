@@ -30,6 +30,7 @@ import { EmbedDocsPage } from '@/pages/embed-docs/EmbedDocsPage'
 import { PublicPreviewPage } from '@/pages/public/PublicPreviewPage'
 import { PublicQuotationPage } from '@/pages/public/PublicQuotationPage'
 import { AuditLogPage } from '@/pages/admin/AuditLogPage'
+import { SuperAdminTenantsPage } from '@/pages/admin/SuperAdminTenantsPage'
 
 export function App() {
   const [lang, setLangState] = useState<Lang>(getLang())
@@ -106,6 +107,9 @@ export function App() {
 
               {/* Audit log — admin-only (page enforces it) */}
               <Route path="/audit-log" element={<AuditLogPage />} />
+
+              {/* Super admin — only sales@configureout.com (page enforces it) */}
+              <Route path="/admin/tenants" element={<SuperAdminTenantsPage />} />
             </Route>
           </Route>
 

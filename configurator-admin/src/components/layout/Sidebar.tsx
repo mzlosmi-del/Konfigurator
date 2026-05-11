@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import { NavLink } from 'react-router-dom'
-import { LayoutDashboard, Package, Inbox, Settings, LogOut, Layers, FileText, AlignLeft, BarChart2, Code2, X, DollarSign, History } from 'lucide-react'
+import { LayoutDashboard, Package, Inbox, Settings, LogOut, Layers, FileText, AlignLeft, BarChart2, Code2, X, DollarSign, History, Shield } from 'lucide-react'
 import { Logo } from '@/components/ui/Logo'
 import { cn } from '@/lib/utils'
 import { useAuthContext } from '@/components/auth/AuthContext'
 import { Separator } from '@/components/ui/separator'
 import { useInquiryCounts } from '@/hooks/useInquiryCounts'
 import { useCanView } from '@/hooks/usePermission'
+import { isSuperAdminEmail } from '@/lib/superAdmin'
 import { t, getLang, setLang, LANGS, type Lang } from '@/i18n'
 
 interface SidebarProps {
@@ -15,9 +16,10 @@ interface SidebarProps {
 }
 
 export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
-  const { signOut, profile } = useAuthContext()
+  const { signOut, profile, user } = useAuthContext()
   const { newCount } = useInquiryCounts()
   const isAdmin = profile?.role === 'admin'
+  const isSuperAdmin = isSuperAdminEmail(user?.email)
   const [lang, setLangState] = useState<Lang>(getLang())
 
   const canViewDashboard  = useCanView('dashboard')
@@ -48,6 +50,7 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
     { to: '/embed-docs', icon: Code2,           label: 'Embed',       badge: 0,        visible: canViewEmbed },
     { to: '/settings',   icon: Settings,        label: 'Settings',    badge: 0,        visible: canViewSettings },
     { to: '/audit-log',  icon: History,         label: 'Audit log',   badge: 0,        visible: isAdmin },
+    { to: '/admin/tenants', icon: Shield,       label: 'Super admin', badge: 0,        visible: isSuperAdmin },
   ]
 
   return (
