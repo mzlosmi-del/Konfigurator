@@ -1074,6 +1074,19 @@ const sr: Record<string, string> = {
 
   // Post-inquiry message
   'Post-inquiry message':                  'Poruka nakon upita',
+  'Quotation messages':                    'Poruke ponude',
+  'Custom email intro and after-response messages, per language. Leave blank to use the default copy. The customer sees these in the language the quotation was generated in.':
+    'Prilagođeni uvod e-maila i poruke nakon odgovora, po jeziku. Ostavite prazno za podrazumevani tekst. Kupac vidi tekst na jeziku na kom je ponuda generisana.',
+  'Email intro':                           'Uvod e-maila',
+  'Inserted into the quotation email body, after the greeting.':
+    'Umeće se u telo e-maila ponude, nakon pozdrava.',
+  'After accept':                          'Nakon prihvatanja',
+  'Shown on the public quotation page once the customer accepts.':
+    'Prikazuje se na javnoj stranici ponude kada kupac prihvati.',
+  'After reject':                          'Nakon odbijanja',
+  'Shown on the public quotation page once the customer rejects.':
+    'Prikazuje se na javnoj stranici ponude kada kupac odbije.',
+  'Quotation messages saved':              'Poruke ponude su sačuvane',
   'Shown to the customer in the widget after they submit an inquiry.':
     'Prikazuje se korisniku u widgetu nakon slanja upita.',
   'Post-inquiry message saved':            'Poruka nakon upita sačuvana',

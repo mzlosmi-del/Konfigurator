@@ -98,7 +98,7 @@ export async function createQuotation(
   input: Omit<
     Quotation,
     'id' | 'tenant_id' | 'created_at' | 'updated_at'
-    | 'public_token' | 'responded_at' | 'responded_ip' | 'responded_user_agent'
+    | 'public_token' | 'responded_at' | 'responded_ip' | 'responded_user_agent' | 'lang'
   >,
 ): Promise<Quotation> {
   const { data, error } = await supabase
