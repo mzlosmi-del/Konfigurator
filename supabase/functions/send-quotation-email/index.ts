@@ -5,7 +5,7 @@
 //
 // Auth-required (caller's JWT). The button URLs use PUBLIC_APP_URL +
 // /q/<public_token>. The token is auto-assigned by the DB trigger from
-// migration 067 the first time the quotation hits status confirmed_sent,
+// migration 067 the first time the quotation hits status 'confirmed'
 // so the calling UI must run "Confirm & Generate PDF" before invoking
 // this function.
 //
@@ -235,7 +235,7 @@ Deno.serve(async (req: Request) => {
   if (!quotation.public_token) {
     return json({ error: 'Quotation token missing — re-confirm to assign one' }, 400)
   }
-  if (quotation.status !== 'confirmed_sent') {
+  if (quotation.status !== 'confirmed' && quotation.status !== 'sent') {
     return json({ error: `Cannot send a quotation in status "${quotation.status}"` }, 400)
   }
 
@@ -258,15 +258,57 @@ Deno.serve(async (req: Request) => {
     : (typeof rawIntro === 'string' ? rawIntro : null)
 
   // ── Fetch PDF bytes ───────────────────────────────────────────────────────
-  let pdfBase64: string
+  let pdfBytes: ArrayBuffer
   try {
     const pdfRes = await fetch(quotation.pdf_url)
     if (!pdfRes.ok) {
       return json({ error: 'Failed to fetch stored PDF', detail: pdfRes.statusText }, 502)
     }
-    pdfBase64 = arrayBufferToBase64(await pdfRes.arrayBuffer())
+    pdfBytes = await pdfRes.arrayBuffer()
   } catch (e) {
     return json({ error: 'Failed to fetch stored PDF', detail: String(e) }, 502)
+  }
+  const pdfBase64 = arrayBufferToBase64(pdfBytes)
+
+  // ── Extra attachments persisted on the quotation ─────────────────────────
+  // 20 MB total cap (PDF + all extra attachments) keeps every email under
+  // the size most receiving servers will accept and matches the limit we
+  // surface in the admin UI.
+  const MAX_EMAIL_BYTES = 20 * 1024 * 1024
+  const extraAttachments: { filename: string; content: string }[] = []
+  let totalBytes = pdfBytes.byteLength
+
+  const { data: attachmentRows } = await sb
+    .from('quotation_attachments')
+    .select('storage_path, filename, size_bytes')
+    .eq('quotation_id', quotation.id)
+  const rows = (attachmentRows ?? []) as { storage_path: string; filename: string; size_bytes: number }[]
+
+  // Cheap up-front cap check using stored sizes.
+  totalBytes += rows.reduce((s, r) => s + Number(r.size_bytes || 0), 0)
+  if (totalBytes > MAX_EMAIL_BYTES) {
+    return json({
+      error:       'Email exceeds 20 MB size limit',
+      total_bytes: totalBytes,
+      max_bytes:   MAX_EMAIL_BYTES,
+    }, 413)
+  }
+
+  // Download each attachment through the service-role storage client and
+  // base64-encode it for Resend.
+  for (const row of rows) {
+    const { data: blob, error: dlErr } = await sb.storage
+      .from('quotation-attachments')
+      .download(row.storage_path)
+    if (dlErr || !blob) {
+      console.error('send-quotation-email attachment download failed', row.storage_path, dlErr)
+      return json({ error: 'Failed to fetch attachment', filename: row.filename }, 502)
+    }
+    const buf = await blob.arrayBuffer()
+    extraAttachments.push({
+      filename: row.filename,
+      content:  arrayBufferToBase64(buf),
+    })
   }
 
   // ── Build + send ──────────────────────────────────────────────────────────
@@ -298,10 +340,13 @@ Deno.serve(async (req: Request) => {
       to:      [toEmail],
       subject,
       html,
-      attachments: [{
-        filename: `quotation-${quotation.reference_number}.pdf`,
-        content:  pdfBase64,
-      }],
+      attachments: [
+        {
+          filename: `quotation-${quotation.reference_number}.pdf`,
+          content:  pdfBase64,
+        },
+        ...extraAttachments,
+      ],
     }),
   })
 
@@ -310,6 +355,13 @@ Deno.serve(async (req: Request) => {
     console.error('send-quotation-email Resend error', text)
     return json({ error: 'Resend send failed', detail: text }, 502)
   }
+
+  // Flip status to 'sent'. Idempotent on resend — the row was already
+  // 'sent' in that case so this just bumps updated_at.
+  await sb
+    .from('quotations')
+    .update({ status: 'sent', updated_at: new Date().toISOString() })
+    .eq('id', quotation.id)
 
   return json({ ok: true, sent_to: toEmail, public_url: publicUrl })
 })
