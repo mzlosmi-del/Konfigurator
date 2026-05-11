@@ -5,7 +5,18 @@ import { createClient } from '@supabase/supabase-js'
 const SUPABASE_URL      = import.meta.env.VITE_SUPABASE_URL      ?? ''
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY ?? ''
 
-const anonClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+// Anon client for the public /q/:token route. No session is ever persisted
+// here, but we still give it a distinct storageKey so it doesn't share the
+// admin app's GoTrueClient storage and trigger the "multiple GoTrueClient
+// instances" warning when both modules are loaded into the same bundle.
+const anonClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: {
+    persistSession:     false,
+    autoRefreshToken:   false,
+    detectSessionInUrl: false,
+    storageKey:         'sb-anon-public-quotation',
+  },
+})
 
 interface Quotation {
   id:                  string
