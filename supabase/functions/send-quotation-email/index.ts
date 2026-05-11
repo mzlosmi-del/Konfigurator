@@ -190,10 +190,29 @@ Deno.serve(async (req: Request) => {
   if (!user) return json({ error: 'Unauthorized' }, 401)
 
   // ── Body ──────────────────────────────────────────────────────────────────
-  let body: { quotation_id?: string; lang?: string }
+  let body: {
+    quotation_id?:    string
+    lang?:            string
+    subject?:         string
+    intro_paragraph?: string
+    to_email?:        string
+  }
   try { body = await req.json() } catch { return json({ error: 'Bad request' }, 400) }
   const quotationId = String(body?.quotation_id ?? '').trim()
   if (!quotationId) return json({ error: 'quotation_id required' }, 400)
+
+  // Optional UI overrides — admin user can tweak Subject / Intro / To from
+  // the "Send to customer" preview dialog before pressing Send.
+  const subjectOverride = typeof body.subject === 'string'
+    ? body.subject.trim().slice(0, 256)
+    : null
+  const introOverride = typeof body.intro_paragraph === 'string'
+    ? body.intro_paragraph.slice(0, 2000)
+    : null
+  const toOverride = typeof body.to_email === 'string' ? body.to_email.trim() : null
+  if (toOverride && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(toOverride)) {
+    return json({ error: 'Invalid to_email' }, 400)
+  }
 
   // ── Load quotation through user client (RLS enforces tenancy) ─────────────
   const { data: quotation, error: qErr } = await userClient
@@ -233,7 +252,10 @@ Deno.serve(async (req: Request) => {
   const tenantName  = tenantRow?.name ?? 'Your store'
   const introMap    = (tenantRow?.quotation_email_intro_i18n ?? {}) as Record<string, unknown>
   const rawIntro    = introMap[lang]
-  const customIntro = typeof rawIntro === 'string' ? rawIntro : null
+  // Per-send override (from the preview dialog) wins over the tenant default.
+  const customIntro = introOverride !== null
+    ? introOverride
+    : (typeof rawIntro === 'string' ? rawIntro : null)
 
   // ── Fetch PDF bytes ───────────────────────────────────────────────────────
   let pdfBase64: string
@@ -260,7 +282,10 @@ Deno.serve(async (req: Request) => {
     lang,
     customIntro,
   })
-  const subject   = COPY[lang].subject(quotation.reference_number, tenantName)
+  const subject = subjectOverride && subjectOverride.length > 0
+    ? subjectOverride
+    : COPY[lang].subject(quotation.reference_number, tenantName)
+  const toEmail = toOverride ?? quotation.customer_email
 
   const emailRes = await fetch('https://api.resend.com/emails', {
     method:  'POST',
@@ -270,7 +295,7 @@ Deno.serve(async (req: Request) => {
     },
     body: JSON.stringify({
       from:    fromEmail,
-      to:      [quotation.customer_email],
+      to:      [toEmail],
       subject,
       html,
       attachments: [{
@@ -286,5 +311,5 @@ Deno.serve(async (req: Request) => {
     return json({ error: 'Resend send failed', detail: text }, 502)
   }
 
-  return json({ ok: true, sent_to: quotation.customer_email, public_url: publicUrl })
+  return json({ ok: true, sent_to: toEmail, public_url: publicUrl })
 })
