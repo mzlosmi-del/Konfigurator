@@ -1,11 +1,144 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import Anthropic from 'npm:@anthropic-ai/sdk'
-import { loadPlanLimits, assertMonthlyLimit, gateForbidden, makePlanError } from '../_shared/planGate.ts'
-import { getMonthlyUsage, incrementMonthlyUsage } from '../_shared/monthlyUsage.ts'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+}
+
+// ── Inlined plan-gate + monthly-usage helpers ──────────────────────────────
+// (Originally in supabase/functions/_shared/. Inlined so this function can be
+// pasted directly into the Supabase dashboard without external file deps.)
+
+interface PlanLimits {
+  plan:                string
+  products_max:        number
+  inquiries_per_month: number
+  team_members_max:    number
+  three_d:             boolean
+  quotations:          boolean
+  webhooks:            boolean
+  remove_branding:     boolean
+  white_label:         boolean
+  ai_setup_per_month:  number
+  analytics:           string
+}
+
+interface PlanLimitError {
+  code:       'PLAN_LIMIT_EXCEEDED'
+  dimension:  string
+  current?:   number
+  limit?:     number
+  plan:       string
+  upgrade_to: string
+}
+
+const NEXT_PLAN: Record<string, string> = {
+  free: 'starter', starter: 'growth', growth: 'scale', scale: 'scale',
+}
+
+function makePlanError(
+  dimension: string,
+  plan: string,
+  current?: number,
+  limit?: number,
+): PlanLimitError {
+  return {
+    code: 'PLAN_LIMIT_EXCEEDED',
+    dimension,
+    ...(current !== undefined && { current }),
+    ...(limit   !== undefined && { limit }),
+    plan,
+    upgrade_to: NEXT_PLAN[plan] ?? 'scale',
+  }
+}
+
+async function loadPlanLimits(
+  sb: ReturnType<typeof createClient>,
+  tenantId: string,
+): Promise<PlanLimits | null> {
+  const { data } = await sb
+    .from('tenants')
+    .select('plan, plan_limits!inner(*)')
+    .eq('id', tenantId)
+    .single()
+  if (!data) return null
+  const row = (data as Record<string, unknown>)
+  const limits = (row.plan_limits as PlanLimits[] | PlanLimits | null)
+  if (!limits) return null
+  return Array.isArray(limits) ? limits[0] : limits
+}
+
+function gateForbidden(err: PlanLimitError, cors: Record<string, string> = {}): Response {
+  return new Response(JSON.stringify(err), {
+    status:  403,
+    headers: { ...cors, 'Content-Type': 'application/json' },
+  })
+}
+
+function assertMonthlyLimit(
+  dimension: 'ai_setup' | 'inquiries',
+  limitValue: number,
+  current: number,
+  plan: string,
+  cors: Record<string, string> = {},
+): Response | null {
+  if (limitValue < 0) return null
+  if (current >= limitValue) {
+    return gateForbidden(makePlanError(dimension, plan, current, limitValue), cors)
+  }
+  return null
+}
+
+function currentPeriodMonth(): string {
+  const d = new Date()
+  d.setUTCDate(1)
+  return d.toISOString().slice(0, 10)
+}
+
+async function getMonthlyUsage(
+  sb: ReturnType<typeof createClient>,
+  tenantId: string,
+  dimension: 'inquiries' | 'ai_setup',
+): Promise<number> {
+  const column = dimension === 'inquiries' ? 'inquiries_count' : 'ai_setup_count'
+  const { data } = await sb
+    .from('monthly_usage')
+    .select(column)
+    .eq('tenant_id', tenantId)
+    .eq('period_month', currentPeriodMonth())
+    .maybeSingle()
+  if (!data) return 0
+  return ((data as Record<string, number>)[column] ?? 0)
+}
+
+async function incrementMonthlyUsage(
+  sb: ReturnType<typeof createClient>,
+  tenantId: string,
+  dimension: 'inquiries' | 'ai_setup',
+): Promise<void> {
+  const period = currentPeriodMonth()
+  const current = await getMonthlyUsage(sb, tenantId, dimension)
+  const row: Record<string, unknown> = {
+    tenant_id:    tenantId,
+    period_month: period,
+    inquiries_count: dimension === 'inquiries' ? current + 1 : 0,
+    ai_setup_count:  dimension === 'ai_setup'  ? current + 1 : 0,
+  }
+  if (current > 0 || dimension === 'ai_setup') {
+    const { data: existing } = await sb
+      .from('monthly_usage')
+      .select('inquiries_count, ai_setup_count')
+      .eq('tenant_id', tenantId)
+      .eq('period_month', period)
+      .maybeSingle()
+    if (existing) {
+      const ex = existing as { inquiries_count: number; ai_setup_count: number }
+      row.inquiries_count = dimension === 'inquiries' ? ex.inquiries_count + 1 : ex.inquiries_count
+      row.ai_setup_count  = dimension === 'ai_setup'  ? ex.ai_setup_count  + 1 : ex.ai_setup_count
+    }
+  }
+  await sb.from('monthly_usage').upsert(row as never, { onConflict: 'tenant_id,period_month' })
 }
 
 const SYSTEM_PROMPT = `You are a product configurator assistant. Given a product description and optional vertical, output a JSON configuration for a configurable product.
