@@ -11,6 +11,7 @@ import { useAuthContext } from '@/components/auth/AuthContext'
 import { supabase } from '@/lib/supabase'
 import type { Quotation, QuotationStatus, QuotationLineItem, QuotationAdjustment, QuotationRejectionReason, ProductText } from '@/types/database'
 import { PdfLayoutDialog, type PdfSection, type ProductTextGroup } from './PdfLayoutDialog'
+import { SendEmailDialog } from './SendEmailDialog'
 import { STATUS_LABELS, statusVariant, STATUS_TRANSITIONS } from './quotationStatusConfig'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Button } from '@/components/ui/button'
@@ -47,7 +48,7 @@ export function QuotationDetailPage() {
   const [loading,        setLoading]        = useState(true)
   const [updatingStatus, setUpdatingStatus] = useState(false)
   const [generatingPdf,    setGeneratingPdf]    = useState(false)
-  const [sendingEmail,     setSendingEmail]     = useState(false)
+  const [showSendDialog,   setShowSendDialog]   = useState(false)
   const [pdfMode,          setPdfMode]          = useState<'preview' | 'confirm'>('preview')
   const [layoutOpen,       setLayoutOpen]       = useState(false)
   const [pdfProductTexts,  setPdfProductTexts]  = useState<Record<string, ProductText[]>>({})
@@ -241,7 +242,7 @@ export function QuotationDetailPage() {
     }
   }
 
-  async function handleSendToCustomer() {
+  function handleSendToCustomer() {
     if (!id || !quotation) return
     if (!quotation.customer_email) {
       toast({ title: t('No customer email on this quotation'), variant: 'destructive' })
@@ -251,23 +252,7 @@ export function QuotationDetailPage() {
       toast({ title: t('Confirm the quotation first'), variant: 'destructive' })
       return
     }
-    setSendingEmail(true)
-    try {
-      const { data, error } = await supabase.functions.invoke('send-quotation-email', {
-        body: { quotation_id: id },
-      })
-      if (error) throw error
-      const sentTo = (data as { sent_to?: string } | null)?.sent_to
-      toast({ title: t('Quotation sent'), description: sentTo ? `${t('To')}: ${sentTo}` : undefined })
-    } catch (err) {
-      toast({
-        title:       t('Failed to send'),
-        description: err instanceof Error ? err.message : undefined,
-        variant:     'destructive',
-      })
-    } finally {
-      setSendingEmail(false)
-    }
+    setShowSendDialog(true)
   }
 
   if (loading) {
@@ -338,7 +323,6 @@ export function QuotationDetailPage() {
               <Button
                 variant="outline"
                 onClick={handleSendToCustomer}
-                loading={sendingEmail}
                 disabled={!quotation.customer_email}
                 title={!quotation.customer_email ? t('No customer email on this quotation') : undefined}
               >
@@ -650,6 +634,34 @@ export function QuotationDetailPage() {
         onConfirm={handleDelete}
         loading={deleting}
       />
+
+      {showSendDialog && quotation && quotation.customer_email && quotation.public_token && (
+        <SendEmailDialog
+          open
+          onClose={() => setShowSendDialog(false)}
+          onSent={sentTo => {
+            setShowSendDialog(false)
+            toast({ title: t('Quotation sent'), description: sentTo ? `${t('To')}: ${sentTo}` : undefined })
+          }}
+          onError={msg => toast({ title: t('Failed to send'), description: msg, variant: 'destructive' })}
+          quotationId={quotation.id}
+          referenceNumber={quotation.reference_number}
+          customerName={quotation.customer_name}
+          customerEmail={quotation.customer_email}
+          totalPrice={total}
+          currency={quotation.currency}
+          validUntil={quotation.valid_until}
+          publicUrl={`${window.location.origin}/q/${quotation.public_token}`}
+          tenantName={tenant?.name ?? 'Your store'}
+          lang={quotation.lang === 'sr' ? 'sr' : 'en'}
+          defaultIntro={(() => {
+            const map = (tenant?.quotation_email_intro_i18n ?? {}) as Record<string, unknown>
+            const v = map[quotation.lang === 'sr' ? 'sr' : 'en']
+            return typeof v === 'string' ? v : ''
+          })()}
+          alreadyResent={!!quotation.responded_at}
+        />
+      )}
 
       <Toaster toasts={toasts} onDismiss={dismiss} />
     </div>
