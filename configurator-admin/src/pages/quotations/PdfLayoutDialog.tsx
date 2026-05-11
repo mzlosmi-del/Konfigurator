@@ -70,7 +70,11 @@ function buildDefaultSections(
   productTexts?: ProductTextGroup[],
 ): PdfSection[] {
   const sections: PdfSection[] = [
-    { id: 'line-items', label: 'Line Items & Summary', visible: true, locked: true },
+    { id: 'line-items',      label: 'Line Items & Summary', visible: true, locked: true },
+    // Operator-toggleable detail-level switch. When off, line items show
+    // only product · qty · unit · total — no configuration breakdown or
+    // formula lines under each item. Defaults to on (current behaviour).
+    { id: 'price-breakdown', label: 'Show price breakdown', visible: true },
   ]
 
   // One toggleable row per product text entry (rendered inline within each line item)

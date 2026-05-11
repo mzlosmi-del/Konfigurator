@@ -78,6 +78,7 @@ export function EditProductPage() {
         currency:         values.currency,
         sku:              values.sku?.trim() || null,
         unit_of_measure:  values.unit_of_measure?.trim() || null,
+        show_price_breakdown: values.show_price_breakdown,
       })
       setProduct(updated as Product)
       const diff = computeDiff(before as unknown as Record<string, unknown>, updated as unknown as Record<string, unknown>, PRODUCT_LABELS)

@@ -64,7 +64,7 @@ export async function fetchProduct(id: string): Promise<Product> {
 
 export async function createProduct(
   input: Pick<Product, 'name' | 'description' | 'base_price' | 'currency'>
-    & { sku?: string | null; unit_of_measure?: string | null; name_i18n?: Record<string,string>; description_i18n?: Record<string,string> }
+    & { sku?: string | null; unit_of_measure?: string | null; name_i18n?: Record<string,string>; description_i18n?: Record<string,string>; show_price_breakdown?: boolean }
 ): Promise<Product> {
   const { data, error } = await supabase
     .from('products')
@@ -88,7 +88,7 @@ export async function createProduct(
 
 export async function updateProduct(
   id: string,
-  input: Partial<Pick<Product, 'name' | 'description' | 'base_price' | 'currency' | 'status' | 'sku' | 'unit_of_measure' | 'ar_enabled' | 'ar_placement' | 'form_config' | 'public_preview_enabled'>>
+  input: Partial<Pick<Product, 'name' | 'description' | 'base_price' | 'currency' | 'status' | 'sku' | 'unit_of_measure' | 'ar_enabled' | 'ar_placement' | 'form_config' | 'public_preview_enabled' | 'show_price_breakdown'>>
     & { name_i18n?: Record<string,string>; description_i18n?: Record<string,string> }
 ): Promise<Product> {
   const { data, error } = await supabase

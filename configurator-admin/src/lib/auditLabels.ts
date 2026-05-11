@@ -10,6 +10,7 @@ export const PRODUCT_LABELS: Record<string, string> = {
   unit_of_measure: 'Unit of measure',
   published:       'Published',
   currency:        'Currency',
+  show_price_breakdown: 'Show price breakdown',
 }
 
 export const CHARACTERISTIC_LABELS: Record<string, string> = {

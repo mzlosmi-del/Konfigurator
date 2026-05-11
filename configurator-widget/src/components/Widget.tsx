@@ -254,8 +254,9 @@ export function Widget({ config, track, onThemeLoad }: Props) {
           </div>
         )}
 
-        {/* Pricing breakdown */}
-        {priceBreakdown && (() => {
+        {/* Pricing breakdown — gated by the per-product setting so operators
+            can opt to show the final total only. */}
+        {priceBreakdown && product.show_price_breakdown && (() => {
           const rows: Array<{ label: string; amount: number }> = []
           rows.push({ label: t('Base price'), amount: priceBreakdown.base })
           for (const opt of priceBreakdown.options) {

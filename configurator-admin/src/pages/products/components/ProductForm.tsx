@@ -22,6 +22,7 @@ export type ProductFormValues = {
   currency: string
   sku?: string
   unit_of_measure?: string
+  show_price_breakdown: boolean
 }
 
 interface ProductFormProps {
@@ -44,6 +45,7 @@ export function ProductForm({
     currency:        z.string().length(3),
     sku:             z.string().max(100).optional().or(z.literal('')),
     unit_of_measure: z.string().max(50).optional().or(z.literal('')),
+    show_price_breakdown: z.boolean(),
   })
 
   const {
@@ -53,8 +55,9 @@ export function ProductForm({
   } = useForm<Omit<ProductFormValues, 'name_i18n' | 'description_i18n'>>({
     resolver: zodResolver(schema),
     defaultValues: {
-      currency:   'EUR',
-      base_price: 0,
+      currency:             'EUR',
+      base_price:           0,
+      show_price_breakdown: true,
       ...defaultValues,
     },
   })
@@ -168,6 +171,22 @@ export function ProductForm({
         </FormField>
       </div>
 
+      <FormField
+        label={t('Price display in the widget')}
+        htmlFor="show_price_breakdown"
+        hint={t('When off, customers see only the final total (no per-option breakdown).')}
+      >
+        <label className="flex items-center gap-2 text-sm cursor-pointer">
+          <input
+            id="show_price_breakdown"
+            type="checkbox"
+            className="h-4 w-4 rounded border-input"
+            {...register('show_price_breakdown')}
+          />
+          {t('Show price breakdown')}
+        </label>
+      </FormField>
+
       <div className="flex justify-end gap-2 pt-2">
         {onCancel && (
           <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>
@@ -192,5 +211,6 @@ export function productToFormValues(p: Product): ProductFormValues {
     currency:        p.currency,
     sku:             p.sku ?? '',
     unit_of_measure: p.unit_of_measure ?? '',
+    show_price_breakdown: p.show_price_breakdown ?? true,
   }
 }

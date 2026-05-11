@@ -112,6 +112,7 @@ export function NewProductPage() {
         currency:         values.currency,
         sku:              values.sku?.trim() || null,
         unit_of_measure:  values.unit_of_measure?.trim() || null,
+        show_price_breakdown: values.show_price_breakdown,
       })
       logChange({ entityType: 'product', entityId: product.id, entityName: product.name, changeType: 'create', changedByName: userName })
       navigate(`/products/${product.id}/edit`, { replace: true })
