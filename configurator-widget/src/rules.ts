@@ -1,4 +1,7 @@
-import type { ConfigurationRule, Selection, NumericInputs } from './types'
+import type {
+  ConfigurationRule, NumExpr, RulePredicate, RuleEffect as RuleEffectV2,
+  Selection, NumericInputs,
+} from './types'
 
 export interface RuleEffect {
   hiddenValues:         Set<string>              // value IDs that should be hidden
@@ -10,13 +13,85 @@ export interface RuleEffect {
   lockedNumericValues:  Record<string, number>   // charId → number (customer cannot override)
 }
 
+function evalNumExpr(expr: NumExpr, numericInputs: NumericInputs): number {
+  switch (expr.type) {
+    case 'number': return expr.value
+    case 'input':  return numericInputs[expr.char_id] ?? 0
+    case 'arith': {
+      const a = evalNumExpr(expr.left,  numericInputs)
+      const b = evalNumExpr(expr.right, numericInputs)
+      switch (expr.op) {
+        case 'add':      return a + b
+        case 'subtract': return a - b
+        case 'multiply': return a * b
+        case 'divide':   return b === 0 ? 0 : a / b
+      }
+    }
+  }
+}
+
+function evalPredicate(
+  p:             RulePredicate,
+  selection:     Selection,
+  numericInputs: NumericInputs,
+): boolean {
+  switch (p.type) {
+    case 'select_eq':  return selection[p.char_id] === p.value_id
+    case 'select_neq': return selection[p.char_id] !== p.value_id
+    case 'cmp': {
+      const left  = evalNumExpr(p.left,  numericInputs)
+      const right = evalNumExpr(p.right, numericInputs)
+      switch (p.op) {
+        case 'gt':  return left >  right
+        case 'gte': return left >= right
+        case 'lt':  return left <  right
+        case 'lte': return left <= right
+        case 'eq':  return left === right
+        case 'neq': return left !== right
+      }
+    }
+  }
+}
+
+function applyEffect(
+  effect:        RuleEffectV2,
+  result:        RuleEffect,
+  numericInputs: NumericInputs,
+): void {
+  switch (effect.type) {
+    case 'hide_value':
+      result.hiddenValues.add(effect.value_id)
+      return
+    case 'disable_value':
+      result.disabledValues.add(effect.value_id)
+      return
+    case 'set_value_default':
+      result.defaultValues[effect.char_id] = effect.value_id
+      return
+    case 'set_value_locked':
+      result.lockedValues[effect.char_id] = effect.value_id
+      return
+    case 'set_numeric_default':
+      result.defaultNumericValues[effect.char_id] = evalNumExpr(effect.expr, numericInputs)
+      return
+    case 'set_numeric_locked':
+      result.lockedNumericValues[effect.char_id] = evalNumExpr(effect.expr, numericInputs)
+      return
+  }
+}
+
 /**
  * Evaluate all active rules against the current selection and numeric inputs.
+ *
+ * Each rule has a flat predicate list combined via `mode` ('all' = AND,
+ * 'any' = OR). An empty predicate list under `all` is a vacuous true; under
+ * `any` it's false. Effects are applied in array order so a later effect
+ * with the same target deterministically wins.
  */
 export function evaluateRules(
-  rules: ConfigurationRule[],
-  selection: Selection,
-  numericInputs: NumericInputs = {}
+  rules:         ConfigurationRule[],
+  selection:     Selection,
+  numericInputs: NumericInputs = {},
 ): RuleEffect {
   const result: RuleEffect = {
     hiddenValues:         new Set(),
@@ -30,53 +105,16 @@ export function evaluateRules(
 
   for (const rule of rules) {
     if (!rule.is_active) continue
+    const preds = rule.condition?.predicates ?? []
+    const mode  = rule.condition?.mode ?? 'all'
 
-    const { characteristic_id, value_id, numeric_op, numeric_value } = rule.condition
-
-    let conditionMet = false
-    if (numeric_op !== undefined && numeric_value !== undefined) {
-      const inputVal = numericInputs[characteristic_id] ?? 0
-      switch (numeric_op) {
-        case 'gt':  conditionMet = inputVal >  numeric_value; break
-        case 'gte': conditionMet = inputVal >= numeric_value; break
-        case 'lt':  conditionMet = inputVal <  numeric_value; break
-        case 'lte': conditionMet = inputVal <= numeric_value; break
-        case 'eq':  conditionMet = inputVal === numeric_value; break
-      }
-    } else if (value_id !== undefined) {
-      conditionMet = selection[characteristic_id] === value_id
-    }
-
+    const conditionMet = mode === 'all'
+      ? preds.every(p => evalPredicate(p, selection, numericInputs))
+      : preds.some( p => evalPredicate(p, selection, numericInputs))
     if (!conditionMet) continue
 
-    switch (rule.rule_type) {
-      case 'hide_value':
-        if (rule.effect.value_id) result.hiddenValues.add(rule.effect.value_id)
-        break
-
-      case 'disable_value':
-        if (rule.effect.value_id) result.disabledValues.add(rule.effect.value_id)
-        break
-
-      case 'set_value_default':
-        if (rule.effect.characteristic_id) {
-          if (rule.effect.value_id) {
-            result.defaultValues[rule.effect.characteristic_id] = rule.effect.value_id
-          } else if (rule.effect.numeric_value !== undefined) {
-            result.defaultNumericValues[rule.effect.characteristic_id] = rule.effect.numeric_value
-          }
-        }
-        break
-
-      case 'set_value_locked':
-        if (rule.effect.characteristic_id) {
-          if (rule.effect.value_id) {
-            result.lockedValues[rule.effect.characteristic_id] = rule.effect.value_id
-          } else if (rule.effect.numeric_value !== undefined) {
-            result.lockedNumericValues[rule.effect.characteristic_id] = rule.effect.numeric_value
-          }
-        }
-        break
+    for (const effect of rule.effects ?? []) {
+      applyEffect(effect, result, numericInputs)
     }
   }
 

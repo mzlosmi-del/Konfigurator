@@ -98,22 +98,41 @@ export interface VisualizationAsset {
   mesh_rules: MeshRule[]
 }
 
+// Configuration rules v2 — JSONB shapes shared with the admin app. See
+// migrations/074_rules_v2.sql for migration notes and the admin types in
+// configurator-admin/src/types/database.ts for the canonical TS source.
+
+export type RuleComparator = 'gt' | 'gte' | 'lt' | 'lte' | 'eq' | 'neq'
+export type RuleArithOp    = 'add' | 'subtract' | 'multiply' | 'divide'
+
+export type NumExpr =
+  | { type: 'number'; value: number }
+  | { type: 'input';  char_id: string }
+  | { type: 'arith';  op: RuleArithOp; left: NumExpr; right: NumExpr }
+
+export type RulePredicate =
+  | { type: 'select_eq';  char_id: string; value_id: string }
+  | { type: 'select_neq'; char_id: string; value_id: string }
+  | { type: 'cmp';        op: RuleComparator; left: NumExpr; right: NumExpr }
+
+export interface RuleCondition {
+  mode:       'all' | 'any'
+  predicates: RulePredicate[]
+}
+
+export type RuleEffect =
+  | { type: 'hide_value';          value_id: string }
+  | { type: 'disable_value';       value_id: string }
+  | { type: 'set_value_default';   char_id: string; value_id: string }
+  | { type: 'set_value_locked';    char_id: string; value_id: string }
+  | { type: 'set_numeric_default'; char_id: string; expr: NumExpr }
+  | { type: 'set_numeric_locked';  char_id: string; expr: NumExpr }
+
 export interface ConfigurationRule {
-  id: string
-  rule_type: 'hide_value' | 'disable_value' | 'price_override' | 'set_value_default' | 'set_value_locked'
-  condition: {
-    characteristic_id: string
-    value_id?: string
-    numeric_op?: 'gt' | 'gte' | 'lt' | 'lte' | 'eq'
-    numeric_value?: number
-  }
-  effect: {
-    characteristic_id?: string
-    value_id?: string
-    price_modifier?: number
-    numeric_value?: number
-  }
-  is_active: boolean
+  id:         string
+  condition:  RuleCondition
+  effects:    RuleEffect[]
+  is_active:  boolean
 }
 
 // ── Formula AST ─────────────────────────────────────────────────────────────

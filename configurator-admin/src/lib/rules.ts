@@ -1,5 +1,5 @@
 import { supabase } from './supabase'
-import type { ConfigurationRule, RuleType } from '@/types/database'
+import type { ConfigurationRule, RuleCondition, RuleEffect } from '@/types/database'
 
 export async function fetchRules(productId: string): Promise<ConfigurationRule[]> {
   const { data, error } = await supabase
@@ -13,13 +13,12 @@ export async function fetchRules(productId: string): Promise<ConfigurationRule[]
 
 export async function createRule(input: {
   product_id: string
-  rule_type: RuleType
-  condition: ConfigurationRule['condition']
-  effect: ConfigurationRule['effect']
+  condition:  RuleCondition
+  effects:    RuleEffect[]
 }): Promise<ConfigurationRule> {
   const { data, error } = await supabase
     .from('configuration_rules')
-    .insert({ ...input, is_active: true } as any)
+    .insert({ ...input, is_active: true } as never)
     .select()
     .single()
   if (error) throw new Error(error.message)
@@ -28,7 +27,7 @@ export async function createRule(input: {
 
 export async function updateRule(
   id: string,
-  input: Partial<Pick<ConfigurationRule, 'rule_type' | 'condition' | 'effect' | 'is_active'>>
+  input: Partial<Pick<ConfigurationRule, 'condition' | 'effects' | 'is_active'>>,
 ): Promise<ConfigurationRule> {
   const { data, error } = await supabase
     .from('configuration_rules')

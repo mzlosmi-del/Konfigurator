@@ -14,9 +14,10 @@ const defaultRule: ConfigurationRule = {
   id:         'rule-1',
   tenant_id:  'tenant-1',
   product_id: 'prod-1',
-  rule_type:  'set_value_default',
-  condition:  { characteristic_id: charA, value_id: valX },
-  effect:     { characteristic_id: charB, value_id: valY },
+  condition:  { mode: 'all', predicates: [
+    { type: 'select_eq', char_id: charA, value_id: valX },
+  ]},
+  effects:    [{ type: 'set_value_default', char_id: charB, value_id: valY }],
   is_active:  true,
   created_at: '',
   updated_at: '',

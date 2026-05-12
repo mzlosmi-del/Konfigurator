@@ -1,115 +1,41 @@
 import { useEffect, useState } from 'react'
-import { Trash2 } from 'lucide-react'
+import { Plus, Trash2, X } from 'lucide-react'
 import { fetchRules, createRule, deleteRule } from '@/lib/rules'
 import { fetchProductCharacteristicsWithValues } from '@/lib/products'
-import type { ConfigurationRule, RuleType, Characteristic, CharacteristicValue } from '@/types/database'
+import type {
+  Characteristic, CharacteristicValue, ConfigurationRule,
+  NumExpr, RuleComparator, RuleCondition, RuleEffect, RuleEffectKind,
+  RulePredicate,
+} from '@/types/database'
 import { Button } from '@/components/ui/button'
+import { Select } from '@/components/ui/select'
 import { Spinner } from '@/components/ui/spinner'
 import { useToast } from '@/hooks/useToast'
 import { Toaster } from '@/components/ui/toast'
 import { t, getLang, pickTranslation, type Lang } from '@/i18n'
+import {
+  COMPARATOR_LABELS, EFFECT_KINDS,
+  emptyCondition, emptySelectPredicate, emptyCmpPredicate,
+  emptyEffect, describeRule,
+} from '@/lib/rulesShape'
+import { NumExprInput } from './NumExprInput'
 
 interface Props {
   productId: string
 }
 
 type ValuesMap = Record<string, CharacteristicValue[]>
-type NumericOp = 'gt' | 'gte' | 'lt' | 'lte' | 'eq'
 
-const NUMERIC_OPS: { op: NumericOp; label: string }[] = [
-  { op: 'gt',  label: '>'  },
-  { op: 'gte', label: '≥'  },
-  { op: 'lt',  label: '<'  },
-  { op: 'lte', label: '≤'  },
-  { op: 'eq',  label: '='  },
-]
+const COMPARATORS: RuleComparator[] = ['gt', 'gte', 'lt', 'lte', 'eq', 'neq']
 
-const RULE_TYPE_CONFIG: Partial<Record<RuleType, { label: string; active: string }>> = {
-  hide_value:        { label: 'Hide value',     active: 'bg-amber-100 text-amber-700 border-amber-300' },
-  disable_value:     { label: 'Disable value',  active: 'bg-orange-100 text-orange-700 border-orange-300' },
-  set_value_default: { label: 'Set default',    active: 'bg-emerald-100 text-emerald-700 border-emerald-300' },
-  set_value_locked:  { label: 'Lock value',     active: 'bg-purple-100 text-purple-700 border-purple-300' },
+const EFFECT_PILL_STYLE: Record<RuleEffectKind, string> = {
+  hide_value:          'bg-amber-100 text-amber-700 border-amber-300',
+  disable_value:       'bg-orange-100 text-orange-700 border-orange-300',
+  set_value_default:   'bg-emerald-100 text-emerald-700 border-emerald-300',
+  set_value_locked:    'bg-purple-100 text-purple-700 border-purple-300',
+  set_numeric_default: 'bg-emerald-100 text-emerald-700 border-emerald-300',
+  set_numeric_locked:  'bg-purple-100 text-purple-700 border-purple-300',
 }
-
-const RULE_TYPES: RuleType[] = [
-  'hide_value', 'disable_value', 'set_value_default', 'set_value_locked',
-]
-
-function requiresSelectTarget(ruleType: RuleType) {
-  return ruleType === 'hide_value' || ruleType === 'disable_value'
-}
-
-// ── Pill pickers ──────────────────────────────────────────────────────────────
-
-function CharPicker({ value, chars, onChange, lang }: {
-  value: string
-  chars: Characteristic[]
-  onChange: (id: string) => void
-  lang: string
-}) {
-  if (chars.length === 0) {
-    return <span className="text-xs text-muted-foreground italic">{t('No characteristics available')}</span>
-  }
-  return (
-    <div className="flex flex-wrap gap-1">
-      {chars.map(c => (
-        <button
-          key={c.id}
-          type="button"
-          onClick={() => onChange(c.id)}
-          className={[
-            'px-2 py-0.5 rounded-full text-xs border font-medium transition-colors',
-            value === c.id
-              ? 'bg-primary text-primary-foreground border-primary'
-              : 'bg-background border-input hover:bg-muted',
-          ].join(' ')}
-        >
-          {pickTranslation(c.name_i18n as Record<string,string> | null, lang, c.name)}
-        </button>
-      ))}
-    </div>
-  )
-}
-
-function ValuePicker({ charId, value, valuesMap, onChange, lang }: {
-  charId: string
-  value: string
-  valuesMap: ValuesMap
-  onChange: (id: string) => void
-  lang: string
-}) {
-  const vals = valuesMap[charId] ?? []
-  if (vals.length === 0) {
-    return <span className="text-xs text-muted-foreground italic">{t('No values')}</span>
-  }
-  return (
-    <div className="flex flex-wrap gap-1">
-      {vals.map(v => (
-        <button
-          key={v.id}
-          type="button"
-          onClick={() => onChange(v.id)}
-          className={[
-            'px-2 py-0.5 rounded-full text-xs border transition-colors',
-            value === v.id
-              ? 'bg-primary text-primary-foreground border-primary'
-              : 'bg-background border-input hover:bg-muted',
-          ].join(' ')}
-        >
-          {pickTranslation(v.label_i18n as Record<string,string> | null, lang, v.label)}
-        </button>
-      ))}
-    </div>
-  )
-}
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-function isNumeric(charId: string, chars: Characteristic[]) {
-  return chars.find(c => c.id === charId)?.display_type === 'number'
-}
-
-// ── Main component ────────────────────────────────────────────────────────────
 
 export function RulesPanel({ productId }: Props) {
   const { toasts, toast, dismiss } = useToast()
@@ -121,25 +47,14 @@ export function RulesPanel({ productId }: Props) {
     return () => window.removeEventListener('langchange', handler)
   }, [])
 
-  const [loading, setLoading]               = useState(true)
-  const [rules, setRules]                   = useState<ConfigurationRule[]>([])
+  const [loading, setLoading]                 = useState(true)
+  const [rules, setRules]                     = useState<ConfigurationRule[]>([])
   const [characteristics, setCharacteristics] = useState<Characteristic[]>([])
-  const [valuesMap, setValuesMap]           = useState<ValuesMap>({})
+  const [valuesMap, setValuesMap]             = useState<ValuesMap>({})
 
-  // Condition
-  const [condCharId, setCondCharId]         = useState('')
-  const [condValueId, setCondValueId]       = useState('')
-  const [condNumericOp, setCondNumericOp]   = useState<NumericOp>('gt')
-  const [condNumericVal, setCondNumericVal] = useState('0')
-
-  // Action
-  const [ruleType, setRuleType]             = useState<RuleType>('hide_value')
-
-  // Effect target
-  const [effCharId, setEffCharId]           = useState('')
-  const [effValueId, setEffValueId]         = useState('')
-  const [effNumericVal, setEffNumericVal]   = useState('0')
-
+  // Edit-buffer for the rule being built. Cleared after save.
+  const [draftCondition, setDraftCondition] = useState<RuleCondition>(emptyCondition())
+  const [draftEffects,   setDraftEffects]   = useState<RuleEffect[]>([])
   const [saving, setSaving]                 = useState(false)
 
   useEffect(() => { load() }, [productId])
@@ -167,55 +82,28 @@ export function RulesPanel({ productId }: Props) {
     }
   }
 
-  function handleCondCharChange(id: string) {
-    setCondCharId(id)
-    setCondValueId('')
-  }
-
-  function handleEffCharChange(id: string) {
-    setEffCharId(id)
-    setEffValueId('')
-  }
-
   async function handleAdd() {
-    if (!condCharId) {
-      toast({ title: t('Select a condition characteristic'), variant: 'destructive' })
+    // Light client-side validation; the rules-engine evaluator tolerates a
+    // missing field by simply not firing, but a half-built rule is almost
+    // certainly a user mistake.
+    if (draftCondition.predicates.length === 0) {
+      toast({ title: t('Add at least one condition'), variant: 'destructive' })
       return
     }
-    const condIsNumeric = isNumeric(condCharId, characteristics)
-    if (!condIsNumeric && !condValueId) {
-      toast({ title: t('Select a condition value'), variant: 'destructive' })
+    if (draftEffects.length === 0) {
+      toast({ title: t('Add at least one effect'), variant: 'destructive' })
       return
     }
-    if (!effCharId) {
-      toast({ title: t('Select a target characteristic'), variant: 'destructive' })
-      return
-    }
-    const effIsNumeric = isNumeric(effCharId, characteristics)
-    if (!effIsNumeric && !effValueId) {
-      toast({ title: t('Select a target value'), variant: 'destructive' })
-      return
-    }
-
-    const condition: ConfigurationRule['condition'] = condIsNumeric
-      ? { characteristic_id: condCharId, numeric_op: condNumericOp, numeric_value: parseFloat(condNumericVal) || 0 }
-      : { characteristic_id: condCharId, value_id: condValueId }
-
-    const effect: ConfigurationRule['effect'] = effIsNumeric
-      ? { characteristic_id: effCharId, numeric_value: parseFloat(effNumericVal) || 0 }
-      : { characteristic_id: effCharId, value_id: effValueId }
-
     setSaving(true)
     try {
       const created = await createRule({
         product_id: productId,
-        rule_type: ruleType,
-        condition,
-        effect,
+        condition:  draftCondition,
+        effects:    draftEffects,
       })
       setRules(prev => [...prev, created])
-      setCondCharId(''); setCondValueId(''); setCondNumericVal('0')
-      setEffCharId(''); setEffValueId(''); setEffNumericVal('0')
+      setDraftCondition(emptyCondition())
+      setDraftEffects([])
       toast({ title: t('Rule added') })
     } catch (e) {
       toast({ title: t('Failed to add rule'), description: e instanceof Error ? e.message : undefined, variant: 'destructive' })
@@ -233,219 +121,54 @@ export function RulesPanel({ productId }: Props) {
     }
   }
 
-  function charName(id: string) {
-    const c = characteristics.find(c => c.id === id)
-    return c ? pickTranslation(c.name_i18n as Record<string,string> | null, lang, c.name) : id
-  }
-
-  function valueName(charId: string, valueId: string) {
-    const v = valuesMap[charId]?.find(v => v.id === valueId)
-    return v ? pickTranslation(v.label_i18n as Record<string,string> | null, lang, v.label) : valueId
-  }
-
-  function ruleConditionLabel(rule: ConfigurationRule) {
-    const cond = rule.condition
-    if (cond.numeric_op !== undefined) {
-      const opLabel = NUMERIC_OPS.find(o => o.op === cond.numeric_op)?.label ?? cond.numeric_op
-      return (
-        <>
-          <span className="px-2 py-0.5 rounded-full text-xs border bg-background font-medium">{charName(cond.characteristic_id)}</span>
-          <span className="text-xs text-muted-foreground font-mono">{opLabel}</span>
-          <span className="px-2 py-0.5 rounded-full text-xs border bg-background font-mono">{cond.numeric_value}</span>
-        </>
-      )
-    }
-    return (
-      <>
-        <span className="px-2 py-0.5 rounded-full text-xs border bg-background font-medium">{charName(cond.characteristic_id)}</span>
-        <span className="text-xs text-muted-foreground">=</span>
-        <span className="px-2 py-0.5 rounded-full text-xs border bg-background">{valueName(cond.characteristic_id, cond.value_id ?? '')}</span>
-      </>
-    )
-  }
-
   if (loading) {
     return <div className="flex justify-center py-10"><Spinner /></div>
   }
 
-  const condIsNumeric = isNumeric(condCharId, characteristics)
-  const effectChars = requiresSelectTarget(ruleType)
-    ? characteristics.filter(c => c.display_type !== 'number')
-    : characteristics
-  const effIsNumeric = isNumeric(effCharId, characteristics)
-
   return (
     <div className="space-y-5">
-
-      {/* ── Existing rules ─────────────────────────────────────────────────── */}
+      {/* ── Existing rules ───────────────────────────────────────────────── */}
       {rules.length === 0 ? (
         <p className="text-sm text-muted-foreground py-2">{t('No rules yet. Add one below.')}</p>
       ) : (
         <div className="space-y-2">
-          {rules.map(rule => {
-            const cfg = RULE_TYPE_CONFIG[rule.rule_type]
-            if (!cfg) return null
-            return (
-              <div key={rule.id} className="flex items-center gap-2 rounded-lg border bg-muted/20 px-4 py-3">
-                <div className="flex-1 flex items-center gap-1.5 flex-wrap text-sm">
-                  <span className="text-xs font-bold text-primary">{t('IF')}</span>
-                  {ruleConditionLabel(rule)}
-                  <span className="text-xs text-muted-foreground mx-0.5">→</span>
-                  <span className={`px-2 py-0.5 rounded-full text-xs border font-medium ${cfg.active}`}>
-                    {t(cfg.label)}
-                  </span>
-                  {rule.effect.characteristic_id && (
-                    <>
-                      <span className="text-xs text-muted-foreground">{t('on')}</span>
-                      <span className="px-2 py-0.5 rounded-full text-xs border bg-background font-medium">
-                        {charName(rule.effect.characteristic_id)}
-                      </span>
-                    </>
-                  )}
-                  {rule.effect.value_id && (
-                    <>
-                      <span className="text-xs text-muted-foreground">=</span>
-                      <span className="px-2 py-0.5 rounded-full text-xs border bg-background">
-                        {valueName(rule.effect.characteristic_id ?? '', rule.effect.value_id)}
-                      </span>
-                    </>
-                  )}
-                  {rule.effect.numeric_value !== undefined && (
-                    <span className="px-2 py-0.5 rounded-full text-xs border bg-background font-mono">
-                      = {rule.effect.numeric_value}
-                    </span>
-                  )}
-
-                </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7 text-destructive hover:text-destructive shrink-0"
-                  onClick={() => handleDelete(rule.id)}
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </Button>
+          {rules.map(rule => (
+            <div key={rule.id} className="flex items-start gap-2 rounded-lg border bg-muted/20 px-4 py-3">
+              <div className="flex-1 min-w-0 space-y-1.5 text-sm">
+                <RuleSummary rule={rule} chars={characteristics} valuesMap={valuesMap} lang={lang} />
               </div>
-            )
-          })}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 text-destructive hover:text-destructive shrink-0"
+                onClick={() => handleDelete(rule.id)}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          ))}
         </div>
       )}
 
-      {/* ── New rule form ──────────────────────────────────────────────────── */}
+      {/* ── New rule form ────────────────────────────────────────────────── */}
       <div className="rounded-lg border p-4 space-y-4 bg-muted/10">
         <p className="text-sm font-medium">{t('New rule')}</p>
 
-        {/* Step 1: Condition */}
-        <div className="space-y-2">
-          <div className="flex items-start gap-3">
-            <span className="text-xs font-bold text-primary pt-1 w-10 shrink-0">{t('IF')}</span>
-            <CharPicker value={condCharId} chars={characteristics} onChange={handleCondCharChange} lang={lang} />
-          </div>
+        <ConditionEditor
+          value={draftCondition}
+          onChange={setDraftCondition}
+          chars={characteristics}
+          valuesMap={valuesMap}
+          lang={lang}
+        />
 
-          {/* Select-type condition: value picker */}
-          {condCharId && !condIsNumeric && (
-            <div className="flex items-start gap-3 pl-[52px]">
-              <span className="text-xs text-muted-foreground pt-1">=</span>
-              <ValuePicker
-                charId={condCharId}
-                value={condValueId}
-                valuesMap={valuesMap}
-                onChange={setCondValueId}
-                lang={lang}
-              />
-            </div>
-          )}
-
-          {/* Numeric condition: op pills + number input */}
-          {condCharId && condIsNumeric && (
-            <div className="flex items-center gap-2 pl-[52px] flex-wrap">
-              {NUMERIC_OPS.map(({ op, label }) => (
-                <button
-                  key={op}
-                  type="button"
-                  onClick={() => setCondNumericOp(op)}
-                  className={[
-                    'px-2.5 py-0.5 rounded-full text-xs border font-mono font-medium transition-colors',
-                    condNumericOp === op
-                      ? 'bg-primary text-primary-foreground border-primary'
-                      : 'bg-background border-input hover:bg-muted',
-                  ].join(' ')}
-                >
-                  {label}
-                </button>
-              ))}
-              <input
-                type="number"
-                value={condNumericVal}
-                onChange={e => setCondNumericVal(e.target.value)}
-                className="w-24 rounded border border-input bg-background px-2 py-0.5 text-xs shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
-                placeholder={t('value')}
-              />
-            </div>
-          )}
-        </div>
-
-        {/* Step 2: Action */}
-        <div className="flex items-start gap-3">
-          <span className="text-xs font-bold text-primary pt-1 w-10 shrink-0">{t('THEN')}</span>
-          <div className="flex flex-wrap gap-1.5">
-            {RULE_TYPES.map(rt => {
-              const cfg = RULE_TYPE_CONFIG[rt]!
-              const selected = ruleType === rt
-              return (
-                <button
-                  key={rt}
-                  type="button"
-                  onClick={() => { setRuleType(rt); setEffCharId(''); setEffValueId('') }}
-                  className={[
-                    'px-2.5 py-1 rounded-full text-xs border font-medium transition-colors',
-                    selected ? cfg.active : 'bg-background border-input hover:bg-muted',
-                  ].join(' ')}
-                >
-                  {t(cfg.label)}
-                </button>
-              )
-            })}
-          </div>
-        </div>
-
-        {/* Step 3: Target characteristic */}
-        <div className="space-y-2">
-          <div className="flex items-start gap-3">
-            <span className="text-xs font-bold text-primary pt-1 w-10 shrink-0">{t('ON')}</span>
-            <CharPicker value={effCharId} chars={effectChars} onChange={handleEffCharChange} lang={lang} />
-          </div>
-
-          {/* Select-type target: value picker */}
-          {effCharId && !effIsNumeric && (
-            <div className="flex items-start gap-3 pl-[52px]">
-              <span className="text-xs text-muted-foreground pt-1">=</span>
-              <ValuePicker
-                charId={effCharId}
-                value={effValueId}
-                valuesMap={valuesMap}
-                onChange={setEffValueId}
-                lang={lang}
-              />
-            </div>
-          )}
-
-          {/* Numeric target: number input (for set default / lock) */}
-          {effCharId && effIsNumeric && (ruleType === 'set_value_default' || ruleType === 'set_value_locked') && (
-            <div className="flex items-center gap-2 pl-[52px]">
-              <span className="text-xs text-muted-foreground">=</span>
-              <input
-                type="number"
-                value={effNumericVal}
-                onChange={e => setEffNumericVal(e.target.value)}
-                className="w-28 rounded border border-input bg-background px-2 py-1 text-xs shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
-                placeholder={t('value')}
-              />
-            </div>
-          )}
-
-
-        </div>
+        <EffectsEditor
+          value={draftEffects}
+          onChange={setDraftEffects}
+          chars={characteristics}
+          valuesMap={valuesMap}
+          lang={lang}
+        />
 
         <div className="flex justify-end">
           <Button size="sm" onClick={handleAdd} loading={saving} disabled={saving}>
@@ -455,6 +178,400 @@ export function RulesPanel({ productId }: Props) {
       </div>
 
       <Toaster toasts={toasts} onDismiss={dismiss} />
+    </div>
+  )
+}
+
+// ── Rule list summary ───────────────────────────────────────────────────
+
+function RuleSummary({
+  rule, chars, valuesMap, lang,
+}: {
+  rule:      ConfigurationRule
+  chars:     Characteristic[]
+  valuesMap: ValuesMap
+  lang:      string
+}) {
+  return (
+    <div className="flex items-center gap-1.5 flex-wrap">
+      <span className="text-xs font-bold text-primary">{t('IF')}</span>
+      <span className="text-xs text-muted-foreground font-mono uppercase">
+        {rule.condition.mode === 'all' ? t('ALL') : t('ANY')}
+      </span>
+      {rule.condition.predicates.map((p, i) => (
+        <span key={i} className="px-2 py-0.5 rounded-full text-xs border bg-background">
+          {predicateLabel(p, chars, valuesMap, lang)}
+        </span>
+      ))}
+      <span className="text-xs text-muted-foreground mx-0.5">→</span>
+      {rule.effects.map((e, i) => (
+        <span key={i} className={`px-2 py-0.5 rounded-full text-xs border font-medium ${EFFECT_PILL_STYLE[e.type]}`}>
+          {effectLabel(e, chars, valuesMap, lang)}
+        </span>
+      ))}
+      <span className="sr-only">{describeRule(rule, chars, valuesMap, lang)}</span>
+    </div>
+  )
+}
+
+function predicateLabel(
+  p:         RulePredicate,
+  chars:     Characteristic[],
+  valuesMap: ValuesMap,
+  lang:      string,
+): string {
+  if (p.type === 'select_eq' || p.type === 'select_neq') {
+    const op = p.type === 'select_eq' ? '=' : '≠'
+    return `${charNameOrId(chars, p.char_id, lang)} ${op} ${valueNameOrId(valuesMap, p.char_id, p.value_id, lang)}`
+  }
+  return `${numExprText(p.left, chars, lang)} ${COMPARATOR_LABELS[p.op]} ${numExprText(p.right, chars, lang)}`
+}
+
+function effectLabel(
+  e:         RuleEffect,
+  chars:     Characteristic[],
+  valuesMap: ValuesMap,
+  lang:      string,
+): string {
+  const kindLabel = EFFECT_KINDS.find(k => k.kind === e.type)?.label ?? e.type
+  switch (e.type) {
+    case 'hide_value':
+    case 'disable_value':
+      return `${kindLabel}: ${anyValueNameOrId(valuesMap, e.value_id, lang)}`
+    case 'set_value_default':
+    case 'set_value_locked':
+      return `${kindLabel}: ${charNameOrId(chars, e.char_id, lang)} = ${valueNameOrId(valuesMap, e.char_id, e.value_id, lang)}`
+    case 'set_numeric_default':
+    case 'set_numeric_locked':
+      return `${kindLabel}: ${charNameOrId(chars, e.char_id, lang)} = ${numExprText(e.expr, chars, lang)}`
+  }
+}
+
+function numExprText(expr: NumExpr, chars: Characteristic[], lang: string): string {
+  if (expr.type === 'number') return String(expr.value)
+  if (expr.type === 'input') return charNameOrId(chars, expr.char_id, lang)
+  const opSym = { add: '+', subtract: '−', multiply: '×', divide: '÷' }[expr.op]
+  return `(${numExprText(expr.left, chars, lang)} ${opSym} ${numExprText(expr.right, chars, lang)})`
+}
+
+function charNameOrId(chars: Characteristic[], id: string, lang: string) {
+  const c = chars.find(c => c.id === id)
+  return c ? pickTranslation(c.name_i18n as Record<string, string> | null, lang, c.name) : id || '—'
+}
+function valueNameOrId(map: ValuesMap, charId: string, valueId: string, lang: string) {
+  const v = map[charId]?.find(v => v.id === valueId)
+  return v ? pickTranslation(v.label_i18n as Record<string, string> | null, lang, v.label) : valueId || '—'
+}
+function anyValueNameOrId(map: ValuesMap, valueId: string, lang: string) {
+  for (const list of Object.values(map)) {
+    const v = list.find(v => v.id === valueId)
+    if (v) return pickTranslation(v.label_i18n as Record<string, string> | null, lang, v.label)
+  }
+  return valueId || '—'
+}
+
+// ── Condition editor ────────────────────────────────────────────────────
+
+function ConditionEditor({
+  value, onChange, chars, valuesMap, lang,
+}: {
+  value:     RuleCondition
+  onChange:  (next: RuleCondition) => void
+  chars:     Characteristic[]
+  valuesMap: ValuesMap
+  lang:      string
+}) {
+  function setMode(mode: 'all' | 'any') {
+    onChange({ ...value, mode })
+  }
+  function setPredicate(i: number, p: RulePredicate) {
+    const next = value.predicates.slice()
+    next[i] = p
+    onChange({ ...value, predicates: next })
+  }
+  function removePredicate(i: number) {
+    onChange({ ...value, predicates: value.predicates.filter((_, j) => j !== i) })
+  }
+  function addPredicate(kind: 'select_eq' | 'cmp') {
+    onChange({
+      ...value,
+      predicates: [...value.predicates, kind === 'select_eq' ? emptySelectPredicate() : emptyCmpPredicate()],
+    })
+  }
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-2">
+        <span className="text-xs font-bold text-primary w-16 shrink-0">{t('IF')}</span>
+        <div className="inline-flex rounded-md border overflow-hidden text-xs">
+          {(['all', 'any'] as const).map(m => (
+            <button
+              key={m}
+              type="button"
+              onClick={() => setMode(m)}
+              className={[
+                'px-2.5 py-1 font-medium transition-colors',
+                value.mode === m ? 'bg-primary text-primary-foreground' : 'bg-background hover:bg-muted',
+              ].join(' ')}
+            >
+              {m === 'all' ? t('ALL match (AND)') : t('ANY match (OR)')}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="space-y-1.5 pl-[72px]">
+        {value.predicates.map((p, i) => (
+          <PredicateRow
+            key={i}
+            value={p}
+            onChange={next => setPredicate(i, next)}
+            onRemove={() => removePredicate(i)}
+            chars={chars}
+            valuesMap={valuesMap}
+            lang={lang}
+          />
+        ))}
+        <div className="flex gap-2 pt-1">
+          <Button variant="outline" size="sm" onClick={() => addPredicate('select_eq')}>
+            <Plus className="h-3 w-3 mr-1" />
+            {t('Value condition')}
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => addPredicate('cmp')}>
+            <Plus className="h-3 w-3 mr-1" />
+            {t('Numeric condition')}
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function PredicateRow({
+  value, onChange, onRemove, chars, valuesMap, lang,
+}: {
+  value:     RulePredicate
+  onChange:  (next: RulePredicate) => void
+  onRemove:  () => void
+  chars:     Characteristic[]
+  valuesMap: ValuesMap
+  lang:      string
+}) {
+  if (value.type === 'select_eq' || value.type === 'select_neq') {
+    const selectChars = chars.filter(c => c.display_type !== 'number')
+    return (
+      <div className="flex items-center gap-2 flex-wrap">
+        <Select
+          value={value.char_id}
+          onChange={e => onChange({ ...value, char_id: e.target.value, value_id: '' })}
+          className="text-xs h-7 w-44"
+        >
+          <option value="">{t('(characteristic)')}</option>
+          {selectChars.map(c => (
+            <option key={c.id} value={c.id}>
+              {pickTranslation(c.name_i18n as Record<string, string> | null, lang, c.name)}
+            </option>
+          ))}
+        </Select>
+        <Select
+          value={value.type}
+          onChange={e => onChange({ ...value, type: e.target.value as 'select_eq' | 'select_neq' })}
+          className="text-xs h-7 w-16"
+        >
+          <option value="select_eq">=</option>
+          <option value="select_neq">≠</option>
+        </Select>
+        <Select
+          value={value.value_id}
+          onChange={e => onChange({ ...value, value_id: e.target.value })}
+          className="text-xs h-7 w-44"
+          disabled={!value.char_id}
+        >
+          <option value="">{t('(value)')}</option>
+          {(valuesMap[value.char_id] ?? []).map(v => (
+            <option key={v.id} value={v.id}>
+              {pickTranslation(v.label_i18n as Record<string, string> | null, lang, v.label)}
+            </option>
+          ))}
+        </Select>
+        <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={onRemove}>
+          <X className="h-3.5 w-3.5" />
+        </Button>
+      </div>
+    )
+  }
+
+  // numeric comparison
+  return (
+    <div className="flex items-center gap-2 flex-wrap">
+      <NumExprInput value={value.left} onChange={left => onChange({ ...value, left })} chars={chars} lang={lang} />
+      <Select
+        value={value.op}
+        onChange={e => onChange({ ...value, op: e.target.value as RuleComparator })}
+        className="text-xs h-7 w-16 font-mono"
+      >
+        {COMPARATORS.map(op => (
+          <option key={op} value={op}>{COMPARATOR_LABELS[op]}</option>
+        ))}
+      </Select>
+      <NumExprInput value={value.right} onChange={right => onChange({ ...value, right })} chars={chars} lang={lang} />
+      <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={onRemove}>
+        <X className="h-3.5 w-3.5" />
+      </Button>
+    </div>
+  )
+}
+
+// ── Effects editor ───────────────────────────────────────────────────────
+
+function EffectsEditor({
+  value, onChange, chars, valuesMap, lang,
+}: {
+  value:     RuleEffect[]
+  onChange:  (next: RuleEffect[]) => void
+  chars:     Characteristic[]
+  valuesMap: ValuesMap
+  lang:      string
+}) {
+  function setEffect(i: number, e: RuleEffect) {
+    const next = value.slice()
+    next[i] = e
+    onChange(next)
+  }
+  function removeEffect(i: number) {
+    onChange(value.filter((_, j) => j !== i))
+  }
+  function addEffect() {
+    onChange([...value, emptyEffect('hide_value')])
+  }
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-2">
+        <span className="text-xs font-bold text-primary w-16 shrink-0">{t('THEN')}</span>
+        <Button variant="outline" size="sm" onClick={addEffect}>
+          <Plus className="h-3 w-3 mr-1" />
+          {t('Add effect')}
+        </Button>
+      </div>
+      <div className="space-y-1.5 pl-[72px]">
+        {value.map((e, i) => (
+          <EffectRow
+            key={i}
+            value={e}
+            onChange={next => setEffect(i, next)}
+            onRemove={() => removeEffect(i)}
+            chars={chars}
+            valuesMap={valuesMap}
+            lang={lang}
+          />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function EffectRow({
+  value, onChange, onRemove, chars, valuesMap, lang,
+}: {
+  value:     RuleEffect
+  onChange:  (next: RuleEffect) => void
+  onRemove:  () => void
+  chars:     Characteristic[]
+  valuesMap: ValuesMap
+  lang:      string
+}) {
+  const numericChars = chars.filter(c => c.display_type === 'number')
+  const selectChars  = chars.filter(c => c.display_type !== 'number')
+
+  function changeKind(kind: RuleEffectKind) {
+    onChange(emptyEffect(kind))
+  }
+
+  return (
+    <div className="flex items-center gap-2 flex-wrap">
+      <Select
+        value={value.type}
+        onChange={e => changeKind(e.target.value as RuleEffectKind)}
+        className="text-xs h-7 w-44"
+      >
+        {EFFECT_KINDS.map(k => (
+          <option key={k.kind} value={k.kind}>{t(k.label)}</option>
+        ))}
+      </Select>
+
+      {/* Target characteristic (omitted for hide/disable — those target a value globally) */}
+      {(value.type === 'set_value_default' || value.type === 'set_value_locked'
+        || value.type === 'set_numeric_default' || value.type === 'set_numeric_locked') && (
+        <Select
+          value={value.char_id}
+          onChange={e => {
+            if (value.type === 'set_value_default' || value.type === 'set_value_locked') {
+              onChange({ ...value, char_id: e.target.value, value_id: '' })
+            } else {
+              onChange({ ...value, char_id: e.target.value })
+            }
+          }}
+          className="text-xs h-7 w-44"
+        >
+          <option value="">{t('(target characteristic)')}</option>
+          {((value.type === 'set_numeric_default' || value.type === 'set_numeric_locked') ? numericChars : selectChars)
+            .map(c => (
+              <option key={c.id} value={c.id}>
+                {pickTranslation(c.name_i18n as Record<string, string> | null, lang, c.name)}
+              </option>
+            ))}
+        </Select>
+      )}
+
+      {/* Value picker for hide / disable / set_value_default / set_value_locked */}
+      {(value.type === 'hide_value' || value.type === 'disable_value') && (
+        <Select
+          value={value.value_id}
+          onChange={e => onChange({ ...value, value_id: e.target.value })}
+          className="text-xs h-7 w-56"
+        >
+          <option value="">{t('(value to hide/disable)')}</option>
+          {chars.flatMap(c =>
+            (valuesMap[c.id] ?? []).map(v => (
+              <option key={v.id} value={v.id}>
+                {pickTranslation(c.name_i18n as Record<string, string> | null, lang, c.name)}
+                {' · '}
+                {pickTranslation(v.label_i18n as Record<string, string> | null, lang, v.label)}
+              </option>
+            )),
+          )}
+        </Select>
+      )}
+      {(value.type === 'set_value_default' || value.type === 'set_value_locked') && (
+        <Select
+          value={value.value_id}
+          onChange={e => onChange({ ...value, value_id: e.target.value })}
+          className="text-xs h-7 w-44"
+          disabled={!value.char_id}
+        >
+          <option value="">{t('(value)')}</option>
+          {(valuesMap[value.char_id] ?? []).map(v => (
+            <option key={v.id} value={v.id}>
+              {pickTranslation(v.label_i18n as Record<string, string> | null, lang, v.label)}
+            </option>
+          ))}
+        </Select>
+      )}
+
+      {/* Numeric expression for numeric defaults / locks */}
+      {(value.type === 'set_numeric_default' || value.type === 'set_numeric_locked') && (
+        <NumExprInput
+          value={value.expr}
+          onChange={expr => onChange({ ...value, expr })}
+          chars={chars}
+          lang={lang}
+        />
+      )}
+
+      <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={onRemove}>
+        <X className="h-3.5 w-3.5" />
+      </Button>
     </div>
   )
 }

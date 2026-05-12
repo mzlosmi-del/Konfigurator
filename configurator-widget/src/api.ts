@@ -90,7 +90,7 @@ export async function loadProductConfig(config: WidgetConfig): Promise<FullProdu
       .eq('product_id', config.productId)
       .order('sort_order', { ascending: true }),
     sb.from('configuration_rules')
-      .select('id, rule_type, condition, effect, is_active')
+      .select('id, condition, effects, is_active')
       .eq('product_id', config.productId)
       .eq('is_active', true),
     sb.from('pricing_formulas')

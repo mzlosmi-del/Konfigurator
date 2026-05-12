@@ -8,7 +8,40 @@ export type ProductStatus = 'draft' | 'published' | 'archived'
 export type Plan = 'free' | 'starter' | 'growth' | 'scale'
 export type DisplayType = 'select' | 'radio' | 'swatch' | 'toggle' | 'number'
 export type AssetType = 'image' | 'render' | '3d_model'
-export type RuleType = 'hide_value' | 'disable_value' | 'price_override' | 'set_value_default' | 'set_value_locked'
+// Configuration rules v2 — see migrations/074_rules_v2.sql.
+//
+// Each rule has a flat ALL/ANY predicate list and an array of effects.
+// The narrow v1 shape (one trigger, one effect, rule_type discriminator)
+// is migrated row-by-row into this shape; no rule_type column remains.
+
+export type RuleComparator = 'gt' | 'gte' | 'lt' | 'lte' | 'eq' | 'neq'
+export type RuleArithOp    = 'add' | 'subtract' | 'multiply' | 'divide'
+
+export type NumExpr =
+  | { type: 'number'; value: number }
+  | { type: 'input';  char_id: string }
+  | { type: 'arith';  op: RuleArithOp; left: NumExpr; right: NumExpr }
+
+export type RulePredicate =
+  | { type: 'select_eq';  char_id: string; value_id: string }
+  | { type: 'select_neq'; char_id: string; value_id: string }
+  | { type: 'cmp';        op: RuleComparator; left: NumExpr; right: NumExpr }
+
+export interface RuleCondition {
+  mode:       'all' | 'any'
+  predicates: RulePredicate[]
+}
+
+export type RuleEffect =
+  | { type: 'hide_value';         value_id: string }
+  | { type: 'disable_value';      value_id: string }
+  | { type: 'set_value_default';  char_id: string; value_id: string }
+  | { type: 'set_value_locked';   char_id: string; value_id: string }
+  | { type: 'set_numeric_default'; char_id: string; expr: NumExpr }
+  | { type: 'set_numeric_locked';  char_id: string; expr: NumExpr }
+
+/** Discriminator for rule effects — handy in switches and UI labels. */
+export type RuleEffectKind = RuleEffect['type']
 export type InquiryStatus = 'new' | 'read' | 'replied' | 'closed'
 export type QuotationStatus =
   | 'in_preparation'
@@ -271,9 +304,8 @@ export interface Database {
           id: string
           tenant_id: string
           product_id: string
-          rule_type: RuleType
           condition: Json
-          effect: Json
+          effects:   Json
           is_active: boolean
           created_at: string
           updated_at: string
@@ -495,22 +527,6 @@ export interface Database {
   }
 }
 
-// Typed shapes for configuration_rules JSONB columns
-export interface RuleCondition {
-  characteristic_id: string
-  // Select-type condition: characteristic has value_id selected
-  value_id?: string
-  // Numeric condition: characteristic input compared against a threshold
-  numeric_op?: 'gt' | 'gte' | 'lt' | 'lte' | 'eq'
-  numeric_value?: number
-}
-export interface RuleEffect {
-  characteristic_id?: string
-  value_id?: string          // target value for select-type characteristics
-  price_modifier?: number    // price_override amount
-  numeric_value?: number     // set_value_default / set_value_locked on numeric chars
-}
-
 // ── plan_limits ───────────────────────────────────────────────────────────────
 export interface PlanLimitsRow {
   plan:                 Plan
@@ -544,8 +560,8 @@ export type ProductCharacteristic = Database['public']['Tables']['product_charac
 export type VisualizationAsset = Database['public']['Tables']['visualization_assets']['Row']
 export type ConfigurationRule = Omit<
   Database['public']['Tables']['configuration_rules']['Row'],
-  'condition' | 'effect'
-> & { condition: RuleCondition; effect: RuleEffect }
+  'condition' | 'effects'
+> & { condition: RuleCondition; effects: RuleEffect[] }
 export type Inquiry            = Database['public']['Tables']['inquiries']['Row']
 export type CharacteristicClass  = Database['public']['Tables']['characteristic_classes']['Row']
 export type ClassMember          = Database['public']['Tables']['characteristic_class_members']['Row']
