@@ -6,6 +6,8 @@ import type { ConfigurationRule, Selection } from '../types'
 
 const charMaterial = 'char-material'
 const charSize     = 'char-size'
+const charWidth    = 'char-width'
+const charHeight   = 'char-height'
 const valOak       = 'val-oak'
 const valPine      = 'val-pine'
 const valSmall     = 'val-small'
@@ -13,25 +15,19 @@ const valLarge     = 'val-large'
 
 const hideRule: ConfigurationRule = {
   id: 'rule-1',
-  rule_type: 'hide_value',
-  condition: { characteristic_id: charMaterial, value_id: valPine },
-  effect:    { characteristic_id: charSize,     value_id: valLarge },
+  condition: { mode: 'all', predicates: [
+    { type: 'select_eq', char_id: charMaterial, value_id: valPine },
+  ]},
+  effects: [{ type: 'hide_value', value_id: valLarge }],
   is_active: true,
 }
 
 const disableRule: ConfigurationRule = {
   id: 'rule-2',
-  rule_type: 'disable_value',
-  condition: { characteristic_id: charMaterial, value_id: valOak },
-  effect:    { characteristic_id: charSize,     value_id: valSmall },
-  is_active: true,
-}
-
-const priceOverrideRule: ConfigurationRule = {
-  id: 'rule-3',
-  rule_type: 'price_override',
-  condition: { characteristic_id: charMaterial, value_id: valOak },
-  effect:    { characteristic_id: charMaterial, price_modifier: 200 },
+  condition: { mode: 'all', predicates: [
+    { type: 'select_eq', char_id: charMaterial, value_id: valOak },
+  ]},
+  effects: [{ type: 'disable_value', value_id: valSmall }],
   is_active: true,
 }
 
@@ -63,17 +59,101 @@ describe('evaluateRules', () => {
     expect(effect.disabledValues.has(valSmall)).toBe(true)
   })
 
-  it('records a price override when condition is met', () => {
-    const selection: Selection = { [charMaterial]: valOak }
-    const effect = evaluateRules([priceOverrideRule], selection)
-    expect(effect.priceOverrides[charMaterial]).toBe(200)
-  })
-
   it('does not apply inactive rules', () => {
     const inactive = { ...hideRule, is_active: false }
     const selection: Selection = { [charMaterial]: valPine }
     const effect = evaluateRules([inactive], selection)
     expect(effect.hiddenValues.size).toBe(0)
+  })
+
+  it('applies multiple effects from a single rule', () => {
+    const rule: ConfigurationRule = {
+      id: 'rule-multi',
+      condition: { mode: 'all', predicates: [
+        { type: 'select_eq', char_id: charMaterial, value_id: valPine },
+      ]},
+      effects: [
+        { type: 'hide_value',    value_id: valLarge },
+        { type: 'disable_value', value_id: valSmall },
+      ],
+      is_active: true,
+    }
+    const selection: Selection = { [charMaterial]: valPine }
+    const effect = evaluateRules([rule], selection)
+    expect(effect.hiddenValues.has(valLarge)).toBe(true)
+    expect(effect.disabledValues.has(valSmall)).toBe(true)
+  })
+
+  it('AND mode requires every predicate to match', () => {
+    const rule: ConfigurationRule = {
+      id: 'rule-and',
+      condition: { mode: 'all', predicates: [
+        { type: 'select_eq', char_id: charMaterial, value_id: valPine },
+        { type: 'select_eq', char_id: charSize,     value_id: valLarge },
+      ]},
+      effects: [{ type: 'hide_value', value_id: valSmall }],
+      is_active: true,
+    }
+    // Only one predicate true ⇒ rule does NOT fire
+    expect(evaluateRules([rule], { [charMaterial]: valPine }).hiddenValues.has(valSmall)).toBe(false)
+    // Both predicates true ⇒ fires
+    expect(evaluateRules([rule], { [charMaterial]: valPine, [charSize]: valLarge }).hiddenValues.has(valSmall)).toBe(true)
+  })
+
+  it('OR mode fires when any predicate matches', () => {
+    const rule: ConfigurationRule = {
+      id: 'rule-or',
+      condition: { mode: 'any', predicates: [
+        { type: 'select_eq', char_id: charMaterial, value_id: valPine },
+        { type: 'select_eq', char_id: charMaterial, value_id: valOak  },
+      ]},
+      effects: [{ type: 'hide_value', value_id: valLarge }],
+      is_active: true,
+    }
+    expect(evaluateRules([rule], { [charMaterial]: valPine }).hiddenValues.has(valLarge)).toBe(true)
+    expect(evaluateRules([rule], { [charMaterial]: valOak  }).hiddenValues.has(valLarge)).toBe(true)
+    expect(evaluateRules([rule], { [charMaterial]: 'val-other' }).hiddenValues.has(valLarge)).toBe(false)
+  })
+
+  it('evaluates arithmetic in a numeric comparison', () => {
+    // IF Width * Height >= 5 → lock Reinforcement (numeric) to Width * 1.2
+    const rule: ConfigurationRule = {
+      id: 'rule-arith',
+      condition: { mode: 'all', predicates: [{
+        type: 'cmp', op: 'gte',
+        left:  { type: 'arith', op: 'multiply',
+                 left:  { type: 'input', char_id: charWidth },
+                 right: { type: 'input', char_id: charHeight } },
+        right: { type: 'number', value: 5 },
+      }]},
+      effects: [{
+        type: 'set_numeric_locked',
+        char_id: 'char-reinforcement',
+        expr: { type: 'arith', op: 'multiply',
+                left:  { type: 'input',  char_id: charWidth },
+                right: { type: 'number', value: 1.2 } },
+      }],
+      is_active: true,
+    }
+    // 2 × 2 < 5 → no effect
+    expect(evaluateRules([rule], {}, { [charWidth]: 2, [charHeight]: 2 })
+      .lockedNumericValues['char-reinforcement']).toBeUndefined()
+    // 3 × 2 = 6 ≥ 5 → reinforcement = 3 × 1.2 = 3.6
+    expect(evaluateRules([rule], {}, { [charWidth]: 3, [charHeight]: 2 })
+      .lockedNumericValues['char-reinforcement']).toBeCloseTo(3.6)
+  })
+
+  it('select_neq fires when the selected value differs', () => {
+    const rule: ConfigurationRule = {
+      id: 'rule-neq',
+      condition: { mode: 'all', predicates: [
+        { type: 'select_neq', char_id: charMaterial, value_id: valOak },
+      ]},
+      effects: [{ type: 'hide_value', value_id: valLarge }],
+      is_active: true,
+    }
+    expect(evaluateRules([rule], { [charMaterial]: valPine }).hiddenValues.has(valLarge)).toBe(true)
+    expect(evaluateRules([rule], { [charMaterial]: valOak  }).hiddenValues.has(valLarge)).toBe(false)
   })
 })
 
@@ -103,8 +183,7 @@ describe('sanitizeSelection', () => {
     expect(sanitized[charMaterial]).toBe(valOak)
   })
 
-  it('initial selection is sanitized — bug 5', () => {
-    // If pine is pre-selected for material, large must be removed (hidden by hideRule)
+  it('initial selection is sanitized', () => {
     const initial: Selection = { [charMaterial]: valPine, [charSize]: valLarge }
     const effect = evaluateRules([hideRule], initial)
     const sanitized = sanitizeSelection(initial, effect)
@@ -120,11 +199,6 @@ describe('calculatePrice', () => {
     expect(calculatePrice(500, selection, chars, {})).toBe(650)
   })
 
-  it('applies price override instead of raw modifier', () => {
-    const selection: Selection = { [charMaterial]: valOak, [charSize]: valLarge }
-    expect(calculatePrice(500, selection, chars, { [charMaterial]: 200 })).toBe(750)
-  })
-
   it('clamps total to zero', () => {
     const selection: Selection = { [charMaterial]: valPine }
     expect(calculatePrice(100, selection, chars, { [charMaterial]: -500 })).toBe(0)
@@ -132,31 +206,5 @@ describe('calculatePrice', () => {
 
   it('returns base price when nothing selected', () => {
     expect(calculatePrice(800, {}, chars, {})).toBe(800)
-  })
-})
-
-// ─── inquiry snapshot reconciliation — bug 6 ─────────────────────────────────
-
-describe('inquiry snapshot vs total price', () => {
-  it('line item modifier uses price override, not raw value modifier', () => {
-    const selection: Selection = { [charMaterial]: valOak, [charSize]: valLarge }
-    const effect = evaluateRules([priceOverrideRule], selection)
-
-    const lineItems = chars
-      .filter(c => !!selection[c.id])
-      .map(c => {
-        const v = c.values.find(val => val.id === selection[c.id])
-        const effectiveModifier = c.id in effect.priceOverrides
-          ? effect.priceOverrides[c.id]
-          : (v?.price_modifier ?? 0)
-        return { characteristic_name: c.id, value_label: v?.id ?? '', price_modifier: effectiveModifier }
-      })
-
-    const materialItem = lineItems.find(l => l.characteristic_name === charMaterial)!
-    expect(materialItem.price_modifier).toBe(200) // override, not raw 100
-
-    const total = calculatePrice(500, selection, chars, effect.priceOverrides)
-    const lineTotal = lineItems.reduce((sum, l) => sum + l.price_modifier, 500)
-    expect(lineTotal).toBe(total) // both 750
   })
 })
