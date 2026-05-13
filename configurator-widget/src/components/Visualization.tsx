@@ -219,6 +219,77 @@ function tweenDimensions(
   rafRef.current = requestAnimationFrame(tick)
 }
 
+// ── Exploded view ─────────────────────────────────────────────────────────────
+
+type ExplodeEntry = {
+  node:  any
+  baseX: number; baseY: number; baseZ: number
+  dirX:  number; dirY:  number; dirZ:  number
+}
+
+// Compute one entry per mesh: its baseline local position + outward direction
+// from the model's centroid in world space. Magnitude is normalised to roughly
+// the model's bounding radius so a factor of 1.0 produces a visible separation
+// across models of any scale.
+function buildExplodeEntries(scene: ThreeScene): { entries: ExplodeEntry[]; radius: number } {
+  type Meshish = { isMesh?: boolean; geometry?: any; matrixWorld?: any; position?: any }
+  const meshes: Meshish[] = []
+  scene.traverse((node: unknown) => {
+    const n = node as Meshish
+    if (n.isMesh && n.geometry && n.position && n.matrixWorld) meshes.push(n)
+  })
+  if (meshes.length === 0) return { entries: [], radius: 0 }
+
+  let cx = 0, cy = 0, cz = 0
+  const centers: Array<{ x: number; y: number; z: number; node: Meshish }> = []
+  for (const n of meshes) {
+    n.geometry.computeBoundingSphere()
+    const s = n.geometry.boundingSphere
+    const m = n.matrixWorld.elements as number[]
+    const wx = m[12] + s.center.x
+    const wy = m[13] + s.center.y
+    const wz = m[14] + s.center.z
+    centers.push({ x: wx, y: wy, z: wz, node: n })
+    cx += wx; cy += wy; cz += wz
+  }
+  cx /= meshes.length; cy /= meshes.length; cz /= meshes.length
+
+  let maxDist = 0
+  for (const c of centers) {
+    const d = Math.hypot(c.x - cx, c.y - cy, c.z - cz)
+    if (d > maxDist) maxDist = d
+  }
+  const radius = maxDist || 1
+
+  const entries: ExplodeEntry[] = centers.map(c => {
+    const dx = c.x - cx, dy = c.y - cy, dz = c.z - cz
+    const len = Math.hypot(dx, dy, dz) || 1
+    return {
+      node:  c.node,
+      baseX: c.node.position.x, baseY: c.node.position.y, baseZ: c.node.position.z,
+      dirX:  dx / len,          dirY:  dy / len,          dirZ:  dz / len,
+    }
+  })
+  return { entries, radius }
+}
+
+function applyExplode(entries: ExplodeEntry[], factor: number, radius: number) {
+  const d = factor * radius
+  for (const e of entries) {
+    e.node.position.x = e.baseX + e.dirX * d
+    e.node.position.y = e.baseY + e.dirY * d
+    e.node.position.z = e.baseZ + e.dirZ * d
+  }
+}
+
+function resetExplode(entries: ExplodeEntry[]) {
+  for (const e of entries) {
+    e.node.position.x = e.baseX
+    e.node.position.y = e.baseY
+    e.node.position.z = e.baseZ
+  }
+}
+
 // ── Highlight / glow ──────────────────────────────────────────────────────────
 
 const GLOW_R          = 1.0
@@ -353,6 +424,9 @@ function ModelViewer3D({
   const [animations, setAnimations] = useState<string[]>([])
   const [currentAnim, setCurrentAnim] = useState<string>('')
   const [playing, setPlaying] = useState(false)
+  const [explodeOn, setExplodeOn] = useState(false)
+  const [explodeFactor, setExplodeFactor] = useState(0.4)
+  const explodeDataRef = useRef<{ entries: ExplodeEntry[]; radius: number } | null>(null)
 
   // Keep refs current on every render
   selectionRef.current     = selection
@@ -416,6 +490,8 @@ function ModelViewer3D({
       setAnimations(clips)
       setCurrentAnim(clips[0] ?? '')
       setPlaying(false)
+      explodeDataRef.current = null
+      setExplodeOn(false)
     })
 
     mv.addEventListener('finished', () => setPlaying(false))
@@ -460,6 +536,29 @@ function ModelViewer3D({
       mv.currentTime = 0
       mv.play({ repetitions: 1 })
     }
+  }
+
+  function toggleExplode() {
+    const mv = mvRef.current
+    if (!mv) return
+    if (explodeOn) {
+      if (explodeDataRef.current) resetExplode(explodeDataRef.current.entries)
+      setExplodeOn(false)
+      return
+    }
+    const scene = findScene(mv)
+    if (!scene) return
+    const data = buildExplodeEntries(scene)
+    if (data.entries.length < 2) return
+    explodeDataRef.current = data
+    applyExplode(data.entries, explodeFactor, data.radius)
+    setExplodeOn(true)
+  }
+
+  function onExplodeChange(value: number) {
+    setExplodeFactor(value)
+    const data = explodeDataRef.current
+    if (data && explodeOn) applyExplode(data.entries, value, data.radius)
   }
 
   // Visibility + texture update on discrete selection change (instant)
@@ -513,8 +612,8 @@ function ModelViewer3D({
     <div style="position:relative;width:100%;height:100%">
       <div ref={containerRef} style="width:100%;height:100%" />
 
-      {animations.length > 0 && (
-        <div class="cw-anim-controls">
+      <div class="cw-anim-controls">
+        {animations.length > 0 && (
           <button
             type="button"
             class="cw-anim-btn"
@@ -533,19 +632,50 @@ function ModelViewer3D({
               </svg>
             )}
           </button>
-          {animations.length > 1 && (
-            <select
-              class="cw-anim-select"
-              value={currentAnim}
-              onChange={(e) => selectAnim((e.target as HTMLSelectElement).value)}
-            >
-              {animations.map(name => (
-                <option key={name} value={name}>{name}</option>
-              ))}
-            </select>
+        )}
+        {animations.length > 1 && (
+          <select
+            class="cw-anim-select"
+            value={currentAnim}
+            onChange={(e) => selectAnim((e.target as HTMLSelectElement).value)}
+          >
+            {animations.map(name => (
+              <option key={name} value={name}>{name}</option>
+            ))}
+          </select>
+        )}
+        <button
+          type="button"
+          class={`cw-anim-btn${explodeOn ? ' cw-anim-btn-active' : ''}`}
+          onClick={toggleExplode}
+          title={explodeOn ? t('Collapse exploded view') : t('Expand parts')}
+          aria-label={explodeOn ? t('Collapse exploded view') : t('Expand parts')}
+        >
+          {explodeOn ? (
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M20 4 14 10" /><path d="M14 4h6v6" />
+              <path d="M4 20l6-6" />  <path d="M4 14v6h6" />
+            </svg>
+          ) : (
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M15 3h6v6" /><path d="M21 3l-7 7" />
+              <path d="M9 21H3v-6" /><path d="M3 21l7-7" />
+            </svg>
           )}
-        </div>
-      )}
+        </button>
+        {explodeOn && (
+          <input
+            type="range"
+            min="0"
+            max="1.5"
+            step="0.01"
+            class="cw-anim-slider"
+            value={explodeFactor}
+            onInput={(e) => onExplodeChange(parseFloat((e.target as HTMLInputElement).value))}
+            aria-label={t('Expand parts')}
+          />
+        )}
+      </div>
 
       {/* Dimension overlay — disabled
       {(wVal > 0 || hVal > 0) && (
