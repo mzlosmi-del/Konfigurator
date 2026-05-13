@@ -350,6 +350,10 @@ function ModelViewer3D({
   const dimRafRef        = useRef<number | null>(null)
   const highlightRef     = useRef<Map<string, HighlightEntry>>(new Map())
 
+  const [animations, setAnimations] = useState<string[]>([])
+  const [currentAnim, setCurrentAnim] = useState<string>('')
+  const [playing, setPlaying] = useState(false)
+
   // Keep refs current on every render
   selectionRef.current     = selection
   numericInputsRef.current = numericInputs
@@ -407,7 +411,14 @@ function ModelViewer3D({
       applyMeshRules(mv, rules, selectionRef.current, numericInputsRef.current)
       applyTextureRules(mv, rules, selectionRef.current)
       if (arEnabled && hintRef.current) hintRef.current.style.display = 'block'
+
+      const clips = ((mv as any).availableAnimations ?? []) as string[]
+      setAnimations(clips)
+      setCurrentAnim(clips[0] ?? '')
+      setPlaying(false)
     })
+
+    mv.addEventListener('finished', () => setPlaying(false))
 
     mvRef.current = mv
     container.appendChild(mv)
@@ -420,8 +431,36 @@ function ModelViewer3D({
       hintRef.current     = null
       loadedRef.current   = false
       prevSelectionRef.current = null
+      setAnimations([])
+      setCurrentAnim('')
+      setPlaying(false)
     }
   }, [url, arEnabled, arPlacement])
+
+  function togglePlay() {
+    const mv = mvRef.current as any
+    if (!mv) return
+    if (playing) {
+      mv.pause()
+      setPlaying(false)
+    } else {
+      if (currentAnim) mv.setAttribute('animation-name', currentAnim)
+      mv.currentTime = 0
+      mv.play({ repetitions: 1 })
+      setPlaying(true)
+    }
+  }
+
+  function selectAnim(name: string) {
+    setCurrentAnim(name)
+    const mv = mvRef.current as any
+    if (!mv) return
+    mv.setAttribute('animation-name', name)
+    if (playing) {
+      mv.currentTime = 0
+      mv.play({ repetitions: 1 })
+    }
+  }
 
   // Visibility + texture update on discrete selection change (instant)
   useEffect(() => {
@@ -473,6 +512,41 @@ function ModelViewer3D({
   return (
     <div style="position:relative;width:100%;height:100%">
       <div ref={containerRef} style="width:100%;height:100%" />
+
+      {animations.length > 0 && (
+        <div class="cw-anim-controls">
+          <button
+            type="button"
+            class="cw-anim-btn"
+            onClick={togglePlay}
+            title={playing ? t('Pause animation') : t('Play animation')}
+            aria-label={playing ? t('Pause animation') : t('Play animation')}
+          >
+            {playing ? (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                <rect x="6" y="5" width="4" height="14" rx="1" />
+                <rect x="14" y="5" width="4" height="14" rx="1" />
+              </svg>
+            ) : (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M8 5.5v13a1 1 0 0 0 1.55.83l10-6.5a1 1 0 0 0 0-1.66l-10-6.5A1 1 0 0 0 8 5.5z" />
+              </svg>
+            )}
+          </button>
+          {animations.length > 1 && (
+            <select
+              class="cw-anim-select"
+              value={currentAnim}
+              onChange={(e) => selectAnim((e.target as HTMLSelectElement).value)}
+            >
+              {animations.map(name => (
+                <option key={name} value={name}>{name}</option>
+              ))}
+            </select>
+          )}
+        </div>
+      )}
+
       {/* Dimension overlay — disabled
       {(wVal > 0 || hVal > 0) && (
         <svg class="cw-dim-overlay" xmlns="http://www.w3.org/2000/svg">

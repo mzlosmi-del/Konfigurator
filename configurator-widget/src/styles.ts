@@ -87,6 +87,47 @@ export const WIDGET_STYLES = `
     -webkit-backdrop-filter: blur(8px);
   }
   .cw-ar-btn:hover { background: rgba(10,10,10,0.88); }
+  .cw-anim-controls {
+    position: absolute;
+    bottom: 14px;
+    left: 14px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .cw-anim-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    background: rgba(10,10,10,0.72);
+    color: #fff;
+    border: none;
+    border-radius: 999px;
+    cursor: pointer;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+  .cw-anim-btn:hover { background: rgba(10,10,10,0.88); }
+  .cw-anim-select {
+    background: rgba(10,10,10,0.72);
+    color: #fff;
+    border: none;
+    border-radius: 999px;
+    padding: 6px 26px 6px 12px;
+    font-size: 11px;
+    font-family: var(--cw-font);
+    cursor: pointer;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    max-width: 160px;
+  }
+  .cw-anim-select option { color: #111; background: #fff; }
   .cw-ar-hint {
     position: absolute;
     bottom: 50px;
