@@ -110,6 +110,38 @@ export const WIDGET_STYLES = `
     -webkit-backdrop-filter: blur(8px);
   }
   .cw-anim-btn:hover { background: rgba(10,10,10,0.88); }
+  .cw-anim-btn-active { background: var(--cw-accent, #2563eb); }
+  .cw-anim-btn-active:hover { background: var(--cw-accent, #2563eb); filter: brightness(1.1); }
+  .cw-anim-slider {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 110px;
+    height: 4px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.35);
+    outline: none;
+    cursor: pointer;
+  }
+  .cw-anim-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #fff;
+    border: none;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+    cursor: pointer;
+  }
+  .cw-anim-slider::-moz-range-thumb {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #fff;
+    border: none;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+    cursor: pointer;
+  }
   .cw-anim-select {
     background: rgba(10,10,10,0.72);
     color: #fff;
