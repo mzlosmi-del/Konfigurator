@@ -1,4 +1,4 @@
-import type { Quotation, ProductText } from '@/types/database'
+import type { Quotation, TenantText } from '@/types/database'
 import type { PdfSection } from '@/pages/quotations/PdfLayoutDialog'
 import { renderModern }  from './pdf/templateModern'
 import { renderClassic } from './pdf/templateClassic'
@@ -18,14 +18,15 @@ export const PDF_TEMPLATES: { id: PdfTemplate; label: string; description: strin
 export async function buildQuotationPdfBytes(
   tenant: TenantProfile,
   quotation: Quotation,
-  productTexts?: Record<string, ProductText[]>,
-  globalTexts?: ProductText[],
+  /** Pre-fetched `tenant_texts` rows scoped to the tenant plus every product
+   *  referenced by this quotation. Use `fetchQuotationTexts` in `lib/texts.ts`. */
+  texts: TenantText[] = [],
   layoutSections?: PdfSection[],
   lang: 'en' | 'sr' = 'en',
   watermark?: boolean,
   template: PdfTemplate = 'modern',
 ): Promise<Uint8Array> {
-  const args = { tenant, quotation, productTexts, globalTexts, layoutSections, lang, watermark, template }
+  const args = { tenant, quotation, texts, layoutSections, lang, watermark, template }
   switch (template) {
     case 'classic': return renderClassic(args)
     case 'compact': return renderCompact(args)

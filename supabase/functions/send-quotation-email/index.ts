@@ -245,17 +245,26 @@ Deno.serve(async (req: Request) => {
 
   const { data: tenant } = await sb
     .from('tenants')
-    .select('name, quotation_email_intro_i18n')
+    .select('name')
     .eq('id', quotation.tenant_id)
     .single()
-  const tenantRow = tenant as { name: string; quotation_email_intro_i18n: Record<string, unknown> | null } | null
+  const tenantRow = tenant as { name: string } | null
   const tenantName  = tenantRow?.name ?? 'Your store'
-  const introMap    = (tenantRow?.quotation_email_intro_i18n ?? {}) as Record<string, unknown>
-  const rawIntro    = introMap[lang]
+
+  // Look up the `quotation_email_intro` slot from `tenant_texts` (migration
+  // 076). Falls back to the other language when the chosen one is empty.
+  const { data: introRows } = await sb
+    .from('tenant_texts')
+    .select('language, content')
+    .eq('tenant_id', quotation.tenant_id)
+    .eq('level', 'tenant')
+    .is('reference_id', null)
+    .eq('slot', 'quotation_email_intro')
+  const introList = (introRows ?? []) as { language: string; content: string }[]
+  const introByLang = (l: string) => introList.find(r => r.language === l && r.content.trim())?.content ?? null
+  const tenantIntro = introByLang(lang) ?? introByLang(lang === 'en' ? 'sr' : 'en')
   // Per-send override (from the preview dialog) wins over the tenant default.
-  const customIntro = introOverride !== null
-    ? introOverride
-    : (typeof rawIntro === 'string' ? rawIntro : null)
+  const customIntro = introOverride !== null ? introOverride : tenantIntro
 
   // ── Fetch PDF bytes ───────────────────────────────────────────────────────
   let pdfBytes: ArrayBuffer

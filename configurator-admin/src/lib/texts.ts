@@ -89,6 +89,60 @@ export async function deleteText(id: string): Promise<void> {
   if (error) throw new Error(error.message)
 }
 
+/** Write an entire per-language map for a single-row slot. Languages whose
+ *  value is empty or whitespace have their row deleted; non-empty languages
+ *  are upserted. Use this for the legacy `_i18n` JSONB editors that took
+ *  `{ en, sr }` and saved the whole map in one go. */
+export async function setEntityI18nText(args: {
+  tenant_id:    string
+  level:        TextLevel
+  reference_id: string | null
+  slot:         string
+  i18n:         Record<string, string>
+}): Promise<void> {
+  const LANGS: ('en' | 'sr')[] = ['en', 'sr']
+  for (const language of LANGS) {
+    const content = (args.i18n[language] ?? '').trim()
+    if (content.length === 0) {
+      let q = supabase.from('tenant_texts').delete()
+        .eq('tenant_id',  args.tenant_id)
+        .eq('level',      args.level)
+        .eq('slot',       args.slot)
+        .eq('language',   language)
+        .eq('sort_order', 0)
+      q = args.reference_id === null ? q.is('reference_id', null) : q.eq('reference_id', args.reference_id)
+      const { error } = await q
+      if (error) throw new Error(error.message)
+    } else {
+      await upsertText({
+        tenant_id:    args.tenant_id,
+        level:        args.level,
+        reference_id: args.reference_id,
+        slot:         args.slot,
+        language,
+        content,
+      })
+    }
+  }
+}
+
+/** Convenience for tenant-level scalar slots (pdf_footer, public_page_title,
+ *  post_inquiry_message). Stores under EN only — we treat these as English-
+ *  canonical strings even though the renderer falls back across languages. */
+export async function setTenantScalarText(args: {
+  tenant_id: string
+  slot:      string
+  content:   string
+}): Promise<void> {
+  await setEntityI18nText({
+    tenant_id:    args.tenant_id,
+    level:        'tenant',
+    reference_id: null,
+    slot:         args.slot,
+    i18n:         { en: args.content },
+  })
+}
+
 /** Apply a new ordering to a set of multi-row slot entries. Pass the IDs in
  *  the desired order; sort_order is renumbered from 0. */
 export async function reorderTexts(ids: string[]): Promise<void> {
@@ -161,4 +215,85 @@ export function resolveTextLines(
     .sort((a, b) => a.sort_order - b.sort_order)
     .map(r => r.content)
     .filter(s => s.trim().length > 0)
+}
+
+// ── Quotation renderer helpers ──────────────────────────────────────────────
+
+/** A simplified representation of a per-product or tenant-level text block,
+ *  mirroring the shape the PDF / DOCX / XLSX templates used when they read
+ *  `ProductText` rows. */
+export interface ResolvedTextBlock {
+  id:         string
+  slot:       string
+  label:      string | null
+  content:    string
+  sort_order: number
+}
+
+const BLOCK_SLOTS = ['product', 'specification', 'note', 'terms'] as const
+
+/** All visible text blocks attached to a product in the chosen language,
+ *  sorted by sort_order. Replaces the legacy
+ *  `productTexts[productId].filter(language === lang)` access. */
+export function resolveProductTextBlocks(
+  rows: TenantText[],
+  productId: string,
+  language: 'en' | 'sr',
+): ResolvedTextBlock[] {
+  return rows
+    .filter(r =>
+      r.level === 'product' &&
+      r.reference_id === productId &&
+      r.language === language &&
+      (BLOCK_SLOTS as readonly string[]).includes(r.slot) &&
+      r.content.trim().length > 0
+    )
+    .sort((a, b) => a.sort_order - b.sort_order)
+    .map(r => ({ id: r.id, slot: r.slot, label: r.label, content: r.content, sort_order: r.sort_order }))
+}
+
+/** All tenant-wide ("global") text blocks in the chosen language. Replaces
+ *  the legacy `globalTexts` array. */
+export function resolveTenantTextBlocks(
+  rows: TenantText[],
+  language: 'en' | 'sr',
+): ResolvedTextBlock[] {
+  return rows
+    .filter(r =>
+      r.level === 'tenant' &&
+      r.reference_id === null &&
+      r.language === language &&
+      (BLOCK_SLOTS as readonly string[]).includes(r.slot) &&
+      r.content.trim().length > 0
+    )
+    .sort((a, b) => a.sort_order - b.sort_order)
+    .map(r => ({ id: r.id, slot: r.slot, label: r.label, content: r.content, sort_order: r.sort_order }))
+}
+
+/** Bulk fetch every text row a quotation builder needs:
+ *  - all tenant-level rows for the current tenant
+ *  - all product-level rows for the products referenced by the quotation's
+ *    line items.
+ *  One SELECT against `tenant_texts` with an OR clause — RLS scopes to the
+ *  tenant automatically. */
+export async function fetchQuotationTexts(productIds: string[]): Promise<TenantText[]> {
+  const ids = Array.from(new Set(productIds.filter(Boolean)))
+  // Tenant-level rows (reference_id IS NULL) always come along; product rows
+  // are filtered server-side when there are product ids in scope.
+  let q = supabase
+    .from('tenant_texts')
+    .select('*')
+    .order('slot',       { ascending: true })
+    .order('language',   { ascending: true })
+    .order('sort_order', { ascending: true })
+
+  if (ids.length > 0) {
+    q = q.or(`level.eq.tenant,and(level.eq.product,reference_id.in.(${ids.join(',')}))`)
+  } else {
+    q = q.eq('level', 'tenant')
+  }
+
+  const { data, error } = await q
+  if (error) throw new Error(error.message)
+  return (data ?? []) as TenantText[]
 }

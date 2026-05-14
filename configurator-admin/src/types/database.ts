@@ -159,19 +159,13 @@ export interface Database {
           logo_url:            string | null
           vat_number:          string | null
           company_reg_number:  string | null
-          post_inquiry_message: string | null
-          pdf_footer:          string | null
           email_from_address:  string | null
           email_from_verified: boolean
           resend_domain_id:    string | null
           favicon_url:         string | null
-          public_page_title:   string | null
           paid_until:          string | null
           current_period_end:  string | null
           cancel_at_period_end: boolean
-          quotation_email_intro_i18n:    Json
-          quotation_accept_message_i18n: Json
-          quotation_reject_message_i18n: Json
           created_at: string
           updated_at: string
         }
@@ -233,29 +227,16 @@ export interface Database {
           form_config: Json
           widget_theme: string
           show_price_breakdown: boolean
-          name_i18n: Json
-          description_i18n: Json
+          /** In-memory translation maps populated from `tenant_texts` by the
+           *  fetch helpers. The DB columns were dropped in migration 078 —
+           *  these fields are not selected from PostgreSQL anymore. */
+          name_i18n?:        Record<string, string>
+          description_i18n?: Record<string, string>
           created_at: string
           updated_at: string
         }
-        Insert: Omit<Database['public']['Tables']['products']['Row'], 'id' | 'created_at' | 'updated_at' | 'show_price_breakdown'> & { id?: string; show_price_breakdown?: boolean }
+        Insert: Omit<Database['public']['Tables']['products']['Row'], 'id' | 'created_at' | 'updated_at' | 'show_price_breakdown' | 'name_i18n' | 'description_i18n'> & { id?: string; show_price_breakdown?: boolean }
         Update: Partial<Database['public']['Tables']['products']['Insert']>
-      }
-      product_texts: {
-        Row: {
-          id: string
-          tenant_id: string
-          product_id: string | null
-          label: string
-          content: string
-          text_type: string
-          language: string
-          sort_order: number
-          created_at: string
-          updated_at: string
-        }
-        Insert: Omit<Database['public']['Tables']['product_texts']['Row'], 'id' | 'created_at' | 'updated_at'> & { id?: string }
-        Update: Partial<Database['public']['Tables']['product_texts']['Insert']>
       }
       characteristic_classes: {
         Row: {
@@ -284,14 +265,15 @@ export interface Database {
           id: string
           tenant_id: string
           name: string
-          name_i18n: Json
-          description_i18n: Json
           display_type: DisplayType
           sort_order: number
+          /** In-memory translations populated from `tenant_texts`. */
+          name_i18n?:        Record<string, string>
+          description_i18n?: Record<string, string>
           created_at: string
           updated_at: string
         }
-        Insert: Omit<Database['public']['Tables']['characteristics']['Row'], 'id' | 'created_at' | 'updated_at' | 'description_i18n'> & { id?: string; description_i18n?: Json }
+        Insert: Omit<Database['public']['Tables']['characteristics']['Row'], 'id' | 'created_at' | 'updated_at' | 'name_i18n' | 'description_i18n'> & { id?: string }
         Update: Partial<Database['public']['Tables']['characteristics']['Insert']>
       }
       characteristic_values: {
@@ -300,14 +282,15 @@ export interface Database {
           characteristic_id: string
           tenant_id: string
           label: string
-          label_i18n: Json
           price_modifier: number
           sort_order: number
           hex_color: string | null
+          /** In-memory translations populated from `tenant_texts`. */
+          label_i18n?: Record<string, string>
           created_at: string
           updated_at: string
         }
-        Insert: Omit<Database['public']['Tables']['characteristic_values']['Row'], 'id' | 'created_at' | 'updated_at'> & { id?: string }
+        Insert: Omit<Database['public']['Tables']['characteristic_values']['Row'], 'id' | 'created_at' | 'updated_at' | 'label_i18n'> & { id?: string }
         Update: Partial<Database['public']['Tables']['characteristic_values']['Insert']>
       }
       product_characteristics: {
@@ -631,11 +614,12 @@ export type ClassMember          = Database['public']['Tables']['characteristic_
 export type ProductClass         = Database['public']['Tables']['product_classes']['Row']
 export type PricingFormula       = Database['public']['Tables']['pricing_formulas']['Row']
 export type Quotation                  = Database['public']['Tables']['quotations']['Row']
-export type ProductText                = Database['public']['Tables']['product_texts']['Row']
+// product_texts table was dropped in migration 078; its content lives in
+// tenant_texts now. The legacy `ProductText` / `ProductTextType` exports
+// were removed at the same time.
 export type TenantText                 = Database['public']['Tables']['tenant_texts']['Row']
 export type TenantTextInsert           = Database['public']['Tables']['tenant_texts']['Insert']
 export type TenantTextUpdate           = Database['public']['Tables']['tenant_texts']['Update']
-export type ProductTextType            = 'product' | 'specification' | 'note' | 'terms'
 export type QuotationRejectionReason   = Database['public']['Tables']['quotation_rejection_reasons']['Row']
 export type QuotationAttachment        = Database['public']['Tables']['quotation_attachments']['Row']
 export type RolePermission             = Database['public']['Tables']['role_permissions']['Row']

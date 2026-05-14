@@ -1,6 +1,6 @@
 import { PDFDocument, PDFFont, rgb } from 'pdf-lib'
 import fontkit from '@pdf-lib/fontkit'
-import type { Quotation, ProductText } from '@/types/database'
+import type { Quotation, TenantText } from '@/types/database'
 import type { PdfSection } from '@/pages/quotations/PdfLayoutDialog'
 
 export interface TenantProfile {
@@ -19,11 +19,40 @@ export interface TenantProfile {
 
 /**
  * Returns the tenant-configured footer when set, else the i18n default.
- * Templates use this in place of `L.footer`.
+ * Templates use this in place of `L.footer`. Looks up the `pdf_footer` slot
+ * in `tenant_texts`, falling back to the legacy `tenant.pdf_footer` scalar
+ * column for now and finally to the i18n default.
  */
-export function getFooterLabel(tenant: TenantProfile, defaultLabel: string): string {
-  const t = (tenant.pdf_footer ?? '').trim()
-  return t.length > 0 ? t : defaultLabel
+export function getFooterLabel(
+  tenant: TenantProfile,
+  defaultLabel: string,
+  texts: TenantText[] | undefined,
+  lang: 'en' | 'sr',
+): string {
+  if (texts && texts.length > 0) {
+    const row = texts.find(r => r.level === 'tenant' && r.reference_id === null && r.slot === 'pdf_footer' && r.language === lang)
+      ?? texts.find(r => r.level === 'tenant' && r.reference_id === null && r.slot === 'pdf_footer')
+    if (row && row.content.trim()) return row.content.trim()
+  }
+  const legacy = (tenant.pdf_footer ?? '').trim()
+  return legacy.length > 0 ? legacy : defaultLabel
+}
+
+/** Resolve the configurable Terms & Conditions lines for the current
+ *  language. Uses `tenant_texts.terms_line` rows when available, falling
+ *  back to the hardcoded `PDF_LABELS.termsLines[lang]`. */
+export function getTermsLines(
+  texts: TenantText[] | undefined,
+  fallback: readonly string[],
+  lang: 'en' | 'sr',
+): readonly string[] {
+  if (!texts || texts.length === 0) return fallback
+  const rows = texts
+    .filter(r => r.level === 'tenant' && r.reference_id === null && r.slot === 'terms_line' && r.language === lang)
+    .sort((a, b) => a.sort_order - b.sort_order)
+    .map(r => r.content)
+    .filter(s => s.trim().length > 0)
+  return rows.length > 0 ? rows : fallback
 }
 
 export type PdfTemplate = 'modern' | 'classic' | 'compact' | 'bold'
@@ -31,8 +60,11 @@ export type PdfTemplate = 'modern' | 'classic' | 'compact' | 'bold'
 export interface PdfBuildArgs {
   tenant:           TenantProfile
   quotation:        Quotation
-  productTexts?:    Record<string, ProductText[]>
-  globalTexts?:     ProductText[]
+  /** Pre-fetched rows from `tenant_texts`. Renderers resolve text blocks /
+   *  terms / footer / per-product texts directly off this array via the
+   *  helpers in `lib/texts.ts`. Falls back to an empty array — old quotations
+   *  whose tenant never had any texts simply render no blocks. */
+  texts?:           TenantText[]
   layoutSections?:  PdfSection[]
   lang:             'en' | 'sr'
   watermark?:       boolean
@@ -266,14 +298,15 @@ export function resolveCharDescription(
 
 export function buildOrderedSections(
   layoutSections: PdfSection[] | undefined,
-  globalTexts: ProductText[] | undefined,
-  lang: 'en' | 'sr',
+  /** Tenant-level text rows in the chosen language; produces one section per row. */
+  globalTextRows: { id: string; label: string | null }[] | undefined,
+  _lang: 'en' | 'sr',
 ): PdfSection[] {
   const defaultOrder: PdfSection[] = [
     { id: 'notes', label: 'Notes', visible: true },
     { id: 'terms', label: 'Terms & Conditions', visible: true },
-    ...(globalTexts ?? []).filter(gt => gt.language === lang).map(gt => ({
-      id: `text-${gt.id}`, label: gt.label, visible: true, textId: gt.id,
+    ...(globalTextRows ?? []).map(gt => ({
+      id: `text-${gt.id}`, label: gt.label ?? '', visible: true, textId: gt.id,
     })),
   ]
   return layoutSections ? layoutSections.filter(s => !s.locked) : defaultOrder

@@ -13,7 +13,6 @@ import {
 import {
   fetchProducts,
   fetchProductCharacteristicsWithValues,
-  fetchProductTexts,
 } from '@/lib/products'
 import { fetchInquiry } from '@/lib/inquiries'
 import { fetchActivePricing, type ActivePricing } from '@/lib/pricing'
@@ -32,7 +31,6 @@ import type {
   QuotationConfigItem,
   ConfigurationRule,
   PricingFormula,
-  ProductText,
   AdjustmentType,
 } from '@/types/database'
 import type { CharacteristicWithValues } from '@/lib/products'
@@ -100,7 +98,9 @@ export function QuotationFormPage() {
   const [detailsCache,      setDetailsCache]      = useState<Record<string, CharacteristicWithValues[]>>({})
   const [rulesCache,        setRulesCache]        = useState<Record<string, ConfigurationRule[]>>({})
   const [formulasCache,     setFormulasCache]     = useState<Record<string, PricingFormula[]>>({})
-  const [productTextsCache, setProductTextsCache] = useState<Record<string, ProductText[]>>({})
+  // Product texts now live in `tenant_texts` and are read directly by the
+  // quotation renderer in QuotationDetailPage, so the form no longer caches
+  // them here.
   const [pricingCache,      setPricingCache]      = useState<Record<string, ActivePricing>>({})
   // ── Customer fields ────────────────────────────────────────────────────────
   const [customerName,       setCustomerName]       = useState('')
@@ -194,23 +194,20 @@ export function QuotationFormPage() {
     const needDetails  = !detailsCache[productId]
     const needRules    = !rulesCache[productId]
     const needFormulas = !formulasCache[productId]
-    const needTexts    = !productTextsCache[productId]
-    if (!needDetails && !needRules && !needFormulas && !needTexts) return
+    if (!needDetails && !needRules && !needFormulas) return
     try {
-      const [details, rulesData, formulasData, texts] = await Promise.all([
+      const [details, rulesData, formulasData] = await Promise.all([
         needDetails  ? fetchProductCharacteristicsWithValues(productId) : Promise.resolve(detailsCache[productId]),
         needRules    ? supabase.from('configuration_rules').select('*').eq('product_id', productId).eq('is_active', true) : Promise.resolve({ data: rulesCache[productId] }),
         needFormulas ? supabase.from('pricing_formulas').select('*').eq('product_id', productId).eq('is_active', true).order('sort_order') : Promise.resolve({ data: formulasCache[productId] }),
-        needTexts    ? fetchProductTexts(productId) : Promise.resolve(productTextsCache[productId]),
       ])
       setDetailsCache(prev      => ({ ...prev, [productId]: details }))
       setRulesCache(prev        => ({ ...prev, [productId]: ((rulesData as any).data ?? []) as ConfigurationRule[] }))
       setFormulasCache(prev     => ({ ...prev, [productId]: ((formulasData as any).data ?? []) as PricingFormula[] }))
-      setProductTextsCache(prev => ({ ...prev, [productId]: texts }))
     } catch {
       toast({ title: t('Failed to load product details'), variant: 'destructive' })
     }
-  }, [detailsCache, rulesCache, formulasCache, productTextsCache])
+  }, [detailsCache, rulesCache, formulasCache])
 
   // ── Line item helpers ───────────────────────────────────────────────────────
   function addLineItem() {

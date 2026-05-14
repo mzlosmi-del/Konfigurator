@@ -5,14 +5,14 @@ import {
   fetchQuotation, updateQuotation, uploadQuotationPdf,
   fetchRejectionReasons, calcSubtotal, calcTotal, deleteQuotation,
 } from '@/lib/quotations'
-import { fetchProductTexts, fetchGlobalTexts } from '@/lib/products'
+import { fetchQuotationTexts, resolveProductTextBlocks, resolveTenantTextBlocks } from '@/lib/texts'
 import { buildQuotationPdfBytes, openPdfBlob, type TenantProfile, type PdfTemplate } from '@/lib/quotationPdf'
 import { buildQuotationDocxBytes, openDocxBlob } from '@/lib/quotationDocx'
 import { buildQuotationXlsxBytes, openXlsxBlob } from '@/lib/quotationXlsx'
 import { useAuthContext } from '@/components/auth/AuthContext'
 import { supabase } from '@/lib/supabase'
-import type { Quotation, QuotationStatus, QuotationLineItem, QuotationAdjustment, QuotationRejectionReason, ProductText } from '@/types/database'
-import { PdfLayoutDialog, type PdfSection, type ProductTextGroup, type ExportFormat } from './PdfLayoutDialog'
+import type { Quotation, QuotationStatus, QuotationLineItem, QuotationAdjustment, QuotationRejectionReason, TenantText } from '@/types/database'
+import { PdfLayoutDialog, type PdfSection, type ProductTextGroup, type PdfTextBlock, type ExportFormat } from './PdfLayoutDialog'
 import { SendEmailDialog } from './SendEmailDialog'
 import { AttachmentsPanel } from '@/components/quotations/AttachmentsPanel'
 import { STATUS_LABELS, statusVariant, STATUS_TRANSITIONS } from './quotationStatusConfig'
@@ -54,8 +54,14 @@ export function QuotationDetailPage() {
   const [showSendDialog,   setShowSendDialog]   = useState(false)
   const [pdfMode,          setPdfMode]          = useState<'preview' | 'confirm'>('preview')
   const [layoutOpen,       setLayoutOpen]       = useState(false)
-  const [pdfProductTexts,  setPdfProductTexts]  = useState<Record<string, ProductText[]>>({})
-  const [pdfGlobalTexts,   setPdfGlobalTexts]   = useState<ProductText[]>([])
+  /** All `tenant_texts` rows scoped to this quotation (tenant rows + product
+   *  rows for every product referenced by the line items). Pre-fetched in
+   *  `handleOpenPdfDialog` so the builder doesn't need to hit Supabase. */
+  const [pdfTexts,         setPdfTexts]         = useState<TenantText[]>([])
+  /** EN-language tenant text blocks reduced to the dialog's shape, plus the
+   *  current dialog language. Captured separately so the toggle list keeps a
+   *  consistent set of section ids. */
+  const [pdfGlobalTexts,   setPdfGlobalTexts]   = useState<PdfTextBlock[]>([])
   const [productTextGroups, setProductTextGroups] = useState<ProductTextGroup[]>([])
   const [tenantProfile,    setTenantProfile]    = useState<TenantProfile | null>(null)
 
@@ -169,26 +175,37 @@ export function QuotationDetailPage() {
     setGeneratingPdf(true)
     try {
       const lineItems = (Array.isArray(quotation.line_items) ? quotation.line_items : []) as unknown as QuotationLineItem[]
-      const uniqueProductIds = [...new Set(lineItems.map(li => li.product_id).filter(Boolean))]
+      const uniqueProductIds = [...new Set(lineItems.map(li => li.product_id).filter(Boolean))] as string[]
 
-      const [textsResults, globalTexts] = await Promise.all([
-        Promise.all(uniqueProductIds.map(pid => fetchProductTexts(pid).then(texts => ({ pid, texts })))),
-        fetchGlobalTexts(),
+      const [textRows, prof] = await Promise.all([
+        fetchQuotationTexts(uniqueProductIds),
+        buildTenantProfile(),
       ])
 
-      const textsMap: Record<string, ProductText[]> = {}
+      // Reduce to the dialog's PdfTextBlock shape for the selected language.
+      // The dialog uses the row id as section id and the label/content for
+      // its preview; the builder will re-resolve from the full rows array.
+      const dialogLang: 'en' | 'sr' = (quotation.lang as 'en' | 'sr') ?? 'en'
+      const globals = resolveTenantTextBlocks(textRows, dialogLang).map(b => ({
+        id:      b.id,
+        label:   b.label ?? b.slot,
+        content: b.content,
+      } satisfies PdfTextBlock))
+
       const groups: ProductTextGroup[] = []
-      for (const { pid, texts } of textsResults) {
-        if (texts.length) {
-          textsMap[pid] = texts
-          const li = lineItems.find(l => l.product_id === pid)
-          groups.push({ productId: pid, productName: li?.product_name ?? pid, texts })
-        }
+      for (const pid of uniqueProductIds) {
+        const blocks = resolveProductTextBlocks(textRows, pid, dialogLang).map(b => ({
+          id:      b.id,
+          label:   b.label ?? b.slot,
+          content: b.content,
+        } satisfies PdfTextBlock))
+        if (blocks.length === 0) continue
+        const li = lineItems.find(l => l.product_id === pid)
+        groups.push({ productId: pid, productName: li?.product_name ?? pid, texts: blocks })
       }
 
-      const prof = await buildTenantProfile()
-      setPdfProductTexts(textsMap)
-      setPdfGlobalTexts(globalTexts)
+      setPdfTexts(textRows)
+      setPdfGlobalTexts(globals)
       setProductTextGroups(groups)
       setTenantProfile(prof)
       setLayoutOpen(true)
@@ -203,15 +220,20 @@ export function QuotationDetailPage() {
     if (!id || !quotation) return
     setGeneratingPdf(true)
     try {
+      // The dialog lets the operator toggle individual product-text sections
+      // on or off. We honour those toggles by filtering the pre-fetched
+      // tenant_texts rows: any row whose id appears in the disabled set is
+      // dropped before reaching the builder. Tenant-level rows (terms,
+      // footer, global text blocks) are always kept — they are gated by the
+      // section visibility flags inside the renderer instead.
       const enabledPtIds = new Set(
         sections.filter(s => s.productTextId && s.visible).map(s => s.productTextId!)
       )
       const hasPtSections = sections.some(s => s.productTextId !== undefined)
-      const filtered: Record<string, ProductText[]> = {}
-      for (const [pid, texts] of Object.entries(pdfProductTexts)) {
-        const kept = hasPtSections ? texts.filter(pt => enabledPtIds.has(pt.id)) : texts
-        if (kept.length) filtered[pid] = kept
-      }
+      const filteredTexts = hasPtSections
+        ? pdfTexts.filter(r => r.level !== 'product' || enabledPtIds.has(r.id))
+        : pdfTexts
+
       const isPreview = pdfMode === 'preview'
       const tp = tenantProfile ?? { name: tenant?.name ?? 'Your store' }
 
@@ -221,14 +243,14 @@ export function QuotationDetailPage() {
         const fileBase = quotation.reference_number ?? 'quotation'
         if (format === 'docx') {
           const bytes = await buildQuotationDocxBytes({
-            tenant: tp, quotation, productTexts: filtered,
-            globalTexts: pdfGlobalTexts, layoutSections: sections, lang,
+            tenant: tp, quotation, texts: filteredTexts,
+            layoutSections: sections, lang,
           })
           openDocxBlob(bytes, `${fileBase}.docx`)
         } else {
           const bytes = await buildQuotationXlsxBytes({
-            tenant: tp, quotation, productTexts: filtered,
-            globalTexts: pdfGlobalTexts, layoutSections: sections, lang,
+            tenant: tp, quotation, texts: filteredTexts,
+            layoutSections: sections, lang,
           })
           openXlsxBlob(bytes, `${fileBase}.xlsx`)
         }
@@ -238,7 +260,7 @@ export function QuotationDetailPage() {
 
       const bytes = await buildQuotationPdfBytes(
         tp,
-        quotation, filtered, pdfGlobalTexts, sections, lang,
+        quotation, filteredTexts, sections, lang,
         isPreview,
         template,
       )
@@ -696,9 +718,18 @@ export function QuotationDetailPage() {
           tenantName={tenant?.name ?? 'Your store'}
           lang={quotation.lang === 'sr' ? 'sr' : 'en'}
           defaultIntro={(() => {
-            const map = (tenant?.quotation_email_intro_i18n ?? {}) as Record<string, unknown>
-            const v = map[quotation.lang === 'sr' ? 'sr' : 'en']
-            return typeof v === 'string' ? v : ''
+            // Fetched once in `handleOpenPdfDialog`; falls back to '' when
+            // the user hasn't opened the PDF preview yet.
+            const lang = quotation.lang === 'sr' ? 'sr' : 'en'
+            const exact = pdfTexts.find(r =>
+              r.level === 'tenant' && r.reference_id === null
+              && r.slot === 'quotation_email_intro' && r.language === lang
+            )
+            const fallback = pdfTexts.find(r =>
+              r.level === 'tenant' && r.reference_id === null
+              && r.slot === 'quotation_email_intro'
+            )
+            return (exact ?? fallback)?.content ?? ''
           })()}
           alreadyResent={!!quotation.responded_at}
         />

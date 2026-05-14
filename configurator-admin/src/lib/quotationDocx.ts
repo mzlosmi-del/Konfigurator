@@ -5,21 +5,23 @@ import {
   Footer,
 } from 'docx'
 import type {
-  Quotation, ProductText, QuotationLineItem, QuotationAdjustment, QuotationConfigItem,
+  Quotation, TenantText, QuotationLineItem, QuotationAdjustment, QuotationConfigItem,
 } from '@/types/database'
 import type { PdfSection } from '@/pages/quotations/PdfLayoutDialog'
 import {
-  PDF_LABELS, type TenantProfile, getFooterLabel, loadLogoBytes,
+  PDF_LABELS, type TenantProfile, getFooterLabel, getTermsLines, loadLogoBytes,
   isSectionVisible, isSectionVisibleOptIn, resolveCharDescription, buildOrderedSections,
 } from './pdf/shared'
+import { resolveProductTextBlocks, resolveTenantTextBlocks, type ResolvedTextBlock } from './texts'
 
 type Labels = (typeof PDF_LABELS)[keyof typeof PDF_LABELS]
 
 export interface BuildDocxArgs {
   tenant:          TenantProfile
   quotation:       Quotation
-  productTexts?:   Record<string, ProductText[]>
-  globalTexts?:    ProductText[]
+  /** Pre-fetched `tenant_texts` rows scoped to the tenant + every product
+   *  referenced by the quotation. */
+  texts?:          TenantText[]
   layoutSections?: PdfSection[]
   lang:            'en' | 'sr'
 }
@@ -256,7 +258,7 @@ function buildBillToAndDetails(quotation: Quotation, tenant: TenantProfile, L: L
 
 function buildLineItemsTable(
   items: QuotationLineItem[],
-  productTexts: Record<string, ProductText[]> | undefined,
+  texts: TenantText[],
   layoutSections: PdfSection[] | undefined,
   lang: 'en' | 'sr',
   L: Labels,
@@ -297,7 +299,7 @@ function buildLineItemsTable(
     const cfg      = Array.isArray(item.configuration) ? item.configuration : []
     const formulas = (Array.isArray(item.formulas) ? item.formulas : []).filter(f => (Number(f.amount) || 0) !== 0)
     const itemAdjs = Array.isArray(item.adjustments) ? item.adjustments : []
-    const ptexts   = (productTexts?.[item.product_id] ?? []).filter(pt => pt.language === lang)
+    const ptexts   = resolveProductTextBlocks(texts, item.product_id, lang)
     const showBreakdown = showBreakdownGlobal && (cfg.length + formulas.length > 0)
     const modSum     = cfg.reduce((s, c) => s + (Number(c.price_modifier) || 0), 0)
     const formulaSum = formulas.reduce((s, f) => s + (Number(f.amount) || 0), 0)
@@ -363,7 +365,7 @@ function buildLineItemsTable(
     }
 
     for (const pt of ptexts) {
-      productCol.push(p([txt(`${pt.label}:`, { bold: true, size: 15, color: HEX.muted })], { spacingBefore: 80 }))
+      productCol.push(p([txt(`${pt.label ?? pt.slot}:`, { bold: true, size: 15, color: HEX.muted })], { spacingBefore: 80 }))
       for (const line of String(pt.content).split(/\r?\n/)) {
         if (line.trim()) productCol.push(p([txt(line, { size: SZ.small, color: HEX.muted })], { indent: 240 }))
       }
@@ -485,9 +487,9 @@ function buildNotesSection(quotation: Quotation, L: Labels): Paragraph[] {
   return out
 }
 
-function buildTermsSection(L: Labels): Paragraph[] {
+function buildTermsSection(L: Labels, texts: TenantText[], lang: 'en' | 'sr'): Paragraph[] {
   const out: Paragraph[] = [ruleParagraph(), ...sectionLabel(L.termsHeader)]
-  for (const line of L.termsLines) {
+  for (const line of getTermsLines(texts, L.termsLines, lang)) {
     out.push(new Paragraph({
       shading: { type: ShadingType.SOLID, color: HEX.termsBox, fill: HEX.termsBox },
       spacing: { before: 0, after: 40 },
@@ -498,8 +500,9 @@ function buildTermsSection(L: Labels): Paragraph[] {
   return out
 }
 
-function buildGlobalTextSection(textBlock: ProductText): Paragraph[] {
-  const out: Paragraph[] = [ruleParagraph(), ...sectionLabel(textBlock.label.toUpperCase())]
+function buildGlobalTextSection(textBlock: ResolvedTextBlock): Paragraph[] {
+  const heading = (textBlock.label ?? textBlock.slot).toUpperCase()
+  const out: Paragraph[] = [ruleParagraph(), ...sectionLabel(heading)]
   for (const line of String(textBlock.content).split(/\r?\n/)) {
     if (line.trim()) out.push(p([txt(line, { size: SZ.body, color: HEX.ink })]))
   }
@@ -507,10 +510,11 @@ function buildGlobalTextSection(textBlock: ProductText): Paragraph[] {
 }
 
 export async function buildQuotationDocxBytes(args: BuildDocxArgs): Promise<Uint8Array> {
-  const { tenant, quotation, productTexts, globalTexts, layoutSections, lang } = args
+  const { tenant, quotation, texts = [], layoutSections, lang } = args
   const L = PDF_LABELS[lang]
   const items = (Array.isArray(quotation.line_items)  ? quotation.line_items  : []) as unknown as QuotationLineItem[]
   const adjs  = (Array.isArray(quotation.adjustments) ? quotation.adjustments : []) as unknown as QuotationAdjustment[]
+  const tenantBlocks = resolveTenantTextBlocks(texts, lang)
 
   const logo = await loadLogoBytes(tenant.logo_url)
 
@@ -521,21 +525,21 @@ export async function buildQuotationDocxBytes(args: BuildDocxArgs): Promise<Uint
     ruleParagraph(),
     buildBillToAndDetails(quotation, tenant, L),
     ...sectionLabel(L.lineItems),
-    buildLineItemsTable(items, productTexts, layoutSections, lang, L),
+    buildLineItemsTable(items, texts, layoutSections, lang, L),
     blank(160),
     buildTotalsBlock(quotation, adjs, L),
   ]
 
   // Notes / Terms / Global texts — respect dialog ordering and visibility.
-  const orderedSections = buildOrderedSections(layoutSections, globalTexts, lang)
+  const orderedSections = buildOrderedSections(layoutSections, tenantBlocks, lang)
   for (const section of orderedSections) {
     if (!section.visible) continue
     if (section.id === 'notes') {
       if (isSectionVisible(layoutSections, 'notes')) children.push(...buildNotesSection(quotation, L))
     } else if (section.id === 'terms') {
-      if (isSectionVisible(layoutSections, 'terms')) children.push(...buildTermsSection(L))
+      if (isSectionVisible(layoutSections, 'terms')) children.push(...buildTermsSection(L, texts, lang))
     } else if (section.textId) {
-      const gt = (globalTexts ?? []).find(t => t.id === section.textId && t.language === lang)
+      const gt = tenantBlocks.find(b => b.id === section.textId)
       if (gt) children.push(...buildGlobalTextSection(gt))
     }
   }
@@ -576,7 +580,7 @@ export async function buildQuotationDocxBytes(args: BuildDocxArgs): Promise<Uint
                 txt(` ${L.of} `, { size: SZ.small, color: HEX.muted }),
                 new TextRun({ children: [PageNumber.TOTAL_PAGES], size: SZ.small, color: HEX.muted, font: 'Noto Sans' }),
                 txt('\t', { size: SZ.small }),
-                txt(getFooterLabel(tenant, L.footer), { size: SZ.small, color: HEX.faint }),
+                txt(getFooterLabel(tenant, L.footer, texts, lang), { size: SZ.small, color: HEX.faint }),
               ],
             }),
           ],

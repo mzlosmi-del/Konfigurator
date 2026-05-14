@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, Link } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
 import { fetchProduct, updateProduct } from '@/lib/products'
+import { setEntityI18nText } from '@/lib/texts'
 import type { Product } from '@/types/database'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Button } from '@/components/ui/button'
@@ -14,7 +15,8 @@ import { RulesPanel } from './components/RulesPanel'
 import { FormulaPanel } from './components/FormulaPanel'
 import { VisualizationPanel } from './components/VisualizationPanel'
 import { EmbedPanel } from './components/EmbedPanel'
-import { TextsPanel } from './components/TextsPanel'
+// Product-specific text blocks are now maintained from the Central Texts
+// page (`/texts`). The legacy inline panel was removed in Phase D.
 import { FormConfigPanel, type FormConfig } from './components/FormConfigPanel'
 import { useToast } from '@/hooks/useToast'
 import { Toaster } from '@/components/ui/toast'
@@ -50,7 +52,7 @@ export function EditProductPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const { toasts, toast, dismiss } = useToast()
-  const { profile } = useAuthContext()
+  const { profile, tenant } = useAuthContext()
   const userName = profile?.email ?? null
 
   const [product, setProduct] = useState<Product | null>(null)
@@ -71,15 +73,27 @@ export function EditProductPage() {
       const before = product
       const updated = await updateProduct(product.id, {
         name:             values.name,
-        name_i18n:        values.name_i18n,
         description:      values.description ?? null,
-        description_i18n: values.description_i18n,
         base_price:       values.base_price,
         currency:         values.currency,
         sku:              values.sku?.trim() || null,
         unit_of_measure:  values.unit_of_measure?.trim() || null,
         show_price_breakdown: values.show_price_breakdown,
       })
+      // i18n maps are persisted in `tenant_texts`. The legacy JSONB columns
+      // were dropped by migration 078.
+      if (tenant?.id) {
+        await Promise.all([
+          setEntityI18nText({
+            tenant_id: tenant.id, level: 'product', reference_id: product.id, slot: 'name',
+            i18n: values.name_i18n ?? { en: values.name ?? '' },
+          }),
+          setEntityI18nText({
+            tenant_id: tenant.id, level: 'product', reference_id: product.id, slot: 'description',
+            i18n: values.description_i18n ?? { en: values.description ?? '' },
+          }),
+        ])
+      }
       setProduct(updated as Product)
       const diff = computeDiff(before as unknown as Record<string, unknown>, updated as unknown as Record<string, unknown>, PRODUCT_LABELS)
       logChange({ entityType: 'product', entityId: updated.id, entityName: updated.name, changeType: 'update', diff, changedByName: userName })
@@ -312,11 +326,13 @@ export function EditProductPage() {
             <CardHeader>
               <CardTitle className="text-base">{t('Product Texts')}</CardTitle>
               <CardDescription>
-                {t('Named text blocks included in PDF quotations. Use these for product descriptions, specifications, or terms.')}
+                {t('Product text blocks are now maintained from the Central Texts page. Filter by Level = Product and Reference = this product.')}
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <TextsPanel productId={product.id} />
+              <Link to={`/texts?level=product&reference=${product.id}`} className="text-sm text-primary underline">
+                {t('Open Central Texts')}
+              </Link>
             </CardContent>
           </Card>
         )}

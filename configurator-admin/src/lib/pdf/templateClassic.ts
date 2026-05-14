@@ -1,11 +1,12 @@
 import { PDFDocument, PDFPage, PDFFont, rgb, degrees } from 'pdf-lib'
-import type { QuotationLineItem, QuotationAdjustment, ProductText } from '@/types/database'
+import type { QuotationLineItem, QuotationAdjustment } from '@/types/database'
 import { calcLineTotal } from '@/lib/quotations'
 import {
-  C, wrapText, PDF_LABELS, loadFonts, loadLogo, getFooterLabel,
+  C, wrapText, PDF_LABELS, loadFonts, loadLogo, getFooterLabel, getTermsLines,
   isSectionVisible, isSectionVisibleOptIn, resolveCharDescription, buildOrderedSections,
   type PdfBuildArgs,
 } from './shared'
+import { resolveProductTextBlocks, resolveTenantTextBlocks, type ResolvedTextBlock } from '@/lib/texts'
 
 /**
  * Classic — traditional professional invoice. Modeled on common online
@@ -14,7 +15,8 @@ import {
  * section is single-column and flows top-down — no overlapping panels.
  */
 export async function renderClassic(args: PdfBuildArgs): Promise<Uint8Array> {
-  const { tenant, quotation, productTexts, globalTexts, layoutSections, lang, watermark } = args
+  const { tenant, quotation, texts = [], layoutSections, lang, watermark } = args
+  const tenantBlocks = resolveTenantTextBlocks(texts, lang)
   const L = PDF_LABELS[lang]
   const pdfDoc = await PDFDocument.create()
   const { fontR, fontB } = await loadFonts(pdfDoc)
@@ -81,7 +83,7 @@ export async function renderClassic(args: PdfBuildArgs): Promise<Uint8Array> {
       ? L.validityText(new Date(quotation.valid_until).toLocaleDateString(L.dateLocale, { dateStyle: 'long' }))
       : L.contactText
     text(validStr, MX, FOOTER_BASELINE, 7.5, fontR, C.muted)
-    rText(getFooterLabel(tenant, L.footer), W - MX, FOOTER_BASELINE, 7.5, fontR, C.faint)
+    rText(getFooterLabel(tenant, L.footer, texts, lang), W - MX, FOOTER_BASELINE, 7.5, fontR, C.faint)
   }
 
   const logoImg = await loadLogo(pdfDoc, tenant.logo_url)
@@ -285,7 +287,7 @@ export async function renderClassic(args: PdfBuildArgs): Promise<Uint8Array> {
       // skip them entirely so the PDF only shows formulas that actually
       // contribute to the line total.
       const formulas        = allFormulas.filter(f => (Number(f.amount) || 0) !== 0)
-      const ptexts          = (productTexts?.[item.product_id] ?? []).filter(pt => pt.language === lang)
+      const ptexts          = resolveProductTextBlocks(texts, item.product_id, lang)
       const modifierSum     = cfg.reduce((s, c) => s + (Number(c.price_modifier) || 0), 0)
       const derivedBase     = item.unit_price - modifierSum - formulaSum
       const showBreakdown   = (cfg.length > 0 || formulas.length > 0)
@@ -356,7 +358,7 @@ export async function renderClassic(args: PdfBuildArgs): Promise<Uint8Array> {
       }
 
       for (const pt of ptexts) {
-        text(`${pt.label}:`, C_PROD + 4, y, 7.5, fontB, NAVY)
+        text(`${pt.label ?? pt.slot}:`, C_PROD + 4, y, 7.5, fontB, NAVY)
         y -= 11
         for (const line of wrapText(pt.content, fontR, 8, PROD_W - 4)) {
           text(line, C_PROD + 8, y, 8, fontR, C.muted)
@@ -455,14 +457,14 @@ export async function renderClassic(args: PdfBuildArgs): Promise<Uint8Array> {
   }
 
   function drawTermsSection() {
-    drawSimpleSection(L.termsHeader, L.termsLines)
+    drawSimpleSection(L.termsHeader, [...getTermsLines(texts, L.termsLines, lang)])
   }
 
-  function drawGlobalTextSection(txt: ProductText) {
-    drawSimpleSection(txt.label.toUpperCase(), txt.content.split(/\r?\n/))
+  function drawGlobalTextSection(txt: ResolvedTextBlock) {
+    drawSimpleSection((txt.label ?? txt.slot).toUpperCase(), txt.content.split(/\r?\n/))
   }
 
-  const orderedSections = buildOrderedSections(layoutSections, globalTexts, lang)
+  const orderedSections = buildOrderedSections(layoutSections, tenantBlocks, lang)
 
   for (const section of orderedSections) {
     if (!section.visible) continue
@@ -471,7 +473,7 @@ export async function renderClassic(args: PdfBuildArgs): Promise<Uint8Array> {
     } else if (section.id === 'terms') {
       if (isSectionVisible(layoutSections, 'terms')) drawTermsSection()
     } else if (section.textId) {
-      const gt = (globalTexts ?? []).find(t => t.id === section.textId && t.language === lang)
+      const gt = tenantBlocks.find(b => b.id === section.textId)
       if (gt) drawGlobalTextSection(gt)
     }
   }

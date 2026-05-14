@@ -17,13 +17,36 @@ export function createSupabaseClient(config: WidgetConfig) {
   })
 }
 
+/** Shape of a row in the `tenant_texts` table — kept local to the widget so
+ *  we don't have to re-export the admin's `database.ts` here. */
+interface TextRow {
+  level:        'tenant' | 'product' | 'characteristic' | 'characteristic_value'
+  reference_id: string | null
+  slot:         string
+  language:     'en' | 'sr'
+  content:      string
+}
+
+/** Build a `{ lang: content }` map from text rows that match a (level,
+ *  reference_id, slot) triple, skipping empty strings. */
+function textsToI18n(rows: TextRow[], level: TextRow['level'], referenceId: string | null, slot: string): Record<string, string> {
+  const out: Record<string, string> = {}
+  for (const r of rows) {
+    if (r.level !== level || r.reference_id !== referenceId || r.slot !== slot) continue
+    if (!r.content?.trim()) continue
+    out[r.language] = r.content
+  }
+  return out
+}
+
 export async function loadProductConfig(config: WidgetConfig): Promise<FullProductConfig> {
   const sb = createSupabaseClient(config)
 
-  // 1. Product
+  // 1. Product — no longer reads the `_i18n` JSONB columns. The i18n map is
+  //    rebuilt below from `tenant_texts`.
   const { data: product, error: productError } = await sb
     .from('products')
-    .select('id, name, name_i18n, description, description_i18n, base_price, currency, ar_enabled, ar_placement, form_config, widget_theme, show_price_breakdown')
+    .select('id, name, description, base_price, currency, ar_enabled, ar_placement, form_config, widget_theme, show_price_breakdown')
     .eq('id', config.productId)
     .eq('status', 'published')
     .single()
@@ -77,11 +100,11 @@ export async function loadProductConfig(config: WidgetConfig): Promise<FullProdu
   // a default visualization asset with no configurable characteristics.
   const [charResult, valuesResult, assetsResult, rulesResult, formulasResult] = await Promise.all([
     characteristicIds.length > 0
-      ? sb.from('characteristics').select('id, name, name_i18n, display_type, sort_order').in('id', characteristicIds)
+      ? sb.from('characteristics').select('id, name, display_type, sort_order').in('id', characteristicIds)
       : Promise.resolve({ data: [], error: null }),
     characteristicIds.length > 0
       ? sb.from('characteristic_values')
-          .select('id, characteristic_id, label, label_i18n, price_modifier, sort_order, hex_color')
+          .select('id, characteristic_id, label, price_modifier, sort_order, hex_color')
           .in('characteristic_id', characteristicIds)
           .order('sort_order', { ascending: true })
       : Promise.resolve({ data: [], error: null }),
@@ -112,9 +135,31 @@ export async function loadProductConfig(config: WidgetConfig): Promise<FullProdu
   const rulesData    = rulesResult.data
   const formulasData = formulasResult.data
 
+  const valueIds = (valuesData ?? []).map((v: any) => v.id as string)
+
+  // 4. Pull every text row this widget needs — tenant post-inquiry message,
+  //    product name/description, every characteristic name and every value
+  //    label — in a single query. RLS allows anonymous read of tenant_texts
+  //    (see migration 076).
+  const textFilterParts: string[] = [
+    `and(level.eq.tenant,reference_id.is.null,slot.eq.post_inquiry_message)`,
+    `and(level.eq.product,reference_id.eq.${config.productId})`,
+  ]
+  if (orderedCharIds.length > 0) {
+    textFilterParts.push(`and(level.eq.characteristic,reference_id.in.(${orderedCharIds.join(',')}))`)
+  }
+  if (valueIds.length > 0) {
+    textFilterParts.push(`and(level.eq.characteristic_value,reference_id.in.(${valueIds.join(',')}))`)
+  }
+  const { data: textsData } = await sb
+    .from('tenant_texts')
+    .select('level, reference_id, slot, language, content')
+    .eq('tenant_id', config.tenantId)
+    .or(textFilterParts.join(','))
+  const textRows = (textsData ?? []) as TextRow[]
+
   // Fetch active scheduled price and modifier overrides for today
   const today    = new Date().toISOString().slice(0, 10)
-  const valueIds = (valuesData ?? []).map((v: any) => v.id as string)
 
   const [priceScheduleResult, modScheduleResult] = await Promise.all([
     sb.from('product_price_schedules')
@@ -151,23 +196,24 @@ export async function loadProductConfig(config: WidgetConfig): Promise<FullProdu
   for (const v of (valuesData ?? []) as (CharacteristicValue & { characteristic_id: string })[]) {
     if (!valuesByCharId[v.characteristic_id]) valuesByCharId[v.characteristic_id] = []
     const sched = modByValueId[v.id]
+    const labelI18n = textsToI18n(textRows, 'characteristic_value', v.id, 'label')
+    const merged = { ...v, name_i18n: undefined, label_i18n: labelI18n } as CharacteristicValue
     valuesByCharId[v.characteristic_id].push(
-      sched !== undefined ? { ...v, price_modifier: sched } : v
+      sched !== undefined ? { ...merged, price_modifier: sched } : merged
     )
   }
 
   const charById: Record<string, Characteristic> = {}
-  for (const c of (charData ?? []) as Characteristic[]) charById[c.id] = c
+  for (const c of (charData ?? []) as Characteristic[]) {
+    charById[c.id] = { ...c, name_i18n: textsToI18n(textRows, 'characteristic', c.id, 'name') }
+  }
 
   const characteristics: Characteristic[] = orderedCharIds
     .filter(id => charById[id])
     .map(id => ({ ...charById[id], values: valuesByCharId[id] ?? [] }))
 
-  // Load branding flag and tenant post-inquiry message in parallel
-  const [brandingResult, tenantResult] = await Promise.all([
-    sb.rpc('get_widget_branding', { p_product_id: config.productId }),
-    sb.from('tenants').select('post_inquiry_message').eq('id', config.tenantId).single(),
-  ])
+  // Load branding flag (tenant post-inquiry message comes from textRows).
+  const brandingResult = await sb.rpc('get_widget_branding', { p_product_id: config.productId })
 
   if (brandingResult.error) {
     // Function not yet deployed — apply migration 039_plan_sync.sql to fix this
@@ -175,14 +221,26 @@ export async function loadProductConfig(config: WidgetConfig): Promise<FullProdu
   }
   const removeBranding = !brandingResult.error && brandingResult.data === true
 
+  const postInquiryRow = textRows.find(r =>
+    r.level === 'tenant' && r.reference_id === null && r.slot === 'post_inquiry_message'
+  )
+
+  // Synthesise the i18n maps the widget UI still reads off the product object.
+  const enrichedProduct: ProductData = {
+    ...(product as ProductData),
+    name_i18n:        textsToI18n(textRows, 'product', config.productId, 'name'),
+    description_i18n: textsToI18n(textRows, 'product', config.productId, 'description'),
+    base_price:       effectiveBasePrice,
+  }
+
   return {
-    product: { ...(product as ProductData), base_price: effectiveBasePrice },
+    product: enrichedProduct,
     characteristics,
     assets:    (assetsData    ?? []) as VisualizationAsset[],
     rules:     (rulesData     ?? []) as ConfigurationRule[],
     formulas:  (formulasData  ?? []) as PricingFormula[],
     removeBranding,
-    postInquiryMessage: (tenantResult.data as { post_inquiry_message: string | null } | null)?.post_inquiry_message ?? null,
+    postInquiryMessage: postInquiryRow?.content ?? null,
   }
 }
 

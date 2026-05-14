@@ -1,20 +1,22 @@
 import ExcelJS from 'exceljs'
 import type {
-  Quotation, ProductText, QuotationLineItem, QuotationAdjustment, QuotationConfigItem,
+  Quotation, TenantText, QuotationLineItem, QuotationAdjustment, QuotationConfigItem,
 } from '@/types/database'
 import type { PdfSection } from '@/pages/quotations/PdfLayoutDialog'
 import {
-  PDF_LABELS, type TenantProfile, getFooterLabel, loadLogoBytes,
+  PDF_LABELS, type TenantProfile, getFooterLabel, getTermsLines, loadLogoBytes,
   isSectionVisible, isSectionVisibleOptIn, resolveCharDescription, buildOrderedSections,
 } from './pdf/shared'
+import { resolveProductTextBlocks, resolveTenantTextBlocks } from './texts'
 
 type Labels = (typeof PDF_LABELS)[keyof typeof PDF_LABELS]
 
 export interface BuildXlsxArgs {
   tenant:          TenantProfile
   quotation:       Quotation
-  productTexts?:   Record<string, ProductText[]>
-  globalTexts?:    ProductText[]
+  /** Pre-fetched `tenant_texts` rows scoped to the tenant + every product
+   *  referenced by the quotation. */
+  texts?:          TenantText[]
   layoutSections?: PdfSection[]
   lang:            'en' | 'sr'
 }
@@ -44,7 +46,8 @@ const FONT = 'Noto Sans'
  *  document at 100% zoom in Excel/LibreOffice. Each visual block is rendered
  *  by appending rows in order — no separate sheets, no pivoting. */
 export async function buildQuotationXlsxBytes(args: BuildXlsxArgs): Promise<Uint8Array> {
-  const { tenant, quotation, productTexts, globalTexts, layoutSections, lang } = args
+  const { tenant, quotation, texts = [], layoutSections, lang } = args
+  const tenantBlocks = resolveTenantTextBlocks(texts, lang)
   const L: Labels = PDF_LABELS[lang]
   const items = (Array.isArray(quotation.line_items)  ? quotation.line_items  : []) as unknown as QuotationLineItem[]
   const adjs  = (Array.isArray(quotation.adjustments) ? quotation.adjustments : []) as unknown as QuotationAdjustment[]
@@ -304,7 +307,7 @@ export async function buildQuotationXlsxBytes(args: BuildXlsxArgs): Promise<Uint
     const cfg      = (Array.isArray(item.configuration) ? item.configuration : []) as QuotationConfigItem[]
     const formulas = (Array.isArray(item.formulas) ? item.formulas : []).filter(f => (Number(f.amount) || 0) !== 0)
     const itemAdjs = Array.isArray(item.adjustments) ? item.adjustments : []
-    const ptexts   = (productTexts?.[item.product_id] ?? []).filter(pt => pt.language === lang)
+    const ptexts   = resolveProductTextBlocks(texts, item.product_id, lang)
     const showBreakdown = showBreakdownGlobal && (cfg.length + formulas.length > 0)
     const modSum     = cfg.reduce((s, c) => s + (Number(c.price_modifier) || 0), 0)
     const formulaSum = formulas.reduce((s, f) => s + (Number(f.amount) || 0), 0)
@@ -414,7 +417,7 @@ export async function buildQuotationXlsxBytes(args: BuildXlsxArgs): Promise<Uint
     // Product text blocks
     for (const pt of ptexts) {
       ws.mergeCells(`B${row}:L${row}`)
-      ws.getCell(`B${row}`).value = `${pt.label}:`
+      ws.getCell(`B${row}`).value = `${pt.label ?? pt.slot}:`
       ws.getCell(`B${row}`).font  = { name: FONT, bold: true, size: 8, color: { argb: HEX.muted } }
       ws.getCell(`B${row}`).alignment = { indent: 1 }
       if (shade) for (const k of ['A','B']) ws.getCell(`${k}${row}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: shade } }
@@ -537,7 +540,7 @@ export async function buildQuotationXlsxBytes(args: BuildXlsxArgs): Promise<Uint
     }
   }
 
-  const orderedSections = buildOrderedSections(layoutSections, globalTexts, lang)
+  const orderedSections = buildOrderedSections(layoutSections, tenantBlocks, lang)
   for (const section of orderedSections) {
     if (!section.visible) continue
     if (section.id === 'notes') {
@@ -547,11 +550,11 @@ export async function buildQuotationXlsxBytes(args: BuildXlsxArgs): Promise<Uint
     } else if (section.id === 'terms') {
       if (!isSectionVisible(layoutSections, 'terms')) continue
       writeBlockHeading(L.termsHeader)
-      writeBlockBody(L.termsLines, { boxed: true })
+      writeBlockBody([...getTermsLines(texts, L.termsLines, lang)], { boxed: true })
     } else if (section.textId) {
-      const gt = (globalTexts ?? []).find(t => t.id === section.textId && t.language === lang)
+      const gt = tenantBlocks.find(b => b.id === section.textId)
       if (!gt) continue
-      writeBlockHeading(gt.label.toUpperCase())
+      writeBlockHeading((gt.label ?? gt.slot).toUpperCase())
       writeBlockBody(String(gt.content).split(/\r?\n/).filter(l => l.trim()))
     }
   }
@@ -567,13 +570,13 @@ export async function buildQuotationXlsxBytes(args: BuildXlsxArgs): Promise<Uint
   ws.getCell(`A${row}`).value = validStr
   ws.getCell(`A${row}`).font  = { name: FONT, size: 8.5, color: { argb: HEX.muted } }
   ws.mergeCells(`G${row}:L${row}`)
-  ws.getCell(`G${row}`).value = getFooterLabel(tenant, L.footer)
+  ws.getCell(`G${row}`).value = getFooterLabel(tenant, L.footer, texts, lang)
   ws.getCell(`G${row}`).font  = { name: FONT, size: 8.5, color: { argb: HEX.faint } }
   ws.getCell(`G${row}`).alignment = { horizontal: 'right' }
   void cellRefs
 
   // Page footer with page numbers (printed only)
-  ws.headerFooter.oddFooter = `&L&"${FONT}"&8&K6C7179${validStr.replace(/&/g, '&&')}&C&"${FONT}"&8&K6C7179${L.page} &P ${L.of} &N&R&"${FONT}"&8&KADB1B7${getFooterLabel(tenant, L.footer).replace(/&/g, '&&')}`
+  ws.headerFooter.oddFooter = `&L&"${FONT}"&8&K6C7179${validStr.replace(/&/g, '&&')}&C&"${FONT}"&8&K6C7179${L.page} &P ${L.of} &N&R&"${FONT}"&8&KADB1B7${getFooterLabel(tenant, L.footer, texts, lang).replace(/&/g, '&&')}`
 
   const buffer = await wb.xlsx.writeBuffer()
   return new Uint8Array(buffer as ArrayBuffer)

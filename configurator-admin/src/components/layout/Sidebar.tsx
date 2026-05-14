@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { NavLink } from 'react-router-dom'
-import { LayoutDashboard, Package, Inbox, Settings, LogOut, Layers, FileText, AlignLeft, BarChart2, Code2, X, DollarSign, History, Shield, Table } from 'lucide-react'
+import { LayoutDashboard, Package, Inbox, Settings, LogOut, Layers, FileText, BarChart2, Code2, X, DollarSign, History, Shield, Table } from 'lucide-react'
 import { Logo } from '@/components/ui/Logo'
 import { cn } from '@/lib/utils'
 import { useAuthContext } from '@/components/auth/AuthContext'
@@ -43,8 +43,7 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
     { to: '/products',   icon: Package,         label: 'Products',    badge: 0,        visible: canViewProducts },
     { to: '/pricing',    icon: DollarSign,      label: 'Pricing',     badge: 0,        visible: canViewPricing },
     { to: '/library',    icon: Layers,          label: 'Library',     badge: 0,        visible: canViewLibrary },
-    { to: '/texts',         icon: AlignLeft,    label: 'Texts',         badge: 0,        visible: canViewTexts },
-    { to: '/texts/central', icon: Table,        label: 'Central Texts', badge: 0,        visible: canViewTexts },
+    { to: '/texts',         icon: Table,        label: 'Texts',         badge: 0,        visible: canViewTexts },
     { to: '/inquiries',  icon: Inbox,           label: 'Inquiries',   badge: newCount, visible: canViewInquiries },
     { to: '/quotations', icon: FileText,        label: 'Quotations',  badge: 0,        visible: canViewQuotations },
     { to: '/analytics',  icon: BarChart2,       label: 'Analytics',   badge: 0,        visible: canViewAnalytics },
