@@ -496,10 +496,29 @@ function AddTextDialog({ open, onOpenChange, tenantId, products, characteristics
     }
   }
 
+  // When picking a characteristic value, prefix each option with the parent
+  // characteristic name so e.g. "Oak" reads as "Material — Oak". Without it
+  // it's impossible to tell short labels apart when several characteristics
+  // share them. Sort by parent characteristic, then by value label.
+  const charNameById: Record<string, string> = Object.fromEntries(
+    characteristics.map(c => [c.id, c.name]),
+  )
+  const valueOptions = Object.values(valueById)
+    .map(v => {
+      const charName = charNameById[v.characteristic_id]
+      return {
+        id:    v.id,
+        label: charName ? `${charName} — ${v.label}` : v.label,
+        sortKey: `${charName ?? '~'}|${v.label}`,
+      }
+    })
+    .sort((a, b) => a.sortKey.localeCompare(b.sortKey))
+    .map(({ id, label }) => ({ id, label }))
+
   const referenceOptions: { id: string; label: string }[] =
     level === 'product'              ? products.map(p => ({ id: p.id, label: p.name }))
     : level === 'characteristic'     ? characteristics.map(c => ({ id: c.id, label: c.name }))
-    : level === 'characteristic_value' ? Object.values(valueById).map(v => ({ id: v.id, label: v.label }))
+    : level === 'characteristic_value' ? valueOptions
     : []
 
   const slotsForLevel = TEXT_SLOTS[level] as readonly string[]
