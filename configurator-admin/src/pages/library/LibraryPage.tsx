@@ -178,6 +178,7 @@ interface DraggableCharProps {
   onToggleExpand: () => void
   onRename: (name: string) => void
   onUpdateI18n: (i18n: Record<string, string>) => void
+  onUpdateDescriptionI18n: (i18n: Record<string, string>) => void
   onChangeType: (type: Characteristic['display_type']) => void
   onDelete: () => void
   onAssignToClass: (classId: string) => void
@@ -194,6 +195,7 @@ function DraggableChar({
   onToggleExpand,
   onRename,
   onUpdateI18n,
+  onUpdateDescriptionI18n,
   onChangeType,
   onDelete,
   onAssignToClass,
@@ -202,6 +204,7 @@ function DraggableChar({
 }: DraggableCharProps) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: char.id })
   const i18n = (char.name_i18n as Record<string, string> | null) ?? {}
+  const descriptionI18n = (char.description_i18n as Record<string, string> | null) ?? {}
 
   return (
     <div
@@ -305,6 +308,19 @@ function DraggableChar({
               value={i18n}
               onChange={onUpdateI18n}
               placeholder={char.name}
+            />
+          </div>
+
+          {/* Description translations (optional, shown on quotation PDFs if toggled on) */}
+          <div>
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1.5">
+              {t('Description (optional, per language)')}
+            </p>
+            <I18nEditor
+              value={descriptionI18n}
+              onChange={onUpdateDescriptionI18n}
+              placeholder={t('Shown on the quotation PDF when descriptions are enabled')}
+              multiline
             />
           </div>
 
@@ -463,6 +479,15 @@ export function LibraryPage() {
       setChars(prev => prev.map(c => c.id === char.id ? updated : c))
     } catch {
       toast({ title: t('Failed to save translation'), variant: 'destructive' })
+    }
+  }
+
+  async function handleUpdateCharDescriptionI18n(char: Characteristic, i18n: Record<string, string>) {
+    try {
+      const updated = await updateCharacteristic(char.id, { description_i18n: i18n })
+      setChars(prev => prev.map(c => c.id === char.id ? updated : c))
+    } catch {
+      toast({ title: t('Failed to save description translation'), variant: 'destructive' })
     }
   }
 
@@ -723,6 +748,7 @@ export function LibraryPage() {
                     onToggleExpand={() => toggleExpand(char.id)}
                     onRename={name => handleRenameChar(char, name)}
                     onUpdateI18n={i18n => handleUpdateCharI18n(char, i18n)}
+                    onUpdateDescriptionI18n={i18n => handleUpdateCharDescriptionI18n(char, i18n)}
                     onChangeType={type => handleChangeType(char, type)}
                     onDelete={() => setToDelete(char)}
                     onAssignToClass={classId => handleAssign(classId, char.id)}

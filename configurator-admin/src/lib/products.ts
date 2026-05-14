@@ -264,7 +264,10 @@ export async function createCharacteristic(
 
 export async function updateCharacteristic(
   id: string,
-  input: Partial<Pick<Characteristic, 'name' | 'display_type'>> & { name_i18n?: Record<string,string> }
+  input: Partial<Pick<Characteristic, 'name' | 'display_type'>> & {
+    name_i18n?: Record<string,string>
+    description_i18n?: Record<string,string>
+  }
 ): Promise<Characteristic> {
   const { data, error } = await supabase
     .from('characteristics')

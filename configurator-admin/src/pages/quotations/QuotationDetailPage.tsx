@@ -7,10 +7,12 @@ import {
 } from '@/lib/quotations'
 import { fetchProductTexts, fetchGlobalTexts } from '@/lib/products'
 import { buildQuotationPdfBytes, openPdfBlob, type TenantProfile, type PdfTemplate } from '@/lib/quotationPdf'
+import { buildQuotationDocxBytes, openDocxBlob } from '@/lib/quotationDocx'
+import { buildQuotationXlsxBytes, openXlsxBlob } from '@/lib/quotationXlsx'
 import { useAuthContext } from '@/components/auth/AuthContext'
 import { supabase } from '@/lib/supabase'
 import type { Quotation, QuotationStatus, QuotationLineItem, QuotationAdjustment, QuotationRejectionReason, ProductText } from '@/types/database'
-import { PdfLayoutDialog, type PdfSection, type ProductTextGroup } from './PdfLayoutDialog'
+import { PdfLayoutDialog, type PdfSection, type ProductTextGroup, type ExportFormat } from './PdfLayoutDialog'
 import { SendEmailDialog } from './SendEmailDialog'
 import { AttachmentsPanel } from '@/components/quotations/AttachmentsPanel'
 import { STATUS_LABELS, statusVariant, STATUS_TRANSITIONS } from './quotationStatusConfig'
@@ -197,7 +199,7 @@ export function QuotationDetailPage() {
     }
   }
 
-  async function handleLayoutConfirm(sections: PdfSection[], lang: 'en' | 'sr', template: PdfTemplate) {
+  async function handleLayoutConfirm(sections: PdfSection[], lang: 'en' | 'sr', template: PdfTemplate, format: ExportFormat) {
     if (!id || !quotation) return
     setGeneratingPdf(true)
     try {
@@ -211,8 +213,31 @@ export function QuotationDetailPage() {
         if (kept.length) filtered[pid] = kept
       }
       const isPreview = pdfMode === 'preview'
+      const tp = tenantProfile ?? { name: tenant?.name ?? 'Your store' }
+
+      // Non-PDF formats only download — never upload or change quotation state.
+      // The confirm flow is PDF-only because the saved file is the canonical record.
+      if (format !== 'pdf') {
+        const fileBase = quotation.reference_number ?? 'quotation'
+        if (format === 'docx') {
+          const bytes = await buildQuotationDocxBytes({
+            tenant: tp, quotation, productTexts: filtered,
+            globalTexts: pdfGlobalTexts, layoutSections: sections, lang,
+          })
+          openDocxBlob(bytes, `${fileBase}.docx`)
+        } else {
+          const bytes = await buildQuotationXlsxBytes({
+            tenant: tp, quotation, productTexts: filtered,
+            globalTexts: pdfGlobalTexts, layoutSections: sections, lang,
+          })
+          openXlsxBlob(bytes, `${fileBase}.xlsx`)
+        }
+        setLayoutOpen(false)
+        return
+      }
+
       const bytes = await buildQuotationPdfBytes(
-        tenantProfile ?? { name: tenant?.name ?? 'Your store' },
+        tp,
         quotation, filtered, pdfGlobalTexts, sections, lang,
         isPreview,
         template,
@@ -237,7 +262,7 @@ export function QuotationDetailPage() {
         toast({ title: t('Quotation confirmed') })
       }
     } catch (err) {
-      toast({ title: t('Failed to generate PDF'), description: String(err), variant: 'destructive' })
+      toast({ title: t('Failed to generate document'), description: String(err), variant: 'destructive' })
     } finally {
       setGeneratingPdf(false)
     }
@@ -634,6 +659,7 @@ export function QuotationDetailPage() {
         loading={generatingPdf}
         quotation={quotation}
         tenant={tenantProfile ?? { name: tenant?.name ?? 'Your store' }}
+        pdfOnly={pdfMode === 'confirm'}
       />
 
       {/* ── Delete confirm ─────────────────────────────────────────────────── */}

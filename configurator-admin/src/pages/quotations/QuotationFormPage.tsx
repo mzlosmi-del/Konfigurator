@@ -68,6 +68,20 @@ function defaultExpiry(): string {
   return d.toISOString().slice(0, 10)
 }
 
+/** Normalise a `description_i18n` JSONB value into a translation map,
+ *  trimming entries and dropping blanks. Returns undefined when nothing remains
+ *  so the column stays optional in the snapshot. */
+function pickDescriptionI18n(raw: Json | undefined): Record<string, string> | undefined {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined
+  const out: Record<string, string> = {}
+  for (const [lang, val] of Object.entries(raw as Record<string, Json>)) {
+    if (typeof val !== 'string') continue
+    const trimmed = val.trim()
+    if (trimmed) out[lang] = trimmed
+  }
+  return Object.keys(out).length > 0 ? out : undefined
+}
+
 // ── Component ──────────────────────────────────────────────────────────────────
 
 export function QuotationFormPage() {
@@ -319,12 +333,14 @@ export function QuotationFormPage() {
         const modOverrides = pricingCache[li.product_id]?.modifierByValueId ?? {}
 
         for (const char of chars) {
+          const descI18n = pickDescriptionI18n(char.description_i18n)
           if (char.display_type === 'number') {
             const rawVal = li.selection[char.id]
             if (rawVal === undefined || rawVal === '') continue
             config.push({
               characteristic_id:   char.id,
               characteristic_name: char.name,
+              characteristic_description_i18n: descI18n,
               value_id:            rawVal,
               value_label:         rawVal,
               price_modifier:      0,
@@ -339,6 +355,7 @@ export function QuotationFormPage() {
           config.push({
             characteristic_id:   char.id,
             characteristic_name: char.name,
+            characteristic_description_i18n: descI18n,
             value_id:            value.id,
             value_label:         value.label,
             price_modifier:      effective,

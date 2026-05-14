@@ -209,6 +209,28 @@ export function isSectionVisible(layoutSections: PdfSection[] | undefined, id: s
   return s ? s.visible : true
 }
 
+/** Like `isSectionVisible` but defaults to false for legacy callers that don't pass
+ *  layoutSections. Use for opt-in additions (e.g. characteristic descriptions). */
+export function isSectionVisibleOptIn(layoutSections: PdfSection[] | undefined, id: string): boolean {
+  if (!layoutSections) return false
+  const s = layoutSections.find(s => s.id === id)
+  return !!s && s.visible
+}
+
+/** Resolve the description for the current language from a snapshotted
+ *  description_i18n map. Returns an empty string when nothing useful is available. */
+export function resolveCharDescription(
+  i18n: Record<string, string> | null | undefined,
+  lang: 'en' | 'sr',
+): string {
+  if (!i18n) return ''
+  const direct = i18n[lang]
+  if (typeof direct === 'string' && direct.trim()) return direct.trim()
+  const fallback = lang === 'en' ? i18n.sr : i18n.en
+  if (typeof fallback === 'string' && fallback.trim()) return fallback.trim()
+  return ''
+}
+
 export function buildOrderedSections(
   layoutSections: PdfSection[] | undefined,
   globalTexts: ProductText[] | undefined,

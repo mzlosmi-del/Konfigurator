@@ -14,9 +14,11 @@ import {
   arrayMove,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { GripVertical, Lock, Eye, EyeOff, FileText } from 'lucide-react'
+import { GripVertical, Lock, Eye, EyeOff, FileText, FileSpreadsheet, FileType2 } from 'lucide-react'
 import type { Quotation, QuotationLineItem, QuotationAdjustment, ProductText } from '@/types/database'
 import { type TenantProfile, type PdfTemplate, PDF_TEMPLATES } from '@/lib/quotationPdf'
+
+export type ExportFormat = 'pdf' | 'docx' | 'xlsx'
 import { calcLineTotal, calcSubtotal, calcTotal } from '@/lib/quotations'
 import {
   Dialog,
@@ -51,10 +53,13 @@ interface Props {
   globalTexts:       ProductText[]
   productTexts?:     ProductTextGroup[]
   quotationHasNotes: boolean
-  onConfirm:         (sections: PdfSection[], lang: 'en' | 'sr', template: PdfTemplate) => void
+  onConfirm:         (sections: PdfSection[], lang: 'en' | 'sr', template: PdfTemplate, format: ExportFormat) => void
   loading:           boolean
   quotation:         Quotation
   tenant:            TenantProfile
+  /** When true, only PDF can be generated (used by the confirm-quotation flow,
+   *  which uploads the file as the official record). */
+  pdfOnly?:          boolean
 }
 
 // Hex must stay in sync with the accent colours used in each template renderer.
@@ -76,6 +81,9 @@ function buildDefaultSections(
     // only product · qty · unit · total — no configuration breakdown or
     // formula lines under each item. Defaults to on (current behaviour).
     { id: 'price-breakdown', label: 'Show price breakdown', visible: true },
+    // Opt-in: when on, render the translated characteristic description under each
+    // selected option in the line items. Off by default to keep existing PDFs unchanged.
+    { id: 'characteristic-descriptions', label: 'Show characteristic descriptions', visible: false },
   ]
 
   // One toggleable row per product text entry (rendered inline within each line item)
@@ -480,13 +488,14 @@ function PreviewA4({ sections, quotation, tenant, globalTexts, productTexts, lan
 
 export function PdfLayoutDialog({
   open, onOpenChange, globalTexts, productTexts, quotationHasNotes,
-  onConfirm, loading, quotation, tenant,
+  onConfirm, loading, quotation, tenant, pdfOnly,
 }: Props) {
   const [sections, setSections] = useState<PdfSection[]>(() =>
     buildDefaultSections(globalTexts, quotationHasNotes, productTexts)
   )
   const [lang, setLang] = useState<'en' | 'sr'>('en')
   const [template, setTemplate] = useState<PdfTemplate>('modern')
+  const [format, setFormat] = useState<ExportFormat>('pdf')
 
   // Reset when dialog opens
   const [lastOpen, setLastOpen] = useState(false)
@@ -494,6 +503,7 @@ export function PdfLayoutDialog({
     setSections(buildDefaultSections(globalTexts, quotationHasNotes, productTexts))
     setLang('en')
     setTemplate('modern')
+    setFormat('pdf')
     setLastOpen(true)
   }
   if (!open && lastOpen) setLastOpen(false)
@@ -616,12 +626,46 @@ export function PdfLayoutDialog({
               </div>
             </div>
             <div className="px-3 py-3 border-t flex flex-col gap-2">
+              {!pdfOnly && (
+                <div>
+                  <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">
+                    {t('Format')}
+                  </p>
+                  <div className="grid grid-cols-3 gap-1">
+                    {([
+                      { id: 'pdf'  as const, label: 'PDF',  Icon: FileText        },
+                      { id: 'docx' as const, label: 'DOCX', Icon: FileType2       },
+                      { id: 'xlsx' as const, label: 'XLSX', Icon: FileSpreadsheet },
+                    ]).map(({ id, label, Icon }) => (
+                      <button
+                        key={id}
+                        type="button"
+                        onClick={() => setFormat(id)}
+                        className={[
+                          'flex items-center justify-center gap-1 border rounded-md px-2 py-1.5 text-xs transition-all',
+                          format === id ? 'border-primary ring-2 ring-primary/20 bg-primary/5' : 'border-border hover:bg-muted/50',
+                        ].join(' ')}
+                        title={
+                          id === 'pdf'  ? t('Portable Document Format')
+                          : id === 'docx' ? t('Microsoft Word document')
+                          : t('Microsoft Excel spreadsheet')
+                        }
+                      >
+                        <Icon className="h-3.5 w-3.5" />
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
               <Button variant="outline" onClick={() => onOpenChange(false)} disabled={loading} className="w-full">
                 {t('Cancel')}
               </Button>
-              <Button onClick={() => onConfirm(sections, lang, template)} loading={loading} className="w-full">
+              <Button onClick={() => onConfirm(sections, lang, template, format)} loading={loading} className="w-full">
                 <FileText className="h-4 w-4 mr-1.5" />
-                {t('Generate PDF')}
+                {format === 'pdf'  ? t('Generate PDF')
+                 : format === 'docx' ? t('Download DOCX')
+                 : t('Download XLSX')}
               </Button>
             </div>
           </div>
