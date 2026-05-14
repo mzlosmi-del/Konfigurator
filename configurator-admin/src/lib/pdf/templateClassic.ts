@@ -3,7 +3,7 @@ import type { QuotationLineItem, QuotationAdjustment, ProductText } from '@/type
 import { calcLineTotal } from '@/lib/quotations'
 import {
   C, wrapText, PDF_LABELS, loadFonts, loadLogo, getFooterLabel,
-  isSectionVisible, buildOrderedSections,
+  isSectionVisible, isSectionVisibleOptIn, resolveCharDescription, buildOrderedSections,
   type PdfBuildArgs,
 } from './shared'
 
@@ -290,11 +290,21 @@ export async function renderClassic(args: PdfBuildArgs): Promise<Uint8Array> {
       const derivedBase     = item.unit_price - modifierSum - formulaSum
       const showBreakdown   = (cfg.length > 0 || formulas.length > 0)
         && isSectionVisible(layoutSections, 'price-breakdown')
+      const showDescriptions = showBreakdown
+        && isSectionVisibleOptIn(layoutSections, 'characteristic-descriptions')
+      const descLines: Record<string, string[]> = {}
+      if (showDescriptions) {
+        for (const c of cfg) {
+          const desc = resolveCharDescription(c.characteristic_description_i18n, lang)
+          if (desc) descLines[c.characteristic_id] = wrapText(desc, fontR, 7.5, PROD_W - 12)
+        }
+      }
+      const descLineCount = Object.values(descLines).reduce((s, ls) => s + ls.length, 0)
 
       const nameLines = wrapText(item.product_name, fontB, 10, PROD_W)
       let rh = nameLines.length * 13
       if (item.product_sku)    rh += 11
-      if (showBreakdown)       rh += 11 + (cfg.length + formulas.length) * 11
+      if (showBreakdown)       rh += 11 + (cfg.length + formulas.length) * 11 + descLineCount * 10
       for (const pt of ptexts) rh += 11 + wrapText(pt.content, fontR, 8, PROD_W - 4).length * 11
       if (itemAdjs.length > 0) rh += 4 + 11 + itemAdjs.length * 11
       rh += 14
@@ -327,6 +337,13 @@ export async function renderClassic(args: PdfBuildArgs): Promise<Uint8Array> {
           const modColor = mod > 0 ? C.positive : mod < 0 ? C.negative : C.muted
           rText(modStr, C_TR, y, 8, fontR, modColor)
           y -= 11
+          const lines = descLines[c.characteristic_id]
+          if (lines) {
+            for (const line of lines) {
+              text(line, C_PROD + 12, y, 7.5, fontR, C.faint)
+              y -= 10
+            }
+          }
         }
         for (const f of formulas) {
           text(`ƒ ${f.formula_name}`, C_PROD + 4, y, 8, fontR, C.muted)

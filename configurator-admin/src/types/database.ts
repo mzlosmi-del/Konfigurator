@@ -54,11 +54,15 @@ export type QuotationStatus =
 export type AdjustmentType = 'surcharge' | 'discount' | 'tax'
 
 export interface QuotationConfigItem {
-  characteristic_id:   string
-  characteristic_name: string
-  value_id:            string
-  value_label:         string
-  price_modifier:      number
+  characteristic_id:          string
+  characteristic_name:        string
+  /** Snapshot of characteristics.description_i18n at save time, e.g. { en: "...", sr: "..." }.
+   *  The PDF renderer picks the entry matching the chosen export language; missing or empty
+   *  entries are skipped. Undefined for legacy line items saved before this column existed. */
+  characteristic_description_i18n?: Record<string, string>
+  value_id:                   string
+  value_label:                string
+  price_modifier:             number
 }
 
 export interface QuotationFormulaItem {
@@ -245,12 +249,13 @@ export interface Database {
           tenant_id: string
           name: string
           name_i18n: Json
+          description_i18n: Json
           display_type: DisplayType
           sort_order: number
           created_at: string
           updated_at: string
         }
-        Insert: Omit<Database['public']['Tables']['characteristics']['Row'], 'id' | 'created_at' | 'updated_at'> & { id?: string }
+        Insert: Omit<Database['public']['Tables']['characteristics']['Row'], 'id' | 'created_at' | 'updated_at' | 'description_i18n'> & { id?: string; description_i18n?: Json }
         Update: Partial<Database['public']['Tables']['characteristics']['Insert']>
       }
       characteristic_values: {
