@@ -25,6 +25,7 @@ import { QuotationFormPage } from '@/pages/quotations/QuotationFormPage'
 import { QuotationDetailPage } from '@/pages/quotations/QuotationDetailPage'
 import { PricingCenterPage } from '@/pages/pricing/PricingCenterPage'
 import { TextsPage } from '@/pages/texts/TextsPage'
+import { CentralTextsPage } from '@/pages/texts/CentralTextsPage'
 import { AnalyticsPage } from '@/pages/analytics/AnalyticsPage'
 import { EmbedDocsPage } from '@/pages/embed-docs/EmbedDocsPage'
 import { PublicPreviewPage } from '@/pages/public/PublicPreviewPage'
@@ -90,7 +91,8 @@ export function App() {
               </Route>
 
               <Route element={<ProtectedRoute functionality="texts" />}>
-                <Route path="/texts" element={<TextsPage />} />
+                <Route path="/texts"         element={<TextsPage        />} />
+                <Route path="/texts/central" element={<CentralTextsPage />} />
               </Route>
 
               <Route element={<ProtectedRoute functionality="analytics" />}>

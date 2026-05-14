@@ -6,6 +6,42 @@ export type Json = string | number | boolean | null | { [key: string]: Json } | 
 
 export type ProductStatus = 'draft' | 'published' | 'archived'
 export type Plan = 'free' | 'starter' | 'growth' | 'scale'
+
+/** Levels supported by the central `tenant_texts` table (see migration 076).
+ *  Tenant rows have `reference_id = null`; the other three resolve against
+ *  products / characteristics / characteristic_values respectively. */
+export type TextLevel = 'tenant' | 'product' | 'characteristic' | 'characteristic_value'
+
+/** Canonical slot names used by the renderers when looking up text. The
+ *  central editor accepts arbitrary strings so tenants can introduce custom
+ *  slots, but these are the ones that have built-in renderer support today. */
+export const TEXT_SLOTS = {
+  tenant: [
+    'pdf_footer',
+    'public_page_title',
+    'post_inquiry_message',
+    'quotation_email_intro',
+    'quotation_accept_message',
+    'quotation_reject_message',
+    'terms_line',
+    // multi-block "global text" slots — inherit text_type names from the
+    // legacy product_texts table so they round-trip cleanly.
+    'product', 'specification', 'note', 'terms',
+  ],
+  product: [
+    'name', 'description',
+    'product', 'specification', 'note', 'terms',
+  ],
+  characteristic:       ['name', 'description'] as const,
+  characteristic_value: ['label', 'description'] as const,
+} as const
+
+/** Multi-row slots — i.e. ones whose `sort_order` matters and a single
+ *  (level, reference, slot, language) can have more than one row. */
+export const MULTI_ROW_SLOTS = new Set<string>([
+  'terms_line',
+  'product', 'specification', 'note', 'terms',
+])
 export type DisplayType = 'select' | 'radio' | 'swatch' | 'toggle' | 'number'
 export type AssetType = 'image' | 'render' | '3d_model'
 // Configuration rules v2 — see migrations/074_rules_v2.sql.
@@ -510,6 +546,28 @@ export interface Database {
         Insert: Omit<Database['public']['Tables']['audit_log']['Row'], 'id' | 'changed_at'> & { id?: string; changed_at?: string }
         Update: Partial<Database['public']['Tables']['audit_log']['Insert']>
       }
+      tenant_texts: {
+        Row: {
+          id:           string
+          tenant_id:    string
+          level:        TextLevel
+          reference_id: string | null
+          slot:         string
+          language:     'en' | 'sr'
+          sort_order:   number
+          label:        string | null
+          content:      string
+          created_at:   string
+          updated_at:   string
+        }
+        Insert: Omit<Database['public']['Tables']['tenant_texts']['Row'], 'id' | 'created_at' | 'updated_at'> & {
+          id?:         string
+          sort_order?: number
+          label?:      string | null
+          content?:    string
+        }
+        Update: Partial<Database['public']['Tables']['tenant_texts']['Insert']>
+      }
     }
     Functions: {
       auth_tenant_id: {
@@ -574,6 +632,9 @@ export type ProductClass         = Database['public']['Tables']['product_classes
 export type PricingFormula       = Database['public']['Tables']['pricing_formulas']['Row']
 export type Quotation                  = Database['public']['Tables']['quotations']['Row']
 export type ProductText                = Database['public']['Tables']['product_texts']['Row']
+export type TenantText                 = Database['public']['Tables']['tenant_texts']['Row']
+export type TenantTextInsert           = Database['public']['Tables']['tenant_texts']['Insert']
+export type TenantTextUpdate           = Database['public']['Tables']['tenant_texts']['Update']
 export type ProductTextType            = 'product' | 'specification' | 'note' | 'terms'
 export type QuotationRejectionReason   = Database['public']['Tables']['quotation_rejection_reasons']['Row']
 export type QuotationAttachment        = Database['public']['Tables']['quotation_attachments']['Row']

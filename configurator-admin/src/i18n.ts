@@ -577,6 +577,39 @@ const sr: Record<string, string> = {
   'Failed to load texts':                  'Učitavanje tekstova nije uspelo',
   'Failed to add text':                    'Dodavanje teksta nije uspelo',
   'Failed to save text':                   'Čuvanje teksta nije uspelo',
+
+  // Central Texts page (migration 076 / 077)
+  'Central Texts':                         'Centralni tekstovi',
+  'Maintain every piece of customer-facing copy in one place — keyed by level, reference, slot and language. Edit inline; changes save when you click the save icon or blur the textarea.':
+    'Održavajte svaki tekst koji vide klijenti na jednom mestu — po nivou, referenci, slotu i jeziku. Izmene se čuvaju kada kliknete ikonu za čuvanje ili napustite polje.',
+  'Tenant':                                'Nalog',
+  'All levels':                            'Svi nivoi',
+  'All slots':                             'Svi slotovi',
+  'Slot':                                  'Slot',
+  'Lang':                                  'Jez',
+  'Both':                                  'Oba',
+  'Content':                               'Sadržaj',
+  'Search content, label, reference…':     'Pretraži sadržaj, oznaku, referencu…',
+  'Showing':                               'Prikazano',
+  'of':                                    'od',
+  'rows':                                  'redova',
+  'No texts yet. Run the migration 077 backfill, or click "Add text" to create the first row.':
+    'Nema još tekstova. Pokrenite backfill iz migracije 077 ili kliknite „Dodaj tekst“ za prvi red.',
+  'No rows match the current filters.':    'Nema redova koji odgovaraju filterima.',
+  'Delete text?':                          'Obrisati tekst?',
+  'This text will be removed. If a renderer depends on it, the legacy column fallback will be used until you restore it.':
+    'Tekst će biti uklonjen. Ako renderer zavisi od njega, koristiće se rezerva iz nasleđene kolone dok ga ne vratite.',
+  'Text deleted':                          'Tekst obrisan',
+  'Pick a level, reference (if applicable), slot and language. The combination must be unique unless the slot is multi-row.':
+    'Izaberite nivo, referencu (ako je potrebno), slot i jezik. Kombinacija mora biti jedinstvena osim ako je slot višestruki.',
+  '— pick one —':                          '— izaberite —',
+  'Please pick a reference':               'Izaberite referencu',
+  'Failed to create text':                 'Kreiranje teksta nije uspelo',
+  'Sort order':                            'Redosled',
+  'Optional — shown as the block heading on the PDF':
+    'Opciono — prikazuje se kao naslov bloka u PDF-u',
+  'Type the text…':                        'Unesite tekst…',
+  'Saved':                                 'Sačuvano',
   'Failed to delete text':                 'Brisanje teksta nije uspelo',
   'Language':                              'Jezik',
   'English':                               'Engleski',
