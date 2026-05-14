@@ -472,6 +472,11 @@ const sr: Record<string, string> = {
   'Quotation not found':                   'Ponuda nije pronađena',
   'Back to Quotations':                    'Nazad na ponude',
   'Download PDF':                          'Preuzmi PDF',
+  'Technical spec':                        'Tehnička specifikacija',
+  'Generate a Word document with the technical specification of the products on this quotation.':
+    'Kreiraj Word dokument sa tehničkom specifikacijom proizvoda iz ove ponude.',
+  'Failed to generate technical specification':
+    'Generisanje tehničke specifikacije nije uspelo',
   'Generate PDF':                          'Generiši PDF',
   'PDF saved':                             'PDF sačuvan',
   'Company':                               'Kompanija',
