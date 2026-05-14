@@ -304,32 +304,68 @@ export async function buildQuotationTechSpecDocxBytes(args: BuildTechSpecArgs): 
   }
   coverChildren.push(new Paragraph({ children: [new PageBreak()] }))
 
-  // ── Pre-walk to build TOC entries + match bookmark ids on body headings ──
-  // Two levels only: product (1.) and characteristic+value (1.1.). The
-  // bookmark id is the same chapter number with `-` separators so we can
-  // link to it from the TOC.
+  // ── Pre-walk: keep only chapters that actually have content ─────────────
+  // A chapter "has content" when its spec text is non-empty OR it has at
+  // least one image attached. Empty chapters — no text and no pictures —
+  // are dropped entirely (no heading rendered). Products that have no own
+  // content but still host one or more surviving children keep their
+  // heading so the children have a parent in the numbering scheme.
+  interface SurvivingChild {
+    entry:          QuotationConfigItem
+    charSpec:       string
+    valueSpec:      string
+    hasValueImages: boolean
+  }
+  interface SurvivingProduct {
+    item:             QuotationLineItem
+    productSpec:      string
+    hasProductImages: boolean
+    children:         SurvivingChild[]
+  }
+
+  const survivors: SurvivingProduct[] = []
+  for (const item of items) {
+    const productSpec      = resolveSpec(texts, 'product', item.product_id, lang)
+    const hasProductImages = (productImages[item.product_id]?.length ?? 0) > 0
+    const hasOwnContent    = productSpec.trim().length > 0 || hasProductImages
+
+    const cfg = Array.isArray(item.configuration) ? item.configuration : []
+    const children: SurvivingChild[] = []
+    for (const entry of cfg as QuotationConfigItem[]) {
+      const charSpec       = resolveSpec(texts, 'characteristic',       entry.characteristic_id, lang)
+      const valueSpec      = resolveSpec(texts, 'characteristic_value', entry.value_id,          lang)
+      const hasValueImages = (valueImages[entry.value_id]?.length ?? 0) > 0
+      if (charSpec.trim() || valueSpec.trim() || hasValueImages) {
+        children.push({ entry, charSpec, valueSpec, hasValueImages })
+      }
+    }
+
+    if (hasOwnContent || children.length > 0) {
+      survivors.push({ item, productSpec, hasProductImages, children })
+    }
+  }
+
+  // ── TOC entries from surviving structure (renumbered consecutively) ─────
   interface TocEntry { level: 1 | 2; number: string; title: string; bookmarkId: string }
   const tocEntries: TocEntry[] = []
-  for (let i = 0; i < items.length; i++) {
-    const item       = items[i]
+  survivors.forEach((s, i) => {
     const productNum = i + 1
     tocEntries.push({
       level:      1,
       number:     `${productNum}`,
-      title:      item.product_name,
+      title:      s.item.product_name,
       bookmarkId: `ch-${productNum}`,
     })
-    const cfg = Array.isArray(item.configuration) ? item.configuration : []
-    cfg.forEach((entry: QuotationConfigItem, j) => {
+    s.children.forEach((c, j) => {
       const charIndex = j + 1
       tocEntries.push({
         level:      2,
         number:     `${productNum}.${charIndex}`,
-        title:      `${entry.characteristic_name}: ${entry.value_label}`,
+        title:      `${c.entry.characteristic_name}: ${c.entry.value_label}`,
         bookmarkId: `ch-${productNum}-${charIndex}`,
       })
     })
-  }
+  })
 
   // ── Table of contents page (static, with click-through bookmarks) ────────
   const tocChildren: Paragraph[] = [
@@ -354,59 +390,45 @@ export async function buildQuotationTechSpecDocxBytes(args: BuildTechSpecArgs): 
     new Paragraph({ children: [new PageBreak()] }),
   ]
 
-  // ── Body chapters ─────────────────────────────────────────────────────────
-  // Two levels: product (Heading 1) and characteristic + value combined
-  // (Heading 2). Each chapter heading wraps its text in a Bookmark whose id
-  // matches the TOC entry, so the TOC's InternalHyperlinks jump to it.
+  // ── Body chapters (matching the surviving structure) ────────────────────
   const bodyChildren: Paragraph[] = []
 
-  for (let i = 0; i < items.length; i++) {
-    const item       = items[i]
+  for (let i = 0; i < survivors.length; i++) {
+    const s          = survivors[i]
     const productNum = i + 1
-    const productEntry = tocEntries.find(e => e.level === 1 && e.number === `${productNum}`)!
     bodyChildren.push(new Paragraph({
       heading: HeadingLevel.HEADING_1,
       spacing: { before: i === 0 ? 200 : 480, after: 160 },
       children: [new Bookmark({
-        id: productEntry.bookmarkId,
-        children: [txt(`${productNum}. ${item.product_name}`, { bold: true, size: SZ.h1, color: HEX.ink })],
+        id: `ch-${productNum}`,
+        children: [txt(`${productNum}. ${s.item.product_name}`, { bold: true, size: SZ.h1, color: HEX.ink })],
       })],
     }))
 
-    // Product spec text
-    const productSpec = resolveSpec(texts, 'product', item.product_id, lang)
-    bodyChildren.push(...specParagraphs(productSpec))
+    bodyChildren.push(...specParagraphs(s.productSpec))
+    if (s.hasProductImages) {
+      bodyChildren.push(...(await imagesForAssets(productImages[s.item.product_id] ?? [])))
+    }
 
-    // Product images
-    const pAssets = productImages[item.product_id] ?? []
-    bodyChildren.push(...(await imagesForAssets(pAssets)))
-
-    // Characteristic + value combined subsections (single Heading 2 per pair)
-    const cfg = Array.isArray(item.configuration) ? item.configuration : []
-    for (let j = 0; j < cfg.length; j++) {
-      const entry     = cfg[j] as QuotationConfigItem
-      const charIndex = j + 1
+    for (let j = 0; j < s.children.length; j++) {
+      const c             = s.children[j]
+      const charIndex     = j + 1
       const chapterNumber = `${productNum}.${charIndex}`
-      const combinedTitle = `${entry.characteristic_name}: ${entry.value_label}`
-      const subEntry = tocEntries.find(e => e.level === 2 && e.number === chapterNumber)!
+      const combinedTitle = `${c.entry.characteristic_name}: ${c.entry.value_label}`
       bodyChildren.push(new Paragraph({
         heading: HeadingLevel.HEADING_2,
         spacing: { before: 320, after: 120 },
         children: [new Bookmark({
-          id: subEntry.bookmarkId,
+          id: `ch-${productNum}-${charIndex}`,
           children: [txt(`${chapterNumber}. ${combinedTitle}`, { bold: true, size: SZ.h2, color: HEX.ink })],
         })],
       }))
 
-      // Characteristic spec text first, value spec text second.
-      const charSpec  = resolveSpec(texts, 'characteristic',       entry.characteristic_id, lang)
-      const valueSpec = resolveSpec(texts, 'characteristic_value', entry.value_id,          lang)
-      bodyChildren.push(...specParagraphs(charSpec))
-      bodyChildren.push(...specParagraphs(valueSpec))
-
-      // Value images (characteristic-level images still out of scope).
-      const vAssets = valueImages[entry.value_id] ?? []
-      bodyChildren.push(...(await imagesForAssets(vAssets)))
+      bodyChildren.push(...specParagraphs(c.charSpec))
+      bodyChildren.push(...specParagraphs(c.valueSpec))
+      if (c.hasValueImages) {
+        bodyChildren.push(...(await imagesForAssets(valueImages[c.entry.value_id] ?? [])))
+      }
     }
   }
 
