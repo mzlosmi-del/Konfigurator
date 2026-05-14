@@ -718,9 +718,18 @@ export function QuotationDetailPage() {
           tenantName={tenant?.name ?? 'Your store'}
           lang={quotation.lang === 'sr' ? 'sr' : 'en'}
           defaultIntro={(() => {
-            const map = (tenant?.quotation_email_intro_i18n ?? {}) as Record<string, unknown>
-            const v = map[quotation.lang === 'sr' ? 'sr' : 'en']
-            return typeof v === 'string' ? v : ''
+            // Fetched once in `handleOpenPdfDialog`; falls back to '' when
+            // the user hasn't opened the PDF preview yet.
+            const lang = quotation.lang === 'sr' ? 'sr' : 'en'
+            const exact = pdfTexts.find(r =>
+              r.level === 'tenant' && r.reference_id === null
+              && r.slot === 'quotation_email_intro' && r.language === lang
+            )
+            const fallback = pdfTexts.find(r =>
+              r.level === 'tenant' && r.reference_id === null
+              && r.slot === 'quotation_email_intro'
+            )
+            return (exact ?? fallback)?.content ?? ''
           })()}
           alreadyResent={!!quotation.responded_at}
         />

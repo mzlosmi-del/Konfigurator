@@ -140,9 +140,9 @@ export function CharacteristicValuesEditor({
       if (rawValue.trim()) merged[editLang] = rawValue.trim()
       else delete merged[editLang]
       try {
-        // Legacy mirror — Phase D removes the label_i18n column.
-        const result = await updateCharacteristicValue(value.id, { label_i18n: merged })
-        // Authoritative copy goes into tenant_texts so renderers see it.
+        // Authoritative storage is `tenant_texts` (the JSONB column was
+        // dropped in migration 078). The in-memory `label_i18n` field is a
+        // virtual property the admin UI uses for the I18nEditor.
         await setEntityI18nText({
           tenant_id:    tenantId,
           level:        'characteristic_value',
@@ -150,7 +150,7 @@ export function CharacteristicValuesEditor({
           slot:         'label',
           i18n:         merged,
         })
-        onChange(values.map(v => (v.id === value.id ? result : v)))
+        onChange(values.map(v => (v.id === value.id ? { ...v, label_i18n: merged } : v)))
       } catch {
         const fresh = await fetchValuesForCharacteristic(characteristicId)
         onChange(fresh)

@@ -106,26 +106,20 @@ export function SettingsPage() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (tenant as any)?.notification_email ?? ''
   )
-  const [postInquiryMessage, setPostInquiryMessage] = useState(
-    tenant?.post_inquiry_message ?? ''
-  )
-  const [pdfFooter,    setPdfFooter]    = useState(tenant?.pdf_footer ?? '')
+  // Tenant text fields are now stored in `tenant_texts`. We seed these
+  // states empty and hydrate them from Supabase in the effect below.
+  const [postInquiryMessage, setPostInquiryMessage] = useState('')
+  const [pdfFooter,    setPdfFooter]    = useState('')
   const [faviconUrl,       setFaviconUrl]       = useState(tenant?.favicon_url ?? '')
-  const [publicPageTitle,  setPublicPageTitle]  = useState(tenant?.public_page_title ?? '')
+  const [publicPageTitle,  setPublicPageTitle]  = useState('')
   const [savingPublicBrand, setSavingPublicBrand] = useState(false)
 
-  // Quotation messages (per-language). Backing stores are JSONB maps keyed by 'en' | 'sr'.
-  const readI18nString = (m: unknown, l: 'en' | 'sr'): string => {
-    if (!m || typeof m !== 'object') return ''
-    const v = (m as Record<string, unknown>)[l]
-    return typeof v === 'string' ? v : ''
-  }
-  const [emailIntroEn,    setEmailIntroEn]    = useState(readI18nString(tenant?.quotation_email_intro_i18n,    'en'))
-  const [emailIntroSr,    setEmailIntroSr]    = useState(readI18nString(tenant?.quotation_email_intro_i18n,    'sr'))
-  const [acceptMsgEn,     setAcceptMsgEn]     = useState(readI18nString(tenant?.quotation_accept_message_i18n, 'en'))
-  const [acceptMsgSr,     setAcceptMsgSr]     = useState(readI18nString(tenant?.quotation_accept_message_i18n, 'sr'))
-  const [rejectMsgEn,     setRejectMsgEn]     = useState(readI18nString(tenant?.quotation_reject_message_i18n, 'en'))
-  const [rejectMsgSr,     setRejectMsgSr]     = useState(readI18nString(tenant?.quotation_reject_message_i18n, 'sr'))
+  const [emailIntroEn,    setEmailIntroEn]    = useState('')
+  const [emailIntroSr,    setEmailIntroSr]    = useState('')
+  const [acceptMsgEn,     setAcceptMsgEn]     = useState('')
+  const [acceptMsgSr,     setAcceptMsgSr]     = useState('')
+  const [rejectMsgEn,     setRejectMsgEn]     = useState('')
+  const [rejectMsgSr,     setRejectMsgSr]     = useState('')
   const [savingQuotationMsgs, setSavingQuotationMsgs] = useState(false)
   const [emailFromAddress, setEmailFromAddress] = useState(tenant?.email_from_address ?? '')
   const [emailFromVerified, setEmailFromVerified] = useState(tenant?.email_from_verified ?? false)
@@ -296,10 +290,10 @@ export function SettingsPage() {
     try {
       const { error } = await supabase
         .from('tenants')
-        .update({ favicon_url: fav, public_page_title: title } as unknown as never)
+        .update({ favicon_url: fav } as unknown as never)
         .eq('id', tenant.id)
       if (error) throw error
-      // Mirror into the unified tenant_texts table (Phase D drops the column).
+      // public_page_title lives in tenant_texts now.
       await setTenantScalarText({ tenant_id: tenant.id, slot: 'public_page_title', content: title ?? '' })
       toast({ title: t('Public page branding saved') })
     } catch (e) {
@@ -328,16 +322,8 @@ export function SettingsPage() {
 
     setSavingQuotationMsgs(true)
     try {
-      const { error } = await supabase
-        .from('tenants')
-        .update({
-          quotation_email_intro_i18n:    compact(intro),
-          quotation_accept_message_i18n: compact(accept),
-          quotation_reject_message_i18n: compact(reject),
-        } as unknown as never)
-        .eq('id', tenant.id)
-      if (error) throw error
-      // Authoritative copy in tenant_texts (Phase D drops the JSONB columns).
+      // The three quotation messages live in tenant_texts now (migration
+      // 078 dropped the JSONB columns on tenants).
       await Promise.all([
         setEntityI18nText({ tenant_id: tenant.id, level: 'tenant', reference_id: null, slot: 'quotation_email_intro',    i18n: compact(intro)  as Record<string, string> }),
         setEntityI18nText({ tenant_id: tenant.id, level: 'tenant', reference_id: null, slot: 'quotation_accept_message', i18n: compact(accept) as Record<string, string> }),
@@ -359,20 +345,14 @@ export function SettingsPage() {
     if (!tenant) return
     setSavingPdfFooter(true)
     try {
-      const oldFooter = tenant.pdf_footer ?? null
       const newFooter = pdfFooter.trim() || null
-      const { error } = await supabase
-        .from('tenants')
-        .update({ pdf_footer: newFooter } as unknown as never)
-        .eq('id', tenant.id)
-      if (error) throw error
       await setTenantScalarText({ tenant_id: tenant.id, slot: 'pdf_footer', content: newFooter ?? '' })
       logChange({
         entityType: 'settings',
         entityId:   tenant.id,
         entityName: tenant.name ?? null,
         changeType: 'update',
-        diff:       { [t('PDF footer')]: { old: oldFooter, new: newFooter } },
+        diff:       { [t('PDF footer')]: { old: null, new: newFooter } },
         changedByName: userName,
       })
       toast({ title: t('PDF footer saved') })
@@ -391,19 +371,13 @@ export function SettingsPage() {
     if (!tenant) return
     setSavingMessage(true)
     try {
-      const oldMsg = tenant.post_inquiry_message ?? null
-      const { error } = await supabase
-        .from('tenants')
-        .update({ post_inquiry_message: postInquiryMessage || null } as unknown as never)
-        .eq('id', tenant.id)
-      if (error) throw error
       await setTenantScalarText({ tenant_id: tenant.id, slot: 'post_inquiry_message', content: postInquiryMessage || '' })
       logChange({
         entityType: 'settings',
         entityId:   tenant.id,
         entityName: tenant.name ?? null,
         changeType: 'update',
-        diff:       { [t('Post-inquiry message')]: { old: oldMsg, new: postInquiryMessage || null } },
+        diff:       { [t('Post-inquiry message')]: { old: null, new: postInquiryMessage || null } },
         changedByName: userName,
       })
       toast({ title: t('Post-inquiry message saved') })
@@ -461,6 +435,39 @@ export function SettingsPage() {
   useEffect(() => {
     if (!tenant?.id) return
     fetchPublishedProductCount(tenant.id).then(setProductCount).catch(() => {})
+  }, [tenant?.id])
+
+  // Hydrate tenant text fields from `tenant_texts`. The legacy `tenants.*`
+  // columns were dropped in migration 078, so these are now the source of
+  // truth for footer, public page title, post-inquiry message and the three
+  // quotation messages.
+  useEffect(() => {
+    if (!tenant?.id) return
+    let cancelled = false
+    void (async () => {
+      const { data } = await supabase
+        .from('tenant_texts')
+        .select('slot, language, content')
+        .eq('tenant_id', tenant.id)
+        .eq('level', 'tenant')
+        .is('reference_id', null)
+      if (cancelled) return
+      const rows = (data ?? []) as { slot: string; language: string; content: string }[]
+      const pick = (slot: string, lang: string) =>
+        rows.find(r => r.slot === slot && r.language === lang)?.content ?? ''
+      const pickAnyLang = (slot: string) =>
+        pick(slot, 'en') || pick(slot, 'sr')
+      setPostInquiryMessage(pickAnyLang('post_inquiry_message'))
+      setPdfFooter(pickAnyLang('pdf_footer'))
+      setPublicPageTitle(pickAnyLang('public_page_title'))
+      setEmailIntroEn(pick('quotation_email_intro',    'en'))
+      setEmailIntroSr(pick('quotation_email_intro',    'sr'))
+      setAcceptMsgEn(pick('quotation_accept_message', 'en'))
+      setAcceptMsgSr(pick('quotation_accept_message', 'sr'))
+      setRejectMsgEn(pick('quotation_reject_message', 'en'))
+      setRejectMsgSr(pick('quotation_reject_message', 'sr'))
+    })()
+    return () => { cancelled = true }
   }, [tenant?.id])
 
   useEffect(() => {

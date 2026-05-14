@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, Link } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
 import { fetchProduct, updateProduct } from '@/lib/products'
 import { setEntityI18nText } from '@/lib/texts'
@@ -15,7 +15,8 @@ import { RulesPanel } from './components/RulesPanel'
 import { FormulaPanel } from './components/FormulaPanel'
 import { VisualizationPanel } from './components/VisualizationPanel'
 import { EmbedPanel } from './components/EmbedPanel'
-import { TextsPanel } from './components/TextsPanel'
+// Product-specific text blocks are now maintained from the Central Texts
+// page (`/texts`). The legacy inline panel was removed in Phase D.
 import { FormConfigPanel, type FormConfig } from './components/FormConfigPanel'
 import { useToast } from '@/hooks/useToast'
 import { Toaster } from '@/components/ui/toast'
@@ -72,19 +73,15 @@ export function EditProductPage() {
       const before = product
       const updated = await updateProduct(product.id, {
         name:             values.name,
-        name_i18n:        values.name_i18n,        // legacy mirror — dropped in Phase D
         description:      values.description ?? null,
-        description_i18n: values.description_i18n, // legacy mirror — dropped in Phase D
         base_price:       values.base_price,
         currency:         values.currency,
         sku:              values.sku?.trim() || null,
         unit_of_measure:  values.unit_of_measure?.trim() || null,
         show_price_breakdown: values.show_price_breakdown,
       })
-      // Mirror the i18n maps into the unified tenant_texts table so the
-      // PDF / DOCX / XLSX renderers and the central editor see the new values
-      // immediately. The legacy JSONB columns above stay populated only until
-      // Phase D drops them.
+      // i18n maps are persisted in `tenant_texts`. The legacy JSONB columns
+      // were dropped by migration 078.
       if (tenant?.id) {
         await Promise.all([
           setEntityI18nText({
@@ -329,11 +326,13 @@ export function EditProductPage() {
             <CardHeader>
               <CardTitle className="text-base">{t('Product Texts')}</CardTitle>
               <CardDescription>
-                {t('Named text blocks included in PDF quotations. Use these for product descriptions, specifications, or terms.')}
+                {t('Product text blocks are now maintained from the Central Texts page. Filter by Level = Product and Reference = this product.')}
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <TextsPanel productId={product.id} />
+              <Link to={`/texts?level=product&reference=${product.id}`} className="text-sm text-primary underline">
+                {t('Open Central Texts')}
+              </Link>
             </CardContent>
           </Card>
         )}

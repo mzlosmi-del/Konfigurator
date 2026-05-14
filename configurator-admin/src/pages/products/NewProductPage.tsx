@@ -11,6 +11,7 @@ import {
   createCharacteristicValue,
 } from '@/lib/products'
 import { useAuthContext } from '@/components/auth/AuthContext'
+import { setEntityI18nText } from '@/lib/texts'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -105,15 +106,26 @@ export function NewProductPage() {
     try {
       const product = await createProduct({
         name:             values.name,
-        name_i18n:        values.name_i18n,
         description:      values.description ?? null,
-        description_i18n: values.description_i18n,
         base_price:       values.base_price,
         currency:         values.currency,
         sku:              values.sku?.trim() || null,
         unit_of_measure:  values.unit_of_measure?.trim() || null,
         show_price_breakdown: values.show_price_breakdown,
       })
+      // Mirror form i18n maps into tenant_texts (the JSONB columns are gone).
+      if (tenant?.id) {
+        await Promise.all([
+          setEntityI18nText({
+            tenant_id: tenant.id, level: 'product', reference_id: product.id, slot: 'name',
+            i18n: values.name_i18n ?? { en: values.name ?? '' },
+          }),
+          setEntityI18nText({
+            tenant_id: tenant.id, level: 'product', reference_id: product.id, slot: 'description',
+            i18n: values.description_i18n ?? { en: values.description ?? '' },
+          }),
+        ])
+      }
       logChange({ entityType: 'product', entityId: product.id, entityName: product.name, changeType: 'create', changedByName: userName })
       navigate(`/products/${product.id}/edit`, { replace: true })
     } catch (e) {

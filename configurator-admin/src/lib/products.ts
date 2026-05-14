@@ -10,7 +10,6 @@ import type {
   ClassMember,
   CharacteristicValue,
   ProductCharacteristic,
-  ProductText,
 } from '@/types/database'
 
 // Enriched type returned by fetchProductClassesWithChars
@@ -38,7 +37,34 @@ export async function fetchProducts(): Promise<Product[]> {
     .order('sort_order', { ascending: true })
     .order('created_at', { ascending: false })
   if (error) throw new Error(error.message)
-  return (data ?? []) as Product[]
+  return enrichProductsWithTexts((data ?? []) as Product[])
+}
+
+/** Populate the in-memory `name_i18n` / `description_i18n` maps on each
+ *  product from `tenant_texts`. The JSONB columns were dropped in
+ *  migration 078; the admin's I18nEditors still expect the maps. */
+async function enrichProductsWithTexts(rows: Product[]): Promise<Product[]> {
+  if (rows.length === 0) return rows
+  const ids = rows.map(p => p.id)
+  const { data: textRows } = await supabase
+    .from('tenant_texts')
+    .select('reference_id, slot, language, content')
+    .eq('level', 'product')
+    .in('reference_id', ids)
+  const byId: Record<string, { name_i18n: Record<string,string>; description_i18n: Record<string,string> }> = {}
+  for (const p of rows) byId[p.id] = { name_i18n: {}, description_i18n: {} }
+  for (const r of (textRows ?? []) as { reference_id: string; slot: string; language: string; content: string }[]) {
+    if (!r.content?.trim()) continue
+    const t = byId[r.reference_id]
+    if (!t) continue
+    if (r.slot === 'name')        t.name_i18n[r.language]        = r.content
+    if (r.slot === 'description') t.description_i18n[r.language] = r.content
+  }
+  return rows.map(p => ({
+    ...p,
+    name_i18n:        byId[p.id].name_i18n,
+    description_i18n: byId[p.id].description_i18n,
+  }))
 }
 
 export async function fetchPublishedProductCount(tenantId: string): Promise<number> {
@@ -59,13 +85,16 @@ export async function fetchProduct(id: string): Promise<Product> {
     .eq('id', id)
     .single()
   if (error) throw new Error(error.message)
-  return data as Product
+  const enriched = await enrichProductsWithTexts([data as Product])
+  return enriched[0]
 }
 
 export async function createProduct(
   input: Pick<Product, 'name' | 'description' | 'base_price' | 'currency'>
-    & { sku?: string | null; unit_of_measure?: string | null; name_i18n?: Record<string,string>; description_i18n?: Record<string,string>; show_price_breakdown?: boolean }
+    & { sku?: string | null; unit_of_measure?: string | null; show_price_breakdown?: boolean }
 ): Promise<Product> {
+  // i18n maps no longer go through this call — they are persisted in
+  // tenant_texts via `setEntityI18nText` from the inline editors.
   const { data, error } = await supabase
     .from('products')
     .insert(input as any)
@@ -88,12 +117,19 @@ export async function createProduct(
 
 export async function updateProduct(
   id: string,
+  /** i18n maps are stored in `tenant_texts` (see `setEntityI18nText`). This
+   *  function only persists the scalar product columns. */
   input: Partial<Pick<Product, 'name' | 'description' | 'base_price' | 'currency' | 'status' | 'sku' | 'unit_of_measure' | 'ar_enabled' | 'ar_placement' | 'form_config' | 'public_preview_enabled' | 'show_price_breakdown'>>
-    & { name_i18n?: Record<string,string>; description_i18n?: Record<string,string> }
 ): Promise<Product> {
+  // Strip any stray i18n keys callers might still pass in during the
+  // deprecation window — Postgres will reject them now that 078 dropped
+  // the columns.
+  const sanitised = { ...input } as Record<string, unknown>
+  delete sanitised.name_i18n
+  delete sanitised.description_i18n
   const { data, error } = await supabase
     .from('products')
-    .update(input as unknown as never)
+    .update(sanitised as unknown as never)
     .eq('id', id)
     .select()
     .single()
@@ -247,11 +283,42 @@ export async function fetchCharacteristics(): Promise<Characteristic[]> {
     .order('sort_order', { ascending: true })
     .order('name', { ascending: true })
   if (error) throw new Error(error.message)
-  return (data ?? []) as Characteristic[]
+  const rows = (data ?? []) as Characteristic[]
+  return enrichCharacteristicsWithTexts(rows)
+}
+
+/** Populate the in-memory `name_i18n` / `description_i18n` maps on each
+ *  characteristic by reading `tenant_texts`. Called by every fetch that
+ *  returns characteristics so the admin's I18nEditors and `pickTranslation`
+ *  lookups keep showing translated copy after migration 078 dropped the
+ *  JSONB columns from `characteristics`. */
+async function enrichCharacteristicsWithTexts(chars: Characteristic[]): Promise<Characteristic[]> {
+  if (chars.length === 0) return chars
+  const ids = chars.map(c => c.id)
+  const { data: textRows } = await supabase
+    .from('tenant_texts')
+    .select('reference_id, slot, language, content')
+    .eq('level', 'characteristic')
+    .in('reference_id', ids)
+  const rows = (textRows ?? []) as { reference_id: string; slot: string; language: string; content: string }[]
+  const byId: Record<string, { name_i18n: Record<string,string>; description_i18n: Record<string,string> }> = {}
+  for (const c of chars) byId[c.id] = { name_i18n: {}, description_i18n: {} }
+  for (const r of rows) {
+    if (!r.content?.trim()) continue
+    const target = byId[r.reference_id]
+    if (!target) continue
+    if (r.slot === 'name')        target.name_i18n[r.language]        = r.content
+    if (r.slot === 'description') target.description_i18n[r.language] = r.content
+  }
+  return chars.map(c => ({
+    ...c,
+    name_i18n:        byId[c.id].name_i18n,
+    description_i18n: byId[c.id].description_i18n,
+  }))
 }
 
 export async function createCharacteristic(
-  input: Pick<Characteristic, 'name' | 'display_type'> & { name_i18n?: Record<string,string> }
+  input: Pick<Characteristic, 'name' | 'display_type'>
 ): Promise<Characteristic> {
   const { data, error } = await supabase
     .from('characteristics')
@@ -264,14 +331,15 @@ export async function createCharacteristic(
 
 export async function updateCharacteristic(
   id: string,
-  input: Partial<Pick<Characteristic, 'name' | 'display_type'>> & {
-    name_i18n?: Record<string,string>
-    description_i18n?: Record<string,string>
-  }
+  /** i18n maps now live in `tenant_texts`; only scalar columns are persisted here. */
+  input: Partial<Pick<Characteristic, 'name' | 'display_type'>>
 ): Promise<Characteristic> {
+  const sanitised = { ...input } as Record<string, unknown>
+  delete sanitised.name_i18n
+  delete sanitised.description_i18n
   const { data, error } = await supabase
     .from('characteristics')
-    .update(input as unknown as never)
+    .update(sanitised as unknown as never)
     .eq('id', id)
     .select()
     .single()
@@ -295,12 +363,29 @@ export async function fetchValuesForCharacteristic(
     .eq('characteristic_id', characteristicId)
     .order('sort_order', { ascending: true })
   if (error) throw new Error(error.message)
-  return (data ?? []) as CharacteristicValue[]
+  const rows = (data ?? []) as CharacteristicValue[]
+  if (rows.length === 0) return rows
+  // Hydrate `label_i18n` from tenant_texts (the JSONB column was dropped).
+  const ids = rows.map(v => v.id)
+  const { data: textRows } = await supabase
+    .from('tenant_texts')
+    .select('reference_id, language, content')
+    .eq('level', 'characteristic_value')
+    .eq('slot', 'label')
+    .in('reference_id', ids)
+  const labelById: Record<string, Record<string, string>> = {}
+  for (const v of rows) labelById[v.id] = {}
+  for (const r of (textRows ?? []) as { reference_id: string; language: string; content: string }[]) {
+    if (!r.content?.trim()) continue
+    const t = labelById[r.reference_id]
+    if (t) t[r.language] = r.content
+  }
+  return rows.map(v => ({ ...v, label_i18n: labelById[v.id] }))
 }
 
 export async function createCharacteristicValue(
   input: Pick<CharacteristicValue, 'characteristic_id' | 'label' | 'price_modifier' | 'sort_order'>
-    & { tenant_id: string; label_i18n?: Record<string,string> }
+    & { tenant_id: string }
 ): Promise<CharacteristicValue> {
   const { data, error } = await supabase
     .from('characteristic_values')
@@ -313,11 +398,14 @@ export async function createCharacteristicValue(
 
 export async function updateCharacteristicValue(
   id: string,
-  input: Partial<Pick<CharacteristicValue, 'label' | 'price_modifier' | 'sort_order' | 'hex_color'>> & { label_i18n?: Record<string,string> }
+  /** Label i18n now goes through `tenant_texts.setEntityI18nText`. */
+  input: Partial<Pick<CharacteristicValue, 'label' | 'price_modifier' | 'sort_order' | 'hex_color'>>
 ): Promise<CharacteristicValue> {
+  const sanitised = { ...input } as Record<string, unknown>
+  delete sanitised.label_i18n
   const { data, error } = await supabase
     .from('characteristic_values')
-    .update(input as unknown as never)
+    .update(sanitised as unknown as never)
     .eq('id', id)
     .select()
     .single()
@@ -437,13 +525,44 @@ export async function fetchProductCharacteristicsWithValues(
   if (charResult.error) throw new Error(charResult.error.message)
   if (valueResult.error) throw new Error(valueResult.error.message)
 
+  // Hydrate `name_i18n` / `description_i18n` (chars) and `label_i18n`
+  // (values) from tenant_texts — they aren't real columns anymore.
+  const valueIds = (valueResult.data ?? []).map((v: { id: string }) => v.id)
+  const allTextScopes = [
+    `and(level.eq.characteristic,reference_id.in.(${orderedCharIds.join(',')}))`,
+    valueIds.length > 0
+      ? `and(level.eq.characteristic_value,reference_id.in.(${valueIds.join(',')}))`
+      : null,
+  ].filter(Boolean).join(',')
+  const { data: textRows } = allTextScopes
+    ? await supabase.from('tenant_texts')
+        .select('level, reference_id, slot, language, content')
+        .or(allTextScopes)
+    : { data: [] }
+  const rows = (textRows ?? []) as { level: string; reference_id: string; slot: string; language: string; content: string }[]
+
   const charById: Record<string, Characteristic> = {}
-  for (const c of (charResult.data ?? []) as Characteristic[]) charById[c.id] = c
+  for (const c of (charResult.data ?? []) as Characteristic[]) {
+    const name_i18n:        Record<string, string> = {}
+    const description_i18n: Record<string, string> = {}
+    for (const r of rows) {
+      if (r.level !== 'characteristic' || r.reference_id !== c.id || !r.content?.trim()) continue
+      if (r.slot === 'name')        name_i18n[r.language]        = r.content
+      if (r.slot === 'description') description_i18n[r.language] = r.content
+    }
+    charById[c.id] = { ...c, name_i18n, description_i18n }
+  }
 
   const valuesByChar: Record<string, CharacteristicValue[]> = {}
   for (const v of (valueResult.data ?? []) as CharacteristicValue[]) {
     if (!valuesByChar[v.characteristic_id]) valuesByChar[v.characteristic_id] = []
-    valuesByChar[v.characteristic_id].push(v)
+    const label_i18n: Record<string, string> = {}
+    for (const r of rows) {
+      if (r.level === 'characteristic_value' && r.reference_id === v.id && r.slot === 'label' && r.content?.trim()) {
+        label_i18n[r.language] = r.content
+      }
+    }
+    valuesByChar[v.characteristic_id].push({ ...v, label_i18n })
   }
 
   return orderedCharIds
@@ -452,68 +571,8 @@ export async function fetchProductCharacteristicsWithValues(
 }
 
 // ─── Product Texts ────────────────────────────────────────────────────────────
-
-export async function fetchProductTexts(productId: string): Promise<ProductText[]> {
-  const { data, error } = await supabase
-    .from('product_texts')
-    .select('*')
-    .eq('product_id', productId)
-    .in('text_type', ['product', 'specification'])
-    .order('sort_order', { ascending: true })
-    .order('created_at', { ascending: true })
-  if (error) throw new Error(error.message)
-  return (data ?? []) as ProductText[]
-}
-
-export async function fetchAllProductTexts(productId: string): Promise<ProductText[]> {
-  const { data, error } = await supabase
-    .from('product_texts')
-    .select('*')
-    .eq('product_id', productId)
-    .order('sort_order', { ascending: true })
-    .order('created_at', { ascending: true })
-  if (error) throw new Error(error.message)
-  return (data ?? []) as ProductText[]
-}
-
-export async function fetchGlobalTexts(): Promise<ProductText[]> {
-  const { data, error } = await supabase
-    .from('product_texts')
-    .select('*')
-    .is('product_id', null)
-    .order('sort_order', { ascending: true })
-    .order('created_at', { ascending: true })
-  if (error) throw new Error(error.message)
-  return (data ?? []) as ProductText[]
-}
-
-export async function createProductText(
-  input: Pick<ProductText, 'product_id' | 'label' | 'content' | 'text_type' | 'language' | 'sort_order'>
-): Promise<ProductText> {
-  const { data, error } = await supabase
-    .from('product_texts')
-    .insert(input as any)
-    .select()
-    .single()
-  if (error) throw new Error(error.message)
-  return data as ProductText
-}
-
-export async function updateProductText(
-  id: string,
-  input: Partial<Pick<ProductText, 'label' | 'content' | 'text_type' | 'language' | 'sort_order'>>
-): Promise<ProductText> {
-  const { data, error } = await supabase
-    .from('product_texts')
-    .update(input as unknown as never)
-    .eq('id', id)
-    .select()
-    .single()
-  if (error) throw new Error(error.message)
-  return data as ProductText
-}
-
-export async function deleteProductText(id: string): Promise<void> {
-  const { error } = await supabase.from('product_texts').delete().eq('id', id)
-  if (error) throw new Error(error.message)
-}
+//
+// The legacy `product_texts` table was dropped by migration 078. Its rows
+// were migrated into `tenant_texts` (level='product' | 'tenant', slot in
+// product/specification/note/terms). Use the helpers in `lib/texts.ts`
+// (`fetchTexts`, `upsertText`, `resolveProductTextBlocks`, etc.) instead.
