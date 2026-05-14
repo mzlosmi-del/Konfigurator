@@ -11,6 +11,7 @@ import {
   deleteRejectionReason,
 } from '@/lib/quotations'
 import { fetchPublishedProductCount } from '@/lib/products'
+import { setEntityI18nText, setTenantScalarText } from '@/lib/texts'
 import { planLabel } from '@/lib/planLimits'
 import type { MonthlyUsageRow, PermLevel, QuotationRejectionReason, RolePermission } from '@/types/database'
 import { PageHeader } from '@/components/layout/PageHeader'
@@ -298,6 +299,8 @@ export function SettingsPage() {
         .update({ favicon_url: fav, public_page_title: title } as unknown as never)
         .eq('id', tenant.id)
       if (error) throw error
+      // Mirror into the unified tenant_texts table (Phase D drops the column).
+      await setTenantScalarText({ tenant_id: tenant.id, slot: 'public_page_title', content: title ?? '' })
       toast({ title: t('Public page branding saved') })
     } catch (e) {
       toast({
@@ -334,6 +337,12 @@ export function SettingsPage() {
         } as unknown as never)
         .eq('id', tenant.id)
       if (error) throw error
+      // Authoritative copy in tenant_texts (Phase D drops the JSONB columns).
+      await Promise.all([
+        setEntityI18nText({ tenant_id: tenant.id, level: 'tenant', reference_id: null, slot: 'quotation_email_intro',    i18n: compact(intro)  as Record<string, string> }),
+        setEntityI18nText({ tenant_id: tenant.id, level: 'tenant', reference_id: null, slot: 'quotation_accept_message', i18n: compact(accept) as Record<string, string> }),
+        setEntityI18nText({ tenant_id: tenant.id, level: 'tenant', reference_id: null, slot: 'quotation_reject_message', i18n: compact(reject) as Record<string, string> }),
+      ])
       toast({ title: t('Quotation messages saved') })
     } catch (e) {
       toast({
@@ -357,6 +366,7 @@ export function SettingsPage() {
         .update({ pdf_footer: newFooter } as unknown as never)
         .eq('id', tenant.id)
       if (error) throw error
+      await setTenantScalarText({ tenant_id: tenant.id, slot: 'pdf_footer', content: newFooter ?? '' })
       logChange({
         entityType: 'settings',
         entityId:   tenant.id,
@@ -387,6 +397,7 @@ export function SettingsPage() {
         .update({ post_inquiry_message: postInquiryMessage || null } as unknown as never)
         .eq('id', tenant.id)
       if (error) throw error
+      await setTenantScalarText({ tenant_id: tenant.id, slot: 'post_inquiry_message', content: postInquiryMessage || '' })
       logChange({
         entityType: 'settings',
         entityId:   tenant.id,

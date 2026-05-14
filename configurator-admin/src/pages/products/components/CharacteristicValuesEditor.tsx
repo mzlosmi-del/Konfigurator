@@ -11,6 +11,7 @@ import {
 } from '@/lib/products'
 import { CONTENT_LANGUAGES } from '@/lib/languages'
 import type { CharacteristicValue } from '@/types/database'
+import { setEntityI18nText } from '@/lib/texts'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useToast } from '@/hooks/useToast'
@@ -139,7 +140,16 @@ export function CharacteristicValuesEditor({
       if (rawValue.trim()) merged[editLang] = rawValue.trim()
       else delete merged[editLang]
       try {
+        // Legacy mirror — Phase D removes the label_i18n column.
         const result = await updateCharacteristicValue(value.id, { label_i18n: merged })
+        // Authoritative copy goes into tenant_texts so renderers see it.
+        await setEntityI18nText({
+          tenant_id:    tenantId,
+          level:        'characteristic_value',
+          reference_id: value.id,
+          slot:         'label',
+          i18n:         merged,
+        })
         onChange(values.map(v => (v.id === value.id ? result : v)))
       } catch {
         const fresh = await fetchValuesForCharacteristic(characteristicId)

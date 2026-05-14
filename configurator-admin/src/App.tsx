@@ -24,7 +24,8 @@ import { QuotationsReportPage } from '@/pages/quotations/QuotationsReportPage'
 import { QuotationFormPage } from '@/pages/quotations/QuotationFormPage'
 import { QuotationDetailPage } from '@/pages/quotations/QuotationDetailPage'
 import { PricingCenterPage } from '@/pages/pricing/PricingCenterPage'
-import { TextsPage } from '@/pages/texts/TextsPage'
+// The legacy TextsPage (global text blocks on product_texts) is retired in
+// favour of CentralTextsPage — see /texts redirect below.
 import { CentralTextsPage } from '@/pages/texts/CentralTextsPage'
 import { AnalyticsPage } from '@/pages/analytics/AnalyticsPage'
 import { EmbedDocsPage } from '@/pages/embed-docs/EmbedDocsPage'
@@ -91,8 +92,11 @@ export function App() {
               </Route>
 
               <Route element={<ProtectedRoute functionality="texts" />}>
-                <Route path="/texts"         element={<TextsPage        />} />
-                <Route path="/texts/central" element={<CentralTextsPage />} />
+                {/* The Texts page is now the central editor. The old
+                    /texts/central URL is kept as a redirect target so
+                    bookmarks keep working. */}
+                <Route path="/texts"         element={<CentralTextsPage />} />
+                <Route path="/texts/central" element={<Navigate to="/texts" replace />} />
               </Route>
 
               <Route element={<ProtectedRoute functionality="analytics" />}>

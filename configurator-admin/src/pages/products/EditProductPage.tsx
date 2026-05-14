@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
 import { fetchProduct, updateProduct } from '@/lib/products'
+import { setEntityI18nText } from '@/lib/texts'
 import type { Product } from '@/types/database'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Button } from '@/components/ui/button'
@@ -50,7 +51,7 @@ export function EditProductPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const { toasts, toast, dismiss } = useToast()
-  const { profile } = useAuthContext()
+  const { profile, tenant } = useAuthContext()
   const userName = profile?.email ?? null
 
   const [product, setProduct] = useState<Product | null>(null)
@@ -71,15 +72,31 @@ export function EditProductPage() {
       const before = product
       const updated = await updateProduct(product.id, {
         name:             values.name,
-        name_i18n:        values.name_i18n,
+        name_i18n:        values.name_i18n,        // legacy mirror — dropped in Phase D
         description:      values.description ?? null,
-        description_i18n: values.description_i18n,
+        description_i18n: values.description_i18n, // legacy mirror — dropped in Phase D
         base_price:       values.base_price,
         currency:         values.currency,
         sku:              values.sku?.trim() || null,
         unit_of_measure:  values.unit_of_measure?.trim() || null,
         show_price_breakdown: values.show_price_breakdown,
       })
+      // Mirror the i18n maps into the unified tenant_texts table so the
+      // PDF / DOCX / XLSX renderers and the central editor see the new values
+      // immediately. The legacy JSONB columns above stay populated only until
+      // Phase D drops them.
+      if (tenant?.id) {
+        await Promise.all([
+          setEntityI18nText({
+            tenant_id: tenant.id, level: 'product', reference_id: product.id, slot: 'name',
+            i18n: values.name_i18n ?? { en: values.name ?? '' },
+          }),
+          setEntityI18nText({
+            tenant_id: tenant.id, level: 'product', reference_id: product.id, slot: 'description',
+            i18n: values.description_i18n ?? { en: values.description ?? '' },
+          }),
+        ])
+      }
       setProduct(updated as Product)
       const diff = computeDiff(before as unknown as Record<string, unknown>, updated as unknown as Record<string, unknown>, PRODUCT_LABELS)
       logChange({ entityType: 'product', entityId: updated.id, entityName: updated.name, changeType: 'update', diff, changedByName: userName })

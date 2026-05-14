@@ -38,6 +38,7 @@ import { t } from '@/i18n'
 import { computeDiff, logChange } from '@/lib/auditLog'
 import { CHARACTERISTIC_LABELS, CLASS_LABELS } from '@/lib/auditLabels'
 import { AssignAutocomplete } from '@/components/library/AssignAutocomplete'
+import { setEntityI18nText } from '@/lib/texts'
 
 // ─── DroppableClass card ─────────────────────────────────────────────────────
 
@@ -500,18 +501,33 @@ export function LibraryPage() {
   }
 
   async function handleUpdateCharI18n(char: Characteristic, i18n: Record<string, string>) {
+    if (!tenant?.id) return
     try {
-      const updated = await updateCharacteristic(char.id, { name_i18n: i18n })
-      setChars(prev => prev.map(c => c.id === char.id ? updated : c))
+      await setEntityI18nText({
+        tenant_id: tenant.id,
+        level: 'characteristic',
+        reference_id: char.id,
+        slot: 'name',
+        i18n,
+      })
+      // Keep the in-memory copy in sync without re-fetching every row.
+      setChars(prev => prev.map(c => c.id === char.id ? { ...c, name_i18n: i18n } : c))
     } catch {
       toast({ title: t('Failed to save translation'), variant: 'destructive' })
     }
   }
 
   async function handleUpdateCharDescriptionI18n(char: Characteristic, i18n: Record<string, string>) {
+    if (!tenant?.id) return
     try {
-      const updated = await updateCharacteristic(char.id, { description_i18n: i18n })
-      setChars(prev => prev.map(c => c.id === char.id ? updated : c))
+      await setEntityI18nText({
+        tenant_id: tenant.id,
+        level: 'characteristic',
+        reference_id: char.id,
+        slot: 'description',
+        i18n,
+      })
+      setChars(prev => prev.map(c => c.id === char.id ? { ...c, description_i18n: i18n } : c))
     } catch {
       toast({ title: t('Failed to save description translation'), variant: 'destructive' })
     }

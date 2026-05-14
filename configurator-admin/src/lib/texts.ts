@@ -89,6 +89,60 @@ export async function deleteText(id: string): Promise<void> {
   if (error) throw new Error(error.message)
 }
 
+/** Write an entire per-language map for a single-row slot. Languages whose
+ *  value is empty or whitespace have their row deleted; non-empty languages
+ *  are upserted. Use this for the legacy `_i18n` JSONB editors that took
+ *  `{ en, sr }` and saved the whole map in one go. */
+export async function setEntityI18nText(args: {
+  tenant_id:    string
+  level:        TextLevel
+  reference_id: string | null
+  slot:         string
+  i18n:         Record<string, string>
+}): Promise<void> {
+  const LANGS: ('en' | 'sr')[] = ['en', 'sr']
+  for (const language of LANGS) {
+    const content = (args.i18n[language] ?? '').trim()
+    if (content.length === 0) {
+      let q = supabase.from('tenant_texts').delete()
+        .eq('tenant_id',  args.tenant_id)
+        .eq('level',      args.level)
+        .eq('slot',       args.slot)
+        .eq('language',   language)
+        .eq('sort_order', 0)
+      q = args.reference_id === null ? q.is('reference_id', null) : q.eq('reference_id', args.reference_id)
+      const { error } = await q
+      if (error) throw new Error(error.message)
+    } else {
+      await upsertText({
+        tenant_id:    args.tenant_id,
+        level:        args.level,
+        reference_id: args.reference_id,
+        slot:         args.slot,
+        language,
+        content,
+      })
+    }
+  }
+}
+
+/** Convenience for tenant-level scalar slots (pdf_footer, public_page_title,
+ *  post_inquiry_message). Stores under EN only — we treat these as English-
+ *  canonical strings even though the renderer falls back across languages. */
+export async function setTenantScalarText(args: {
+  tenant_id: string
+  slot:      string
+  content:   string
+}): Promise<void> {
+  await setEntityI18nText({
+    tenant_id:    args.tenant_id,
+    level:        'tenant',
+    reference_id: null,
+    slot:         args.slot,
+    i18n:         { en: args.content },
+  })
+}
+
 /** Apply a new ordering to a set of multi-row slot entries. Pass the IDs in
  *  the desired order; sort_order is renumbered from 0. */
 export async function reorderTexts(ids: string[]): Promise<void> {
