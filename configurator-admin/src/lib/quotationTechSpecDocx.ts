@@ -1,7 +1,8 @@
 import {
   Document, Packer, Paragraph, TextRun, ImageRun, HeadingLevel,
   AlignmentType, BorderStyle,
-  PageBreak, TableOfContents, PageNumber, Footer,
+  PageBreak, PageNumber, Footer,
+  Bookmark, InternalHyperlink,
 } from 'docx'
 import type {
   Quotation, TenantText, QuotationLineItem, QuotationConfigItem,
@@ -53,7 +54,6 @@ const FONT = 'Noto Sans'
 const TS_LABELS: Record<Lang, {
   title: string
   toc: string
-  tocHint: string
   refNumber: string
   customer: string
   preparedFor: string
@@ -64,7 +64,6 @@ const TS_LABELS: Record<Lang, {
   en: {
     title: 'Technical Specification',
     toc: 'Table of Contents',
-    tocHint: 'If entries are blank, right-click the table and choose "Update Field".',
     refNumber: 'Reference',
     customer: 'Customer',
     preparedFor: 'Prepared for',
@@ -75,7 +74,6 @@ const TS_LABELS: Record<Lang, {
   sr: {
     title: 'Tehnička specifikacija',
     toc: 'Sadržaj',
-    tocHint: 'Ako su stavke prazne, desni klik na tabelu i izaberite „Update Field“ (Ažuriraj polje).',
     refNumber: 'Referenca',
     customer: 'Kupac',
     preparedFor: 'Pripremljeno za',
@@ -294,31 +292,74 @@ export async function buildQuotationTechSpecDocxBytes(args: BuildTechSpecArgs): 
   }
   coverChildren.push(new Paragraph({ children: [new PageBreak()] }))
 
-  // ── Table of contents page ────────────────────────────────────────────────
-  const tocChildren: (Paragraph | TableOfContents)[] = [
+  // ── Pre-walk to build TOC entries + match bookmark ids on body headings ──
+  // Two levels only: product (1.) and characteristic+value (1.1.). The
+  // bookmark id is the same chapter number with `-` separators so we can
+  // link to it from the TOC.
+  interface TocEntry { level: 1 | 2; number: string; title: string; bookmarkId: string }
+  const tocEntries: TocEntry[] = []
+  for (let i = 0; i < items.length; i++) {
+    const item       = items[i]
+    const productNum = i + 1
+    tocEntries.push({
+      level:      1,
+      number:     `${productNum}`,
+      title:      item.product_name,
+      bookmarkId: `ch-${productNum}`,
+    })
+    const cfg = Array.isArray(item.configuration) ? item.configuration : []
+    cfg.forEach((entry: QuotationConfigItem, j) => {
+      const charIndex = j + 1
+      tocEntries.push({
+        level:      2,
+        number:     `${productNum}.${charIndex}`,
+        title:      `${entry.characteristic_name}: ${entry.value_label}`,
+        bookmarkId: `ch-${productNum}-${charIndex}`,
+      })
+    })
+  }
+
+  // ── Table of contents page (static, with click-through bookmarks) ────────
+  const tocChildren: Paragraph[] = [
     p([txt(L.toc, { bold: true, size: SZ.h1, color: HEX.ink })],
-      { spacingBefore: 240, spacingAfter: 240 }),
-    new TableOfContents(L.toc, {
-      hyperlink:        true,
-      headingStyleRange: '1-3',
-    }),
-    p(
-      [txt(L.tocHint, { size: SZ.small, italics: true, color: HEX.faint })],
-      { spacingBefore: 400 },
-    ),
+      { spacingBefore: 240, spacingAfter: 320 }),
+    ...tocEntries.map(entry => new Paragraph({
+      spacing: { after: 60 },
+      indent:  entry.level === 2 ? { left: 480 } : undefined,
+      children: [new InternalHyperlink({
+        anchor:   entry.bookmarkId,
+        children: [
+          new TextRun({
+            text:  `${entry.number}. ${entry.title}`,
+            font:  FONT,
+            size:  entry.level === 1 ? SZ.body + 2 : SZ.body,
+            bold:  entry.level === 1,
+            color: HEX.ink,
+          }),
+        ],
+      })],
+    })),
     new Paragraph({ children: [new PageBreak()] }),
   ]
 
   // ── Body chapters ─────────────────────────────────────────────────────────
+  // Two levels: product (Heading 1) and characteristic + value combined
+  // (Heading 2). Each chapter heading wraps its text in a Bookmark whose id
+  // matches the TOC entry, so the TOC's InternalHyperlinks jump to it.
   const bodyChildren: Paragraph[] = []
 
   for (let i = 0; i < items.length; i++) {
-    const item = items[i]
+    const item       = items[i]
     const productNum = i + 1
-    bodyChildren.push(p(
-      [txt(`${productNum}. ${item.product_name}`, { bold: true, size: SZ.h1, color: HEX.ink })],
-      { heading: HeadingLevel.HEADING_1, spacingBefore: i === 0 ? 200 : 480, spacingAfter: 160 },
-    ))
+    const productEntry = tocEntries.find(e => e.level === 1 && e.number === `${productNum}`)!
+    bodyChildren.push(new Paragraph({
+      heading: HeadingLevel.HEADING_1,
+      spacing: { before: i === 0 ? 200 : 480, after: 160 },
+      children: [new Bookmark({
+        id: productEntry.bookmarkId,
+        children: [txt(`${productNum}. ${item.product_name}`, { bold: true, size: SZ.h1, color: HEX.ink })],
+      })],
+    }))
 
     // Product spec text
     const productSpec = resolveSpec(texts, 'product', item.product_id, lang)
@@ -328,29 +369,30 @@ export async function buildQuotationTechSpecDocxBytes(args: BuildTechSpecArgs): 
     const pAssets = productImages[item.product_id] ?? []
     bodyChildren.push(...(await imagesForAssets(pAssets)))
 
-    // Characteristic + value subsections
+    // Characteristic + value combined subsections (single Heading 2 per pair)
     const cfg = Array.isArray(item.configuration) ? item.configuration : []
-    let charIndex = 0
-    for (const entry of cfg as QuotationConfigItem[]) {
-      charIndex++
-      const charNum = `${productNum}.${charIndex}`
-      bodyChildren.push(p(
-        [txt(`${charNum}. ${entry.characteristic_name}`, { bold: true, size: SZ.h2, color: HEX.ink })],
-        { heading: HeadingLevel.HEADING_2, spacingBefore: 320, spacingAfter: 120 },
-      ))
-      const charSpec = resolveSpec(texts, 'characteristic', entry.characteristic_id, lang)
-      bodyChildren.push(...specParagraphs(charSpec))
-      // No characteristic-level images in v1.
+    for (let j = 0; j < cfg.length; j++) {
+      const entry     = cfg[j] as QuotationConfigItem
+      const charIndex = j + 1
+      const chapterNumber = `${productNum}.${charIndex}`
+      const combinedTitle = `${entry.characteristic_name}: ${entry.value_label}`
+      const subEntry = tocEntries.find(e => e.level === 2 && e.number === chapterNumber)!
+      bodyChildren.push(new Paragraph({
+        heading: HeadingLevel.HEADING_2,
+        spacing: { before: 320, after: 120 },
+        children: [new Bookmark({
+          id: subEntry.bookmarkId,
+          children: [txt(`${chapterNumber}. ${combinedTitle}`, { bold: true, size: SZ.h2, color: HEX.ink })],
+        })],
+      }))
 
-      // Always exactly one selected value per characteristic on a line item,
-      // so the third level is always .1
-      const valueNum = `${charNum}.1`
-      bodyChildren.push(p(
-        [txt(`${valueNum}. ${entry.value_label}`, { bold: true, size: SZ.h3, color: HEX.ink })],
-        { heading: HeadingLevel.HEADING_3, spacingBefore: 240, spacingAfter: 100 },
-      ))
-      const valueSpec = resolveSpec(texts, 'characteristic_value', entry.value_id, lang)
+      // Characteristic spec text first, value spec text second.
+      const charSpec  = resolveSpec(texts, 'characteristic',       entry.characteristic_id, lang)
+      const valueSpec = resolveSpec(texts, 'characteristic_value', entry.value_id,          lang)
+      bodyChildren.push(...specParagraphs(charSpec))
       bodyChildren.push(...specParagraphs(valueSpec))
+
+      // Value images (characteristic-level images still out of scope).
       const vAssets = valueImages[entry.value_id] ?? []
       bodyChildren.push(...(await imagesForAssets(vAssets)))
     }
@@ -386,20 +428,20 @@ export async function buildQuotationTechSpecDocxBytes(args: BuildTechSpecArgs): 
 
   // ── Document ──────────────────────────────────────────────────────────────
   // Three sections: cover (no footer), TOC, body (with footer + page numbers).
-  // Heading styles are configured so the TableOfContents field picks them up.
+  // The TOC is built statically with InternalHyperlinks to Bookmarks on the
+  // chapter headings, so it always renders without needing Word to update
+  // fields on open.
   const headingRunStyle = (size: number) => ({ bold: true, size, color: HEX.ink, font: FONT })
   const doc = new Document({
     creator: tenant.name,
     title:   `${L.title} — ${quotation.reference_number ?? ''}`.trim(),
     styles: {
       default: {
-        document:    { run: { font: FONT, size: SZ.body } },
-        heading1:    { run: headingRunStyle(SZ.h1), paragraph: { spacing: { before: 360, after: 160 } } },
-        heading2:    { run: headingRunStyle(SZ.h2), paragraph: { spacing: { before: 280, after: 120 } } },
-        heading3:    { run: headingRunStyle(SZ.h3), paragraph: { spacing: { before: 220, after: 100 } } },
+        document: { run: { font: FONT, size: SZ.body } },
+        heading1: { run: headingRunStyle(SZ.h1), paragraph: { spacing: { before: 360, after: 160 } } },
+        heading2: { run: headingRunStyle(SZ.h2), paragraph: { spacing: { before: 280, after: 120 } } },
       },
     },
-    features: { updateFields: true }, // tells Word to refresh TOC on open
     sections: [
       // Cover — no footer, no page number.
       {

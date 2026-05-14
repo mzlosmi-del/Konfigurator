@@ -131,7 +131,15 @@ export function CentralTextsPage() {
       case 'tenant':               return '—'
       case 'product':              return productById[row.reference_id ?? '']?.name ?? row.reference_id ?? '?'
       case 'characteristic':       return characteristicById[row.reference_id ?? '']?.name ?? row.reference_id ?? '?'
-      case 'characteristic_value': return valueById[row.reference_id ?? '']?.label ?? row.reference_id ?? '?'
+      case 'characteristic_value': {
+        const v = valueById[row.reference_id ?? '']
+        if (!v) return row.reference_id ?? '?'
+        // Prefix with the parent characteristic name so e.g. an "Oak" value
+        // reads as "Material — Oak" — essential when several characteristics
+        // share short value labels.
+        const charName = characteristicById[v.characteristic_id]?.name
+        return charName ? `${charName} — ${v.label}` : v.label
+      }
     }
   }
 
