@@ -566,10 +566,16 @@ export function PdfLayoutDialog({
           {/* Left panel — template + section controls */}
           <div className="w-64 shrink-0 border-r flex flex-col">
             <div className="flex-1 overflow-y-auto px-3 py-3 space-y-4">
-              {/* Template selector */}
-              <div>
+              {/* Template selector — disabled for DOCX/XLSX, which always use
+                  the canonical layout (mirrors the Modern PDF). */}
+              <div className={format === 'pdf' ? '' : 'opacity-50 pointer-events-none'}>
                 <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">
                   {t('Template')}
+                  {format !== 'pdf' && (
+                    <span className="ml-1 font-normal normal-case tracking-normal text-muted-foreground/70">
+                      ({t('PDF only')})
+                    </span>
+                  )}
                 </p>
                 <div className="grid grid-cols-2 gap-1.5">
                   {PDF_TEMPLATES.map(tpl => {
@@ -580,6 +586,7 @@ export function PdfLayoutDialog({
                         key={tpl.id}
                         type="button"
                         onClick={() => setTemplate(tpl.id)}
+                        disabled={format !== 'pdf'}
                         className={[
                           'border rounded-md px-2 py-2 text-left transition-all hover:bg-muted/50',
                           active ? 'border-primary ring-2 ring-primary/20 bg-primary/5' : 'border-border',
