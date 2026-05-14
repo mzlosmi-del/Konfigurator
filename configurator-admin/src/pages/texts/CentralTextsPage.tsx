@@ -23,7 +23,8 @@ import { useToast } from '@/hooks/useToast'
 import { Toaster } from '@/components/ui/toast'
 import { useAuthContext } from '@/components/auth/AuthContext'
 import { useCanEdit } from '@/hooks/usePermission'
-import { t } from '@/i18n'
+import { t, getLang } from '@/i18n'
+import { slotLabel, slotDescription, slotLabelAnyLevel } from '@/lib/textSlots'
 
 const LEVELS: { value: TextLevel; label: string }[] = [
   { value: 'tenant',               label: 'Tenant'               },
@@ -58,6 +59,10 @@ export function CentralTextsPage() {
   const { tenant } = useAuthContext()
   const canEdit = useCanEdit('texts')
   const { toasts, toast, dismiss } = useToast()
+
+  // Resolve the active UI language once per render — slot labels and
+  // tooltips switch with the global language toggle.
+  const uiLang = getLang()
 
   const [loading,    setLoading]    = useState(true)
   const [rows,       setRows]       = useState<TenantText[]>([])
@@ -235,7 +240,11 @@ export function CentralTextsPage() {
                 <label className="text-xs font-medium text-muted-foreground mb-1 block">{t('Slot')}</label>
                 <Select value={filterSlot} onChange={e => setFilterSlot(e.target.value)}>
                   <option value="">{t('All slots')}</option>
-                  {slotOptions.map(s => <option key={s} value={s}>{s}</option>)}
+                  {slotOptions.map(s => (
+                    <option key={s} value={s}>
+                      {slotLabelAnyLevel(s, uiLang)}{slotLabelAnyLevel(s, uiLang) !== s ? ` (${s})` : ''}
+                    </option>
+                  ))}
                 </Select>
               </div>
               <div>
@@ -307,7 +316,18 @@ export function CentralTextsPage() {
                         {referenceLabel(row)}
                       </td>
                       <td className="px-3 py-2 align-top">
-                        <code className="text-xs text-muted-foreground">{row.slot}</code>
+                        <span
+                          className="text-sm cursor-help"
+                          title={slotDescription(row.level, row.slot, uiLang) || undefined}
+                        >
+                          {slotLabel(row.level, row.slot, uiLang)}
+                        </span>
+                        <span
+                          className="ml-1.5 font-mono text-[10px] text-muted-foreground/60 select-all"
+                          title={row.slot}
+                        >
+                          {row.slot}
+                        </span>
                       </td>
                       <td className="px-3 py-2 align-top">
                         <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-mono ${LANG_BADGE[row.language]}`}>
@@ -517,7 +537,11 @@ function AddTextDialog({ open, onOpenChange, tenantId, products, characteristics
             <div>
               <label className="text-xs font-medium text-muted-foreground mb-1 block">{t('Slot')}</label>
               <Select value={slot} onChange={e => setSlot(e.target.value)}>
-                {slotsForLevel.map(s => <option key={s} value={s}>{s}</option>)}
+                {slotsForLevel.map(s => (
+                  <option key={s} value={s} title={slotDescription(level, s, getLang())}>
+                    {slotLabel(level, s, getLang())}
+                  </option>
+                ))}
               </Select>
             </div>
             {MULTI_ROW_SLOTS.has(slot) && (
@@ -531,6 +555,14 @@ function AddTextDialog({ open, onOpenChange, tenantId, products, characteristics
               </div>
             )}
           </div>
+
+          {/* Live description of the picked slot — saves the user from hunting
+              for what the slot actually does. */}
+          {slotDescription(level, slot, getLang()) && (
+            <p className="text-xs text-muted-foreground leading-relaxed -mt-1">
+              {slotDescription(level, slot, getLang())}
+            </p>
+          )}
 
           {MULTI_ROW_SLOTS.has(slot) && level !== 'tenant' && (
             <div>
