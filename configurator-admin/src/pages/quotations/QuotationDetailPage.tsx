@@ -9,6 +9,8 @@ import { fetchQuotationTexts, resolveProductTextBlocks, resolveTenantTextBlocks 
 import { buildQuotationPdfBytes, openPdfBlob, type TenantProfile, type PdfTemplate } from '@/lib/quotationPdf'
 import { buildQuotationDocxBytes, openDocxBlob } from '@/lib/quotationDocx'
 import { buildQuotationXlsxBytes, openXlsxBlob } from '@/lib/quotationXlsx'
+import { buildQuotationTechSpecDocxBytes, openTechSpecDocxBlob } from '@/lib/quotationTechSpecDocx'
+import { fetchImageAssetsForProducts } from '@/lib/assets'
 import { useAuthContext } from '@/components/auth/AuthContext'
 import { supabase } from '@/lib/supabase'
 import type { Quotation, QuotationStatus, QuotationLineItem, QuotationAdjustment, QuotationRejectionReason, TenantText } from '@/types/database'
@@ -51,6 +53,7 @@ export function QuotationDetailPage() {
   const [loading,        setLoading]        = useState(true)
   const [updatingStatus, setUpdatingStatus] = useState(false)
   const [generatingPdf,    setGeneratingPdf]    = useState(false)
+  const [generatingTechSpec, setGeneratingTechSpec] = useState(false)
   const [showSendDialog,   setShowSendDialog]   = useState(false)
   const [pdfMode,          setPdfMode]          = useState<'preview' | 'confirm'>('preview')
   const [layoutOpen,       setLayoutOpen]       = useState(false)
@@ -290,6 +293,40 @@ export function QuotationDetailPage() {
     }
   }
 
+  /** Build and download the Technical Specification Word document for the
+   *  current quotation. This is always a download path — never uploads or
+   *  changes quotation state. Pre-fetches the same `tenant_texts` rows the
+   *  PDF preview uses plus all `asset_type='image'` rows for the products. */
+  async function handleGenerateTechSpec() {
+    if (!quotation) return
+    setGeneratingTechSpec(true)
+    try {
+      const lineItems = (Array.isArray(quotation.line_items) ? quotation.line_items : []) as unknown as QuotationLineItem[]
+      const productIds = [...new Set(lineItems.map(li => li.product_id).filter(Boolean))] as string[]
+
+      const [textRows, assets, prof] = await Promise.all([
+        fetchQuotationTexts(productIds),
+        fetchImageAssetsForProducts(productIds),
+        buildTenantProfile(),
+      ])
+
+      const lang: 'en' | 'sr' = (quotation.lang as 'en' | 'sr') ?? 'en'
+      const bytes = await buildQuotationTechSpecDocxBytes({
+        tenant:    prof,
+        quotation,
+        texts:     textRows,
+        assets,
+        lang,
+      })
+      const filename = `tech-spec-${quotation.reference_number ?? quotation.id.slice(0, 8)}.docx`
+      openTechSpecDocxBlob(bytes, filename)
+    } catch (err) {
+      toast({ title: t('Failed to generate technical specification'), description: String(err), variant: 'destructive' })
+    } finally {
+      setGeneratingTechSpec(false)
+    }
+  }
+
   function handleSendToCustomer() {
     if (!id || !quotation) return
     if (!quotation.customer_email) {
@@ -367,6 +404,15 @@ export function QuotationDetailPage() {
                 </a>
               </Button>
             )}
+            <Button
+              variant="outline"
+              onClick={handleGenerateTechSpec}
+              loading={generatingTechSpec}
+              title={t('Generate a Word document with the technical specification of the products on this quotation.')}
+            >
+              <FileText className="h-4 w-4 mr-1.5" />
+              {t('Technical spec')}
+            </Button>
             {canEdit && (quotation.status === 'confirmed' || quotation.status === 'sent') && quotation.pdf_url && (
               <Button
                 variant="outline"

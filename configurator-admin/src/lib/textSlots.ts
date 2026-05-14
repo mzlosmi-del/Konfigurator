@@ -151,6 +151,13 @@ const TEXT_SLOT_META: Record<TextLevel, Record<string, SlotMeta>> = {
         sr: 'Opcioni opis. Prikazuje se ispod izabrane vrednosti u PDF ponudi kada je uključena sekcija „Prikaži opise karakteristika” u pregledu PDF-a.',
       },
     },
+    specification: {
+      label: { en: 'Characteristic specification', sr: 'Specifikacija karakteristike' },
+      description: {
+        en: 'Detailed specification text for this characteristic. Printed as a 1.x. chapter in the Technical Specification Word document, under the parent product.',
+        sr: 'Detaljan tekst specifikacije za ovu karakteristiku. Štampa se kao poglavlje 1.x. u Word dokumentu Tehničke specifikacije, ispod nadređenog proizvoda.',
+      },
+    },
   },
   characteristic_value: {
     label: {
@@ -165,6 +172,13 @@ const TEXT_SLOT_META: Record<TextLevel, Record<string, SlotMeta>> = {
       description: {
         en: 'Optional description for this value. Reserved for future use; not yet read by any renderer.',
         sr: 'Opcioni opis ove vrednosti. Rezervisano za buduću upotrebu; nijedan renderer ga još ne čita.',
+      },
+    },
+    specification: {
+      label: { en: 'Value specification', sr: 'Specifikacija vrednosti' },
+      description: {
+        en: 'Detailed specification text for this characteristic value. Printed as a 1.x.1 chapter in the Technical Specification Word document, under the parent characteristic.',
+        sr: 'Detaljan tekst specifikacije za ovu vrednost karakteristike. Štampa se kao poglavlje 1.x.1 u Word dokumentu Tehničke specifikacije, ispod nadređene karakteristike.',
       },
     },
   },

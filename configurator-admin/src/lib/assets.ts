@@ -19,6 +19,22 @@ export async function fetchAssetsForProduct(productId: string): Promise<Visualiz
   return (data ?? []) as VisualizationAsset[]
 }
 
+/** Fetch every `asset_type = 'image'` row for a list of products in a single
+ *  query. Used by the Technical Specification Word builder to embed product
+ *  and characteristic-value images. */
+export async function fetchImageAssetsForProducts(productIds: string[]): Promise<VisualizationAsset[]> {
+  if (productIds.length === 0) return []
+  const { data, error } = await supabase
+    .from('visualization_assets')
+    .select('*')
+    .in('product_id', productIds)
+    .eq('asset_type', 'image')
+    .order('sort_order', { ascending: true })
+    .order('created_at', { ascending: true })
+  if (error) throw new Error(error.message)
+  return (data ?? []) as VisualizationAsset[]
+}
+
 export async function createAsset(
   input: Pick<
     VisualizationAsset,
