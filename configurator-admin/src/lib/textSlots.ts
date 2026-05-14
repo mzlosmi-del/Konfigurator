@@ -177,8 +177,8 @@ const TEXT_SLOT_META: Record<TextLevel, Record<string, SlotMeta>> = {
     specification: {
       label: { en: 'Value specification', sr: 'Specifikacija vrednosti' },
       description: {
-        en: 'Detailed specification text for this characteristic value. Printed as a 1.x.1 chapter in the Technical Specification Word document, under the parent characteristic.',
-        sr: 'Detaljan tekst specifikacije za ovu vrednost karakteristike. Štampa se kao poglavlje 1.x.1 u Word dokumentu Tehničke specifikacije, ispod nadređene karakteristike.',
+        en: 'Detailed specification text for this characteristic value. Printed inside the combined 1.x. chapter on the Technical Specification Word document, right after the characteristic specification text.',
+        sr: 'Detaljan tekst specifikacije za ovu vrednost karakteristike. Prikazuje se unutar zajedničkog poglavlja 1.x. u Word dokumentu Tehničke specifikacije, odmah nakon teksta specifikacije karakteristike.',
       },
     },
   },
