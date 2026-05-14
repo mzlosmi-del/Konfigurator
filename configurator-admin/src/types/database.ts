@@ -32,8 +32,8 @@ export const TEXT_SLOTS = {
     'name', 'description',
     'product', 'specification', 'note', 'terms',
   ],
-  characteristic:       ['name', 'description'] as const,
-  characteristic_value: ['label', 'description'] as const,
+  characteristic:       ['name', 'description', 'specification'] as const,
+  characteristic_value: ['label', 'description', 'specification'] as const,
 } as const
 
 /** Multi-row slots — i.e. ones whose `sort_order` matters and a single
