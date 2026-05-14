@@ -203,6 +203,39 @@ export async function loadLogo(pdfDoc: PDFDocument, logoUrl: string | null | und
   }
 }
 
+/** Fetches the tenant logo as raw bytes plus a detected extension and natural
+ *  pixel dimensions. Used by DOCX/XLSX exporters that don't need a pdf-lib
+ *  embedded image. Returns null when no URL is set or the fetch fails. */
+export async function loadLogoBytes(logoUrl: string | null | undefined): Promise<
+  { bytes: Uint8Array; extension: 'png' | 'jpg' | 'gif' | 'bmp'; width: number; height: number } | null
+> {
+  if (!logoUrl) return null
+  try {
+    const res = await fetch(logoUrl)
+    if (!res.ok) return null
+    const ct  = res.headers.get('content-type') ?? ''
+    const buf = await res.arrayBuffer()
+    const bytes = new Uint8Array(buf)
+    let extension: 'png' | 'jpg' | 'gif' | 'bmp' = 'png'
+    if (ct.includes('jpeg') || ct.includes('jpg') || logoUrl.toLowerCase().match(/\.jpe?g(\?|$)/)) extension = 'jpg'
+    else if (ct.includes('gif')  || logoUrl.toLowerCase().includes('.gif')) extension = 'gif'
+    else if (ct.includes('bmp')  || logoUrl.toLowerCase().includes('.bmp')) extension = 'bmp'
+
+    // Decode natural dimensions in-browser so the consumer can scale to its target box.
+    const { width, height } = await new Promise<{ width: number; height: number }>((resolve) => {
+      const url = URL.createObjectURL(new Blob([buf]))
+      const img = new Image()
+      img.onload  = () => { resolve({ width: img.naturalWidth, height: img.naturalHeight }); URL.revokeObjectURL(url) }
+      img.onerror = () => { resolve({ width: 0, height: 0 });                                 URL.revokeObjectURL(url) }
+      img.src = url
+    })
+
+    return { bytes, extension, width, height }
+  } catch {
+    return null
+  }
+}
+
 export function isSectionVisible(layoutSections: PdfSection[] | undefined, id: string): boolean {
   if (!layoutSections) return true
   const s = layoutSections.find(s => s.id === id)
