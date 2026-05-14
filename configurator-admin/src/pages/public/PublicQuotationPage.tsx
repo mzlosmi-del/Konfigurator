@@ -174,13 +174,39 @@ export function PublicQuotationPage() {
       if (cancelled) return
       if (!quotation) { setView({ kind: 'invalid' }); return }
 
-      const { data: tenantRow } = await anonClient
-        .from('tenants')
-        .select('name, plan, logo_url, favicon_url, public_page_title, quotation_accept_message_i18n, quotation_reject_message_i18n')
-        .eq('id', (quotation as Quotation).tenant_id)
-        .maybeSingle()
+      const tenantId = (quotation as Quotation).tenant_id
+      const [{ data: tenantRow }, { data: textRows }] = await Promise.all([
+        anonClient
+          .from('tenants')
+          .select('name, plan, logo_url, favicon_url, public_page_title')
+          .eq('id', tenantId)
+          .maybeSingle(),
+        anonClient
+          .from('tenant_texts')
+          .select('slot, language, content')
+          .eq('tenant_id', tenantId)
+          .eq('level', 'tenant')
+          .is('reference_id', null)
+          .in('slot', ['quotation_accept_message', 'quotation_reject_message']),
+      ])
 
-      const tenant = (tenantRow as Tenant | null) ?? null
+      // Resolve the accept/reject message rows from the central texts table
+      // into the legacy JSONB shape the renderer below already understands.
+      const messageRows = (textRows ?? []) as { slot: string; language: string; content: string }[]
+      const messagesForSlot = (slot: string): Record<string, string> => {
+        const out: Record<string, string> = {}
+        for (const r of messageRows) {
+          if (r.slot === slot && r.content.trim()) out[r.language] = r.content
+        }
+        return out
+      }
+      const tenant: Tenant | null = tenantRow
+        ? {
+            ...(tenantRow as Tenant),
+            quotation_accept_message_i18n: messagesForSlot('quotation_accept_message'),
+            quotation_reject_message_i18n: messagesForSlot('quotation_reject_message'),
+          }
+        : null
       const q      = quotation as Quotation
       const expired = !!q.valid_until && new Date(q.valid_until) < new Date()
       const respondedTerminal = q.status !== 'sent' && q.status !== 'confirmed' && (

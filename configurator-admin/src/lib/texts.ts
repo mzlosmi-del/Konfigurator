@@ -162,3 +162,84 @@ export function resolveTextLines(
     .map(r => r.content)
     .filter(s => s.trim().length > 0)
 }
+
+// ── Quotation renderer helpers ──────────────────────────────────────────────
+
+/** A simplified representation of a per-product or tenant-level text block,
+ *  mirroring the shape the PDF / DOCX / XLSX templates used when they read
+ *  `ProductText` rows. */
+export interface ResolvedTextBlock {
+  id:         string
+  slot:       string
+  label:      string | null
+  content:    string
+  sort_order: number
+}
+
+const BLOCK_SLOTS = ['product', 'specification', 'note', 'terms'] as const
+
+/** All visible text blocks attached to a product in the chosen language,
+ *  sorted by sort_order. Replaces the legacy
+ *  `productTexts[productId].filter(language === lang)` access. */
+export function resolveProductTextBlocks(
+  rows: TenantText[],
+  productId: string,
+  language: 'en' | 'sr',
+): ResolvedTextBlock[] {
+  return rows
+    .filter(r =>
+      r.level === 'product' &&
+      r.reference_id === productId &&
+      r.language === language &&
+      (BLOCK_SLOTS as readonly string[]).includes(r.slot) &&
+      r.content.trim().length > 0
+    )
+    .sort((a, b) => a.sort_order - b.sort_order)
+    .map(r => ({ id: r.id, slot: r.slot, label: r.label, content: r.content, sort_order: r.sort_order }))
+}
+
+/** All tenant-wide ("global") text blocks in the chosen language. Replaces
+ *  the legacy `globalTexts` array. */
+export function resolveTenantTextBlocks(
+  rows: TenantText[],
+  language: 'en' | 'sr',
+): ResolvedTextBlock[] {
+  return rows
+    .filter(r =>
+      r.level === 'tenant' &&
+      r.reference_id === null &&
+      r.language === language &&
+      (BLOCK_SLOTS as readonly string[]).includes(r.slot) &&
+      r.content.trim().length > 0
+    )
+    .sort((a, b) => a.sort_order - b.sort_order)
+    .map(r => ({ id: r.id, slot: r.slot, label: r.label, content: r.content, sort_order: r.sort_order }))
+}
+
+/** Bulk fetch every text row a quotation builder needs:
+ *  - all tenant-level rows for the current tenant
+ *  - all product-level rows for the products referenced by the quotation's
+ *    line items.
+ *  One SELECT against `tenant_texts` with an OR clause — RLS scopes to the
+ *  tenant automatically. */
+export async function fetchQuotationTexts(productIds: string[]): Promise<TenantText[]> {
+  const ids = Array.from(new Set(productIds.filter(Boolean)))
+  // Tenant-level rows (reference_id IS NULL) always come along; product rows
+  // are filtered server-side when there are product ids in scope.
+  let q = supabase
+    .from('tenant_texts')
+    .select('*')
+    .order('slot',       { ascending: true })
+    .order('language',   { ascending: true })
+    .order('sort_order', { ascending: true })
+
+  if (ids.length > 0) {
+    q = q.or(`level.eq.tenant,and(level.eq.product,reference_id.in.(${ids.join(',')}))`)
+  } else {
+    q = q.eq('level', 'tenant')
+  }
+
+  const { data, error } = await q
+  if (error) throw new Error(error.message)
+  return (data ?? []) as TenantText[]
+}

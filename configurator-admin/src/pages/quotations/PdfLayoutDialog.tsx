@@ -15,7 +15,16 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { GripVertical, Lock, Eye, EyeOff, FileText, FileSpreadsheet, FileType2 } from 'lucide-react'
-import type { Quotation, QuotationLineItem, QuotationAdjustment, ProductText } from '@/types/database'
+import type { Quotation, QuotationLineItem, QuotationAdjustment } from '@/types/database'
+
+/** Minimal text-block shape needed by the dialog: an id (used as section key
+ *  in the URL), a heading label, and the body content shown in the preview.
+ *  Caller derives these from `tenant_texts` rows for the chosen language. */
+export interface PdfTextBlock {
+  id:      string
+  label:   string
+  content: string
+}
 import { type TenantProfile, type PdfTemplate, PDF_TEMPLATES } from '@/lib/quotationPdf'
 
 export type ExportFormat = 'pdf' | 'docx' | 'xlsx'
@@ -44,13 +53,13 @@ export interface PdfSection {
 export interface ProductTextGroup {
   productId:   string
   productName: string
-  texts:       ProductText[]
+  texts:       PdfTextBlock[]
 }
 
 interface Props {
   open:              boolean
   onOpenChange:      (open: boolean) => void
-  globalTexts:       ProductText[]
+  globalTexts:       PdfTextBlock[]
   productTexts?:     ProductTextGroup[]
   quotationHasNotes: boolean
   onConfirm:         (sections: PdfSection[], lang: 'en' | 'sr', template: PdfTemplate, format: ExportFormat) => void
@@ -71,7 +80,7 @@ const TEMPLATE_ACCENTS: Record<PdfTemplate, string> = {
 }
 
 function buildDefaultSections(
-  globalTexts: ProductText[],
+  globalTexts: PdfTextBlock[],
   hasNotes: boolean,
   productTexts?: ProductTextGroup[],
 ): PdfSection[] {
@@ -205,7 +214,7 @@ interface PreviewA4Props {
   sections:     PdfSection[]
   quotation:    Quotation
   tenant:       TenantProfile
-  globalTexts:  ProductText[]
+  globalTexts:  PdfTextBlock[]
   productTexts: ProductTextGroup[]
   lang:         'en' | 'sr'
   template:     PdfTemplate
@@ -230,7 +239,7 @@ function PreviewA4({ sections, quotation, tenant, globalTexts, productTexts, lan
   const globalTextMap = Object.fromEntries(globalTexts.map(t => [t.id, t]))
 
   // map productTextId → content for product text blocks
-  const productTextMap: Record<string, ProductText> = {}
+  const productTextMap: Record<string, PdfTextBlock> = {}
   for (const g of productTexts) {
     for (const pt of g.texts) productTextMap[pt.id] = pt
   }

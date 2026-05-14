@@ -1,11 +1,12 @@
 import { PDFDocument, PDFPage, PDFFont, rgb, degrees } from 'pdf-lib'
-import type { QuotationLineItem, QuotationAdjustment, ProductText } from '@/types/database'
+import type { QuotationLineItem, QuotationAdjustment } from '@/types/database'
 import { calcLineTotal } from '@/lib/quotations'
 import {
-  C, wrapText, PDF_LABELS, loadFonts, loadLogo, getFooterLabel,
+  C, wrapText, PDF_LABELS, loadFonts, loadLogo, getFooterLabel, getTermsLines,
   isSectionVisible, isSectionVisibleOptIn, resolveCharDescription, buildOrderedSections,
   type PdfBuildArgs,
 } from './shared'
+import { resolveProductTextBlocks, resolveTenantTextBlocks, type ResolvedTextBlock } from '@/lib/texts'
 
 /**
  * Modern — current default. Minimal light palette, no filled colour rectangles
@@ -13,8 +14,9 @@ import {
  * and thin rules.
  */
 export async function renderModern(args: PdfBuildArgs): Promise<Uint8Array> {
-  const { tenant, quotation, productTexts, globalTexts, layoutSections, lang, watermark } = args
+  const { tenant, quotation, texts = [], layoutSections, lang, watermark } = args
   const L = PDF_LABELS[lang]
+  const tenantBlocks = resolveTenantTextBlocks(texts, lang)
   const pdfDoc = await PDFDocument.create()
   const { fontR, fontB } = await loadFonts(pdfDoc)
 
@@ -74,7 +76,7 @@ export async function renderModern(args: PdfBuildArgs): Promise<Uint8Array> {
       ? L.validityText(new Date(quotation.valid_until).toLocaleDateString(L.dateLocale, { dateStyle: 'long' }))
       : L.contactText
     text(validStr, MX, FOOTER_BASELINE, 7.5, fontR, C.muted)
-    rText(getFooterLabel(tenant, L.footer), W - MX, FOOTER_BASELINE, 7.5, fontR, C.faint)
+    rText(getFooterLabel(tenant, L.footer, texts, lang), W - MX, FOOTER_BASELINE, 7.5, fontR, C.faint)
   }
 
   const logoImg = await loadLogo(pdfDoc, tenant.logo_url)
@@ -247,7 +249,7 @@ export async function renderModern(args: PdfBuildArgs): Promise<Uint8Array> {
       const allFormulas  = Array.isArray(item.formulas) ? item.formulas : []
       const formulaSum   = allFormulas.reduce((s, f) => s + (Number(f.amount) || 0), 0)
       const formulas     = allFormulas.filter(f => (Number(f.amount) || 0) !== 0)
-      const ptexts       = (productTexts?.[item.product_id] ?? []).filter(pt => pt.language === lang)
+      const ptexts       = resolveProductTextBlocks(texts, item.product_id, lang)
       const modifierSum  = cfg.reduce((s, c) => s + (Number(c.price_modifier) || 0), 0)
       const derivedBase  = item.unit_price - modifierSum - formulaSum
       const showBreakdown = (cfg.length > 0 || formulas.length > 0)
@@ -319,7 +321,7 @@ export async function renderModern(args: PdfBuildArgs): Promise<Uint8Array> {
       }
 
       for (const pt of ptexts) {
-        text(`${pt.label}:`, C_PROD + 4, y, 7.5, fontB, C.muted)
+        text(`${pt.label ?? pt.slot}:`, C_PROD + 4, y, 7.5, fontB, C.muted)
         y -= 11
         for (const line of wrapText(pt.content, fontR, 8, PROD_W - 4)) {
           text(line, C_PROD + 8, y, 8, fontR, C.muted)
@@ -411,7 +413,7 @@ export async function renderModern(args: PdfBuildArgs): Promise<Uint8Array> {
   }
 
   function drawTermsSection() {
-    const boxLines = L.termsLines
+    const boxLines = getTermsLines(texts, L.termsLines, lang)
     const BOX_H   = boxLines.length * 13 + 18
     ensureSpace(BOX_H + 40)
     y -= 18
@@ -429,13 +431,13 @@ export async function renderModern(args: PdfBuildArgs): Promise<Uint8Array> {
     y -= 8
   }
 
-  function drawGlobalTextSection(txt: ProductText) {
+  function drawGlobalTextSection(txt: ResolvedTextBlock) {
     const lines = wrapText(txt.content, fontR, 9.5, col)
     ensureSpace(36 + lines.length * 14)
     y -= 18
     rule(y)
     y -= 18
-    sectionLabel(txt.label.toUpperCase())
+    sectionLabel((txt.label ?? txt.slot).toUpperCase())
     for (const line of lines) {
       ensureSpace(14)
       text(line, MX, y, 9.5, fontR, C.ink)
@@ -444,7 +446,7 @@ export async function renderModern(args: PdfBuildArgs): Promise<Uint8Array> {
     y -= 6
   }
 
-  const orderedSections = buildOrderedSections(layoutSections, globalTexts, lang)
+  const orderedSections = buildOrderedSections(layoutSections, tenantBlocks, lang)
 
   for (const section of orderedSections) {
     if (!section.visible) continue
@@ -453,7 +455,7 @@ export async function renderModern(args: PdfBuildArgs): Promise<Uint8Array> {
     } else if (section.id === 'terms') {
       if (isSectionVisible(layoutSections, 'terms')) drawTermsSection()
     } else if (section.textId) {
-      const gt = (globalTexts ?? []).find(t => t.id === section.textId && t.language === lang)
+      const gt = tenantBlocks.find(b => b.id === section.textId)
       if (gt) drawGlobalTextSection(gt)
     }
   }
