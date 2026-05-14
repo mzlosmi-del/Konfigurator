@@ -813,6 +813,12 @@ const sr: Record<string, string> = {
   'Description translations':             'Prevodi opisa',
   'Translated name':                       'Prevedeni naziv',
   'Translated description':               'Prevedeni opis',
+  'Description (optional, per language)':  'Opis (opciono, po jeziku)',
+  'Shown on the quotation PDF when descriptions are enabled': 'Prikazuje se u PDF-u ponude kada su opisi uključeni',
+  'Failed to save description translation': 'Greška pri čuvanju prevoda opisa',
+  'Desc':                                  'Opis',
+  'Add description':                       'Dodaj opis',
+  'Expand to edit name translations and description': 'Proširite za uređivanje prevoda naziva i opisa',
   'Failed to save translation':            'Čuvanje prevoda nije uspelo',
 
   // Analytics

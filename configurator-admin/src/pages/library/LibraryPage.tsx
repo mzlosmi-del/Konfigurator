@@ -205,6 +205,9 @@ function DraggableChar({
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: char.id })
   const i18n = (char.name_i18n as Record<string, string> | null) ?? {}
   const descriptionI18n = (char.description_i18n as Record<string, string> | null) ?? {}
+  const descriptionLangs = Object.entries(descriptionI18n)
+    .filter(([, v]) => typeof v === 'string' && v.trim().length > 0)
+    .map(([k]) => k)
 
   return (
     <div
@@ -232,6 +235,8 @@ function DraggableChar({
           type="button"
           onClick={onToggleExpand}
           className="text-muted-foreground hover:text-foreground transition-colors shrink-0"
+          title={t('Expand to edit name translations and description')}
+          aria-label={t('Expand to edit name translations and description')}
         >
           {expanded
             ? <ChevronDown className="h-4 w-4" />
@@ -244,6 +249,27 @@ function DraggableChar({
           defaultValue={char.name}
           onBlur={e => onRename(e.target.value)}
         />
+
+        {/* Description status — surfaces a feature that lives inside the
+            expanded section so users can find it without hunting for the
+            chevron. Mirrors the class card's translated-langs badge. */}
+        {descriptionLangs.length > 0 ? (
+          <span
+            className="shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-primary/10 text-primary"
+            title={t('Description')}
+          >
+            {t('Desc')}: {descriptionLangs.map(l => l.toUpperCase()).join('/')}
+          </span>
+        ) : (
+          <button
+            type="button"
+            onClick={onToggleExpand}
+            className="shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium border border-dashed border-muted-foreground/40 text-muted-foreground hover:text-primary hover:border-primary transition-colors"
+          >
+            + {t('Add description')}
+          </button>
+        )}
+
         <span className="font-mono text-[10px] text-muted-foreground/50 shrink-0 select-all" title={char.id}>
           #{char.id.slice(0, 8)}
         </span>
