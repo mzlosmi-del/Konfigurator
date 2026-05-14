@@ -203,25 +203,37 @@ export async function buildQuotationTechSpecDocxBytes(args: BuildTechSpecArgs): 
   }
 
   // ── Cover page ────────────────────────────────────────────────────────────
-  const logo = await loadLogoBytes(tenant.logo_url)
+  // Embed the logo whenever `loadLogoBytes` returns *any* bytes. The previous
+  // version gated on `width > 0 && height > 0`, but the in-browser dimension
+  // probe (`new Image()` on a blob URL) silently returns 0×0 for some image
+  // payloads, which dropped the logo entirely and fell through to a text
+  // fallback. When we don't know the natural size we fall back to the max
+  // bounding box — Word/LibreOffice/Pages all happily render it.
+  const logo  = await loadLogoBytes(tenant.logo_url)
+  const LOGO_MAX_W = 320
+  const LOGO_MAX_H = 130
   const coverChildren: Paragraph[] = []
 
-  if (logo && logo.width > 0 && logo.height > 0) {
-    const maxW = 260, maxH = 110
-    const ratio = Math.min(maxW / logo.width, maxH / logo.height, 1)
+  if (logo) {
+    const hasDims = logo.width > 0 && logo.height > 0
+    const ratio   = hasDims ? Math.min(LOGO_MAX_W / logo.width, LOGO_MAX_H / logo.height, 1) : 1
+    const w       = hasDims ? Math.max(60, logo.width  * ratio) : LOGO_MAX_W
+    const h       = hasDims ? Math.max(60, logo.height * ratio) : LOGO_MAX_H
     coverChildren.push(new Paragraph({
       alignment: AlignmentType.CENTER,
-      spacing: { before: 2400, after: 600 },
+      spacing: { before: 720, after: 600 },
       children: [new ImageRun({
         data: logo.bytes,
         type: logo.extension,
-        transformation: { width: logo.width * ratio, height: logo.height * ratio },
+        transformation: { width: w, height: h },
       } as unknown as ConstructorParameters<typeof ImageRun>[0])],
     }))
   } else {
+    // No logo URL set on the tenant, or the fetch failed entirely — fall back
+    // to the tenant name as the cover mark.
     coverChildren.push(new Paragraph({
       alignment: AlignmentType.CENTER,
-      spacing: { before: 2400, after: 600 },
+      spacing: { before: 720, after: 600 },
       children: [txt(tenant.name.toUpperCase(), { bold: true, size: 36, color: HEX.ink })],
     }))
   }
