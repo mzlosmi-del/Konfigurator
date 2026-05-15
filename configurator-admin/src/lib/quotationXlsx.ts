@@ -373,7 +373,7 @@ export async function buildQuotationXlsxBytes(args: BuildXlsxArgs): Promise<Uint
         const mod = Number(c.price_modifier) || 0
         const modColor = mod > 0 ? HEX.positive : mod < 0 ? HEX.negative : HEX.muted
         ws.mergeCells(`B${row}:K${row}`)
-        ws.getCell(`B${row}`).value = `+ ${c.characteristic_name}: ${c.value_label}`
+        ws.getCell(`B${row}`).value = c.value_label ? `+ ${c.characteristic_name}: ${c.value_label}` : `+ ${c.characteristic_name}`
         ws.getCell(`B${row}`).font  = { name: FONT, size: 8.5, color: { argb: HEX.muted } }
         ws.getCell(`B${row}`).alignment = { indent: 1 }
         ws.getCell(`L${row}`).value = mod === 0 ? '—' : Number(mod.toFixed(2))

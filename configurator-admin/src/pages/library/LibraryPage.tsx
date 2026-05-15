@@ -286,6 +286,7 @@ function DraggableChar({
           <option value="swatch">{t('Swatch')}</option>
           <option value="toggle">{t('Toggle')}</option>
           <option value="number">{t('Number')}</option>
+          <option value="boolean">{t('Boolean')}</option>
         </Select>
 
         {/* Class membership tags + type-to-assign input */}
@@ -761,6 +762,7 @@ export function LibraryPage() {
                       <option value="swatch">{t('Swatch')}</option>
                       <option value="toggle">{t('Toggle')}</option>
                       <option value="number">{t('Number')}</option>
+                      <option value="boolean">{t('Boolean')}</option>
                     </Select>
                   </div>
                   <div className="flex gap-2">

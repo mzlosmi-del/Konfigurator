@@ -182,7 +182,9 @@ export function InquiryDetailPage() {
                       <div className="flex items-center justify-between py-2.5 text-sm">
                         <span className="text-muted-foreground">{item.characteristic_name}</span>
                         <div className="flex items-center gap-3">
-                          <span className="font-medium">{item.value_label}</span>
+                          {item.value_label
+                            ? <span className="font-medium">{item.value_label}</span>
+                            : <span className="text-emerald-600" aria-label="checked">{'✓'}</span>}
                           {item.price_modifier !== 0 && (
                             <span className={`text-xs tabular-nums ${item.price_modifier > 0 ? 'text-emerald-600' : 'text-red-600'}`}>
                               {item.price_modifier > 0 ? '+' : ''}

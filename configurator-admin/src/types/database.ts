@@ -42,7 +42,7 @@ export const MULTI_ROW_SLOTS = new Set<string>([
   'terms_line',
   'product', 'specification', 'note', 'terms',
 ])
-export type DisplayType = 'select' | 'radio' | 'swatch' | 'toggle' | 'number'
+export type DisplayType = 'select' | 'radio' | 'swatch' | 'toggle' | 'number' | 'boolean'
 export type AssetType = 'image' | 'render' | '3d_model'
 // Configuration rules v2 — see migrations/074_rules_v2.sql.
 //

@@ -419,7 +419,7 @@ async function buildQuotePdf({
       page.drawRectangle({ x: margin, y: y - 4, width: col, height: 20, color: rgb(1, 1, 1) })
 
       page.drawText(item.characteristic_name, { x: margin + 8,     y, size: 10, font: fontRegular, color: black })
-      page.drawText(item.value_label,          { x: margin + col * 0.45, y, size: 10, font: fontBold,    color: black })
+      page.drawText(item.value_label || '✓', { x: margin + col * 0.45, y, size: 10, font: fontBold,    color: black })
 
       if (item.price_modifier !== 0) {
         const sign    = item.price_modifier > 0 ? '+' : ''
@@ -521,7 +521,7 @@ function buildEmailHtml({
   const configRows = config.map(item => `
     <tr>
       <td style="padding:6px 12px;color:#555;font-size:14px;">${esc(item.characteristic_name)}</td>
-      <td style="padding:6px 12px;font-size:14px;font-weight:600;">${esc(item.value_label)}</td>
+      <td style="padding:6px 12px;font-size:14px;font-weight:600;">${item.value_label ? esc(item.value_label) : '&#10003;'}</td>
       <td style="padding:6px 12px;font-size:14px;text-align:right;color:${item.price_modifier > 0 ? '#059669' : item.price_modifier < 0 ? '#dc2626' : '#555'};">
         ${item.price_modifier !== 0
           ? (item.price_modifier > 0 ? '+' : '') + item.price_modifier.toFixed(2)

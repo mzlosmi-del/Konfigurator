@@ -349,12 +349,15 @@ export function QuotationFormPage() {
           const value = char.characteristic_values.find(v => v.id === valueId)
           if (!value) continue
           const effective = ruleEffect.priceOverrides[value.id] ?? modOverrides[value.id] ?? Number(value.price_modifier)
+          // Boolean: store an empty value_label so renderers display only the
+          // characteristic name. The value's label is admin-only.
+          const valueLabel = char.display_type === 'boolean' ? '' : value.label
           config.push({
             characteristic_id:   char.id,
             characteristic_name: char.name,
             characteristic_description_i18n: descI18n,
             value_id:            value.id,
-            value_label:         value.label,
+            value_label:         valueLabel,
             price_modifier:      effective,
           })
           unitPrice += effective
