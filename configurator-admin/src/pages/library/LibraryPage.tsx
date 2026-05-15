@@ -12,7 +12,7 @@ import {
   fetchCharacteristics,
   createCharacteristic,
   updateCharacteristic,
-  deleteCharacteristic,
+  deleteCharacteristicCascade,
   fetchClasses,
   createClass,
   updateClass,
@@ -22,6 +22,7 @@ import {
   removeCharacteristicFromClass,
   fetchValuesForCharacteristic,
 } from '@/lib/products'
+import { CharacteristicDeletionDialog } from './CharacteristicDeletionDialog'
 import type { Characteristic, CharacteristicClass, CharacteristicValue } from '@/types/database'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Button } from '@/components/ui/button'
@@ -549,7 +550,7 @@ export function LibraryPage() {
     if (!toDelete) return
     setDeleting(true)
     try {
-      await deleteCharacteristic(toDelete.id)
+      await deleteCharacteristicCascade(toDelete.id)
       logChange({ entityType: 'characteristic', entityId: toDelete.id, entityName: toDelete.name, changeType: 'delete', changedByName: userName })
       setChars(prev => prev.filter(c => c.id !== toDelete.id))
       setMemberships(prev => {
@@ -560,8 +561,12 @@ export function LibraryPage() {
         return next
       })
       setToDelete(null)
-    } catch {
-      toast({ title: t('Failed to delete characteristic'), variant: 'destructive' })
+    } catch (e) {
+      toast({
+        title:       t('Failed to delete characteristic'),
+        description: e instanceof Error ? e.message : undefined,
+        variant:     'destructive',
+      })
     } finally {
       setDeleting(false)
     }
@@ -819,14 +824,12 @@ export function LibraryPage() {
         </DragOverlay>
       </DndContext>
 
-      <ConfirmDialog
+      <CharacteristicDeletionDialog
         open={!!toDelete}
         onOpenChange={open => !open && setToDelete(null)}
-        title={t('Delete characteristic?')}
-        description={`Delete "${toDelete?.name}"? This removes it from all classes and products.`}
-        confirmLabel={t('Delete')}
+        characteristicId={toDelete?.id ?? null}
         onConfirm={handleDeleteChar}
-        loading={deleting}
+        deleting={deleting}
       />
 
       <ConfirmDialog
