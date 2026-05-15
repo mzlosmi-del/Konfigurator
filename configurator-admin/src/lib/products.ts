@@ -10,6 +10,12 @@ import type {
   ClassMember,
   CharacteristicValue,
   ProductCharacteristic,
+  ConfigurationRule,
+  PricingFormula,
+  RulePredicate,
+  RuleEffect,
+  NumExpr,
+  FormulaNode,
 } from '@/types/database'
 
 // Enriched type returned by fetchProductClassesWithChars
@@ -349,6 +355,243 @@ export async function updateCharacteristic(
 
 export async function deleteCharacteristic(id: string): Promise<void> {
   const { error } = await supabase.from('characteristics').delete().eq('id', id)
+  if (error) throw new Error(error.message)
+}
+
+// ─── Cascade-aware deletion ──────────────────────────────────────────────────
+// `tenant_texts.reference_id` has no FK and no trigger (see migration 076), so
+// deleting a characteristic leaves orphan text rows behind. Configuration rules
+// and pricing formulas reference char/value IDs inside JSONB, also un-FK'd —
+// they keep dead references and silently never match again. The two helpers
+// below let the UI surface every consequence to the user before deleting, then
+// clean everything up in one go.
+//
+// Quotation/inquiry snapshots (`line_items[].configuration[]`) are intentionally
+// left alone — they are point-in-time records and must keep their original IDs.
+
+export interface CharacteristicDeletionPreview {
+  characteristic: { id: string; name: string }
+  /** Values that will be deleted alongside the characteristic (DB cascade). */
+  values:         { id: string; label: string }[]
+  /** Centralised text rows that will become orphan (level=characteristic). */
+  characteristicTextRows: number
+  /** Centralised text rows for any of this char's values (level=characteristic_value). */
+  valueTextRows:          number
+  /** Configuration rules whose JSONB references the char or any of its values. */
+  affectedRules:    { id: string; product_id: string; product_name: string }[]
+  /** Pricing formulas whose JSONB references the char or any of its values. */
+  affectedFormulas: { id: string; product_id: string; product_name: string; name: string }[]
+  /** Products this char is currently attached to (relationship will be removed). */
+  attachedProducts: { id: string; name: string }[]
+  /** Classes this char belongs to (membership will be removed). */
+  attachedClasses:  { id: string; name: string }[]
+  /** visualization_assets whose `characteristic_value_id` points at one of
+   *  this char's values. The DB sets that column to NULL on cascade — the
+   *  asset rows survive but are detached from any value. */
+  detachedAssets:   number
+}
+
+function numExprReferences(expr: NumExpr, charId: string): boolean {
+  if (expr.type === 'number') return false
+  if (expr.type === 'input')  return expr.char_id === charId
+  return numExprReferences(expr.left, charId) || numExprReferences(expr.right, charId)
+}
+
+function predicateReferences(p: RulePredicate, charId: string, valueIds: Set<string>): boolean {
+  if (p.type === 'select_eq' || p.type === 'select_neq') {
+    return p.char_id === charId || valueIds.has(p.value_id)
+  }
+  return numExprReferences(p.left, charId) || numExprReferences(p.right, charId)
+}
+
+function effectReferences(e: RuleEffect, charId: string, valueIds: Set<string>): boolean {
+  switch (e.type) {
+    case 'hide_value':
+    case 'disable_value':
+      return valueIds.has(e.value_id)
+    case 'set_value_default':
+    case 'set_value_locked':
+      return e.char_id === charId || valueIds.has(e.value_id)
+    case 'set_numeric_default':
+    case 'set_numeric_locked':
+      return e.char_id === charId || numExprReferences(e.expr, charId)
+  }
+}
+
+function ruleReferences(rule: ConfigurationRule, charId: string, valueIds: Set<string>): boolean {
+  if (rule.condition.predicates.some(p => predicateReferences(p, charId, valueIds))) return true
+  return rule.effects.some(e => effectReferences(e, charId, valueIds))
+}
+
+function formulaReferences(node: FormulaNode, charId: string, valueIds: Set<string>): boolean {
+  switch (node.type) {
+    case 'number':
+    case 'base_price':
+    case 'formula_result':
+      return false
+    case 'modifier':
+    case 'input':
+      return node.char_id === charId
+    case 'is_selected':
+      return node.char_id === charId || valueIds.has(node.value_id)
+    case 'add': case 'subtract': case 'multiply': case 'divide':
+    case 'gt':  case 'gte':      case 'lt':       case 'lte': case 'eq':
+    case 'and': case 'or':
+      return formulaReferences(node.left, charId, valueIds)
+          || formulaReferences(node.right, charId, valueIds)
+    case 'if':
+      return formulaReferences(node.condition, charId, valueIds)
+          || formulaReferences(node.then,      charId, valueIds)
+          || formulaReferences(node.else_node, charId, valueIds)
+  }
+}
+
+export async function previewCharacteristicDeletion(
+  charId: string,
+): Promise<CharacteristicDeletionPreview> {
+  const { data: charRow, error: charErr } = await supabase
+    .from('characteristics').select('id, name').eq('id', charId).single()
+  if (charErr || !charRow) throw new Error(charErr?.message ?? 'Characteristic not found')
+  const characteristic = charRow as { id: string; name: string }
+
+  const { data: valueRows } = await supabase
+    .from('characteristic_values').select('id, label').eq('characteristic_id', charId)
+  const values   = (valueRows ?? []) as { id: string; label: string }[]
+  const valueIds = new Set(values.map(v => v.id))
+
+  // tenant_texts at characteristic level
+  const { count: charTextCount } = await supabase
+    .from('tenant_texts').select('id', { count: 'exact', head: true })
+    .eq('level', 'characteristic').eq('reference_id', charId)
+  // tenant_texts at characteristic_value level (skip the IN query when there are no values)
+  let valueTextCount = 0
+  if (values.length > 0) {
+    const { count } = await supabase
+      .from('tenant_texts').select('id', { count: 'exact', head: true })
+      .eq('level', 'characteristic_value').in('reference_id', [...valueIds])
+    valueTextCount = count ?? 0
+  }
+
+  // visualization_assets that would lose their value link
+  let detachedAssets = 0
+  if (values.length > 0) {
+    const { count } = await supabase
+      .from('visualization_assets').select('id', { count: 'exact', head: true })
+      .in('characteristic_value_id', [...valueIds])
+    detachedAssets = count ?? 0
+  }
+
+  // Products this char is attached to
+  const { data: pcRows } = await supabase
+    .from('product_characteristics').select('product_id').eq('characteristic_id', charId)
+  const productIds = [...new Set((pcRows ?? []).map(r => (r as { product_id: string }).product_id))]
+  const { data: prodRows } = productIds.length > 0
+    ? await supabase.from('products').select('id, name').in('id', productIds)
+    : { data: [] as { id: string; name: string }[] }
+  const attachedProducts = (prodRows ?? []) as { id: string; name: string }[]
+
+  // Classes this char belongs to
+  const { data: clsMemberRows } = await supabase
+    .from('characteristic_class_members').select('class_id').eq('characteristic_id', charId)
+  const classIds = [...new Set((clsMemberRows ?? []).map(r => (r as { class_id: string }).class_id))]
+  const { data: clsRows } = classIds.length > 0
+    ? await supabase.from('characteristic_classes').select('id, name').in('id', classIds)
+    : { data: [] as { id: string; name: string }[] }
+  const attachedClasses = (clsRows ?? []) as { id: string; name: string }[]
+
+  // Rules + formulas. Rules and formulas live on products, but we have to walk
+  // their JSONB to find references — there's no SQL operator that does this
+  // cleanly across every shape. Tenant volume is small enough to fetch all and
+  // filter in JS.
+  const productNameById = new Map<string, string>(attachedProducts.map(p => [p.id, p.name]))
+  // Pull names for any product that owns a rule/formula but isn't yet in the map.
+  const affectedRules:    CharacteristicDeletionPreview['affectedRules']    = []
+  const affectedFormulas: CharacteristicDeletionPreview['affectedFormulas'] = []
+
+  if (productIds.length > 0) {
+    const { data: ruleRows } = await supabase
+      .from('configuration_rules').select('id, product_id, condition, effects')
+      .in('product_id', productIds)
+    for (const r of (ruleRows ?? []) as ConfigurationRule[]) {
+      if (ruleReferences(r, charId, valueIds)) {
+        affectedRules.push({
+          id:           r.id,
+          product_id:   r.product_id,
+          product_name: productNameById.get(r.product_id) ?? '',
+        })
+      }
+    }
+
+    const { data: formulaRows } = await supabase
+      .from('pricing_formulas').select('id, product_id, name, formula')
+      .in('product_id', productIds)
+    for (const f of (formulaRows ?? []) as PricingFormula[]) {
+      if (formulaReferences(f.formula as unknown as FormulaNode, charId, valueIds)) {
+        affectedFormulas.push({
+          id:           f.id,
+          product_id:   f.product_id,
+          product_name: productNameById.get(f.product_id) ?? '',
+          name:         f.name,
+        })
+      }
+    }
+  }
+
+  return {
+    characteristic,
+    values,
+    characteristicTextRows: charTextCount ?? 0,
+    valueTextRows:          valueTextCount,
+    affectedRules,
+    affectedFormulas,
+    attachedProducts,
+    attachedClasses,
+    detachedAssets,
+  }
+}
+
+/**
+ * Cleans up everything that won't be touched by the DB cascade, then deletes
+ * the characteristic itself. Idempotent w.r.t. orphan rows: if a previous
+ * delete attempt failed mid-way and you retry, the second pass simply has
+ * fewer orphans to clean.
+ *
+ * Order matters: rules/formulas/texts first (they would otherwise hold dead
+ * references), then the characteristic (which cascade-deletes values,
+ * product_characteristics, class memberships, and detaches visualization
+ * assets via SET NULL).
+ */
+export async function deleteCharacteristicCascade(charId: string): Promise<void> {
+  const preview = await previewCharacteristicDeletion(charId)
+  const valueIds = preview.values.map(v => v.id)
+
+  // 1. tenant_texts (characteristic level)
+  if (preview.characteristicTextRows > 0) {
+    const { error } = await supabase.from('tenant_texts')
+      .delete().eq('level', 'characteristic').eq('reference_id', charId)
+    if (error) throw new Error(`Failed to remove characteristic texts: ${error.message}`)
+  }
+  // 2. tenant_texts (value level)
+  if (valueIds.length > 0 && preview.valueTextRows > 0) {
+    const { error } = await supabase.from('tenant_texts')
+      .delete().eq('level', 'characteristic_value').in('reference_id', valueIds)
+    if (error) throw new Error(`Failed to remove value texts: ${error.message}`)
+  }
+  // 3. configuration_rules (delete entire rule when it references char/values)
+  if (preview.affectedRules.length > 0) {
+    const { error } = await supabase.from('configuration_rules')
+      .delete().in('id', preview.affectedRules.map(r => r.id))
+    if (error) throw new Error(`Failed to remove rules: ${error.message}`)
+  }
+  // 4. pricing_formulas (same — drop the whole formula)
+  if (preview.affectedFormulas.length > 0) {
+    const { error } = await supabase.from('pricing_formulas')
+      .delete().in('id', preview.affectedFormulas.map(f => f.id))
+    if (error) throw new Error(`Failed to remove formulas: ${error.message}`)
+  }
+  // 5. The characteristic itself — DB cascades values, product_characteristics,
+  //    class memberships, and SET NULL on visualization_assets.
+  const { error } = await supabase.from('characteristics').delete().eq('id', charId)
   if (error) throw new Error(error.message)
 }
 
