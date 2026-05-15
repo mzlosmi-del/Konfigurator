@@ -276,10 +276,27 @@ export function resolveTenantTextBlocks(
  *    line items.
  *  One SELECT against `tenant_texts` with an OR clause — RLS scopes to the
  *  tenant automatically. */
-export async function fetchQuotationTexts(productIds: string[]): Promise<TenantText[]> {
-  const ids = Array.from(new Set(productIds.filter(Boolean)))
-  // Tenant-level rows (reference_id IS NULL) always come along; product rows
-  // are filtered server-side when there are product ids in scope.
+/** Bulk fetch every text row a quotation builder needs:
+ *  - all tenant-level rows for the current tenant
+ *  - all product-level rows for the products referenced by the quotation's
+ *    line items
+ *  - all characteristic-level rows for the characteristics that appear in
+ *    `line_items[].configuration` (only fetched when `characteristicIds`
+ *    is non-empty — the PDF/DOCX/XLSX quotation builders don't need them
+ *    because they read snapshotted text off the line item directly)
+ *  - all characteristic_value-level rows for the values that appear in the
+ *    configuration.
+ *  One SELECT against `tenant_texts` with an OR clause — RLS scopes to the
+ *  tenant automatically. */
+export async function fetchQuotationTexts(
+  productIds:        string[],
+  characteristicIds: string[] = [],
+  valueIds:          string[] = [],
+): Promise<TenantText[]> {
+  const pIds = Array.from(new Set(productIds.filter(Boolean)))
+  const cIds = Array.from(new Set(characteristicIds.filter(Boolean)))
+  const vIds = Array.from(new Set(valueIds.filter(Boolean)))
+
   let q = supabase
     .from('tenant_texts')
     .select('*')
@@ -287,11 +304,15 @@ export async function fetchQuotationTexts(productIds: string[]): Promise<TenantT
     .order('language',   { ascending: true })
     .order('sort_order', { ascending: true })
 
-  if (ids.length > 0) {
-    q = q.or(`level.eq.tenant,and(level.eq.product,reference_id.in.(${ids.join(',')}))`)
-  } else {
-    q = q.eq('level', 'tenant')
-  }
+  // Always include tenant-level rows; entity-level filters are only added
+  // when the corresponding ID list is non-empty (otherwise PostgREST's
+  // `in.()` syntax would be invalid).
+  const orParts: string[] = ['level.eq.tenant']
+  if (pIds.length > 0) orParts.push(`and(level.eq.product,reference_id.in.(${pIds.join(',')}))`)
+  if (cIds.length > 0) orParts.push(`and(level.eq.characteristic,reference_id.in.(${cIds.join(',')}))`)
+  if (vIds.length > 0) orParts.push(`and(level.eq.characteristic_value,reference_id.in.(${vIds.join(',')}))`)
+
+  q = q.or(orParts.join(','))
 
   const { data, error } = await q
   if (error) throw new Error(error.message)

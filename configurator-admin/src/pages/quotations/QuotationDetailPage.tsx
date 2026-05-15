@@ -303,9 +303,22 @@ export function QuotationDetailPage() {
     try {
       const lineItems = (Array.isArray(quotation.line_items) ? quotation.line_items : []) as unknown as QuotationLineItem[]
       const productIds = [...new Set(lineItems.map(li => li.product_id).filter(Boolean))] as string[]
+      // The Tech Spec reads characteristic + characteristic_value spec text
+      // off `tenant_texts` directly (unlike the quotation PDF, which uses the
+      // snapshot on each line item). Walk the configuration to collect both
+      // sets of IDs so `fetchQuotationTexts` brings the relevant rows along.
+      const characteristicIds: string[] = []
+      const valueIds:          string[] = []
+      for (const li of lineItems) {
+        const cfg = Array.isArray(li.configuration) ? li.configuration : []
+        for (const entry of cfg) {
+          if (entry.characteristic_id) characteristicIds.push(entry.characteristic_id)
+          if (entry.value_id)          valueIds.push(entry.value_id)
+        }
+      }
 
       const [textRows, assets, prof] = await Promise.all([
-        fetchQuotationTexts(productIds),
+        fetchQuotationTexts(productIds, characteristicIds, valueIds),
         fetchImageAssetsForProducts(productIds),
         buildTenantProfile(),
       ])
