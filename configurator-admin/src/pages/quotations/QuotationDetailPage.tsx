@@ -91,7 +91,7 @@ export function QuotationDetailPage() {
     if (tenant?.id) {
       const { data } = await supabase
         .from('tenants')
-        .select('name, logo_url, company_address, company_phone, company_email, company_website, contact_person, vat_number, company_reg_number, pdf_footer')
+        .select('name, logo_url, company_address, company_phone, company_email, company_website, contact_person, vat_number, company_reg_number')
         .eq('id', tenant.id)
         .single()
       if (data) return data as TenantProfile
