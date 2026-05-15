@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document generator test harness</title>
+    <style>
+      html, body { margin: 0; padding: 0; background: #ffffff; font-family: system-ui, sans-serif; }
+      #status { padding: 12px 16px; color: #444; font-size: 14px; }
+      #pdf-canvases { display: flex; flex-direction: column; gap: 16px; padding: 16px; }
+      #pdf-canvases canvas { display: block; box-shadow: 0 0 0 1px #ddd; }
+    </style>
+  </head>
+  <body>
+    <div id="status">Harness loading…</div>
+    <div id="pdf-canvases"></div>
+    <script type="module" src="/src/test-harness/harness.ts"></script>
+  </body>
+</html>

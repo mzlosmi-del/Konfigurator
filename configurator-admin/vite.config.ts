@@ -24,4 +24,21 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  build: {
+    rollupOptions: {
+      // The test harness is a separate HTML entry that exposes document
+      // generators on `window.__testHarness` for Playwright. The Vite dev
+      // server always serves test-harness.html (any HTML in the root is
+      // reachable); production builds only emit it when BUILD_HARNESS=1,
+      // which CI / Vercel never sets.
+      input: process.env.BUILD_HARNESS
+        ? {
+            main:    path.resolve(__dirname, 'index.html'),
+            harness: path.resolve(__dirname, 'test-harness.html'),
+          }
+        : {
+            main: path.resolve(__dirname, 'index.html'),
+          },
+    },
+  },
 })

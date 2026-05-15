@@ -4,3 +4,7 @@ dist/
 .env.local
 .env.*.local
 *.local
+
+# Playwright (visual tests live in configurator-admin/tests-visual/)
+playwright-report/
+test-results/

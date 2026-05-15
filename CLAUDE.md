@@ -6,12 +6,45 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### Admin panel (`configurator-admin/`)
 ```bash
-npm run dev        # Vite dev server
-npm run build      # tsc + vite build
-npm run test       # vitest (jsdom)
-npm run lint       # eslint
-npx tsc --noEmit   # type-check without emitting
+npm run dev                # Vite dev server
+npm run build              # tsc + vite build
+npm run test               # vitest (jsdom)
+npm run test:visual        # Playwright: doc-generator visual + content tests
+npm run test:visual:update # re-record PDF golden snapshots
+npm run test:visual:report # open the last Playwright HTML report
+npm run lint               # eslint
+npx tsc --noEmit           # type-check without emitting
 ```
+
+### Visual + content tests for document generators
+Lives in `configurator-admin/tests-visual/`. Covers all 7 generated outputs
+(4 PDF templates × 2 langs, plus XLSX + 2 DOCX). PDFs use Playwright's
+`toHaveScreenshot` against committed PNG goldens; XLSX/DOCX use ExcelJS /
+JSZip parsers to assert text content. All run against a single hand-written
+fixture in `src/__fixtures__/quotationFixture.ts`.
+
+A separate Vite entry — `test-harness.html` + `src/test-harness/harness.ts` —
+exposes the generator functions on `window.__testHarness` so Playwright can
+call them directly. The harness is **dev-only**:
+- `vite.config.ts` only adds it to `rollupOptions.input` when
+  `BUILD_HARNESS=1` (CI / Vercel never set this).
+- `harness.ts` throws on `import.meta.env.PROD`.
+- Verify after any harness change: `npm run build && grep -r __testHarness dist/` should return nothing.
+
+When generators change and you need fresh goldens:
+1. `npm run test:visual:update` (re-records every snapshot in
+   `tests-visual/pdf.spec.ts-snapshots/`).
+2. Open each PNG and confirm it looks right.
+3. Commit alongside the code change.
+
+The first run on a fresh machine also needs `npx playwright install chromium`
+(one-time download of the headless browser, ~150 MB, cached under
+`~/AppData/Local/ms-playwright/`).
+
+**Local-only for v1.** Visual tests are not in CI — font anti-aliasing
+drifts across OS, so cross-platform goldens would flake without a Docker
+baseline. Run the suite on your dev machine before merging quotation-renderer
+changes.
 
 ### Widget (`configurator-widget/`)
 ```bash
