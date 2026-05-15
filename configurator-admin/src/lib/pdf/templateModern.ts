@@ -296,7 +296,7 @@ export async function renderModern(args: PdfBuildArgs): Promise<Uint8Array> {
         rText(derivedBase.toFixed(2), C_TR, y, 8, fontR, C.muted)
         y -= 11
         for (const c of cfg) {
-          text(`+ ${c.characteristic_name}: ${c.value_label}`, C_PROD + 4, y, 8, fontR, C.muted)
+          text(c.value_label ? `+ ${c.characteristic_name}: ${c.value_label}` : `+ ${c.characteristic_name}`, C_PROD + 4, y, 8, fontR, C.muted)
           const mod      = Number(c.price_modifier) || 0
           const modStr   = mod === 0 ? '—' : `${mod >= 0 ? '+' : ''}${mod.toFixed(2)}`
           const modColor = mod > 0 ? C.positive : mod < 0 ? C.negative : C.muted

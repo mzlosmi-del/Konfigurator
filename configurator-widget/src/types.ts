@@ -42,7 +42,7 @@ export interface Characteristic {
   id: string
   name: string
   name_i18n?: Record<string, string>
-  display_type: 'select' | 'radio' | 'swatch' | 'toggle' | 'number'
+  display_type: 'select' | 'radio' | 'swatch' | 'toggle' | 'number' | 'boolean'
   sort_order: number
   values: CharacteristicValue[]
 }

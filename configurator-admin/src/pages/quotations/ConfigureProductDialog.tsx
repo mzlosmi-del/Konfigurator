@@ -98,7 +98,10 @@ export function ConfigureProductDialog({
   }, [basePrice, characteristics, selection, ruleEffect, formulas])
 
   function handleSelect(charId: string, valueId: string) {
-    const next     = { ...selection, [charId]: valueId }
+    // Empty valueId = deselect (used by boolean characteristics).
+    const next: Record<string, string> = { ...selection }
+    if (valueId) next[charId] = valueId
+    else delete next[charId]
     const effect   = evaluateRules(rules, next, extractNumericInputs(next))
     const withDef  = applyDefaultValues(next, effect, new Set([charId]), prevDefaultsRef.current)
     // Apply newly-active numeric defaults into selection (as strings)
@@ -141,7 +144,8 @@ export function ConfigureProductDialog({
 
         <div className="space-y-5 py-1">
           {characteristics.map(char => {
-            const isNumber = char.display_type === 'number'
+            const isNumber  = char.display_type === 'number'
+            const isBoolean = char.display_type === 'boolean'
             const lockedValueId = ruleEffect.lockedValues[char.id]
             const lockedNumeric = ruleEffect.lockedNumericValues[char.id]
 
@@ -168,6 +172,37 @@ export function ConfigureProductDialog({
             const visibleValues = char.characteristic_values
               .filter(v => !ruleEffect.hiddenValues.has(v.id))
               .sort((a, b) => a.sort_order - b.sort_order)
+
+            if (isBoolean) {
+              const value    = visibleValues[0]
+              const checked  = !!value && selection[char.id] === value.id
+              const disabled = !value || ruleEffect.disabledValues.has(value.id)
+              return (
+                <div key={char.id} className="space-y-1.5">
+                  <label className={`flex items-center gap-2 text-sm font-medium ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4"
+                      checked={checked}
+                      disabled={disabled}
+                      onChange={e => {
+                        if (!value || disabled) return
+                        handleSelect(char.id, e.target.checked ? value.id : '')
+                      }}
+                    />
+                    <span>{char.name}</span>
+                    {value && value.price_modifier !== 0 && (
+                      <span className={`text-xs ${value.price_modifier > 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                        ({value.price_modifier > 0 ? '+' : ''}{value.price_modifier.toFixed(2)})
+                      </span>
+                    )}
+                    {!value && (
+                      <span className="text-xs text-muted-foreground">({t('No available options')})</span>
+                    )}
+                  </label>
+                </div>
+              )
+            }
 
             return (
               <div key={char.id} className="space-y-1.5">

@@ -211,5 +211,37 @@ export function CharacteristicInput({
     )
   }
 
+  // ── Boolean (single checkbox) ───────────────────────────────────────────────
+  // Uses a single value to represent the "checked" state; the value's label
+  // is admin-only — the customer just sees the characteristic name. Leaving
+  // the box unchecked is allowed (it submits with no selection for this char).
+  if (display_type === 'boolean') {
+    const value    = visible[0]
+    const disabled = !value || ruleEffect.disabledValues.has(value.id)
+    const checked  = !!value && selectedValueId === value.id
+    return (
+      <div>
+        <label class={`cw-checkbox-row${disabled ? ' disabled' : ''}`}>
+          <input
+            type="checkbox"
+            class="cw-checkbox"
+            checked={checked}
+            disabled={disabled}
+            onChange={(e) => {
+              if (!value || disabled) return
+              onChange(id, (e.target as HTMLInputElement).checked ? value.id : '')
+            }}
+          />
+          <span class="cw-checkbox-label">{charName}</span>
+          {value && value.price_modifier !== 0 && (
+            <span class={modifierClass(value.price_modifier)}>
+              {formatModifier(value.price_modifier)}
+            </span>
+          )}
+        </label>
+      </div>
+    )
+  }
+
   return null
 }

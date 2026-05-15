@@ -61,7 +61,11 @@ export function Widget({ config, track, onThemeLoad }: Props) {
   function handleSelect(charId: string, valueId: string) {
     if (state.phase !== 'ready') return
     track('characteristic_changed', { char_id: charId, value_id: valueId })
-    const next      = { ...selection, [charId]: valueId }
+    // Empty valueId = deselect (used by boolean characteristics when the
+    // checkbox is unchecked).
+    const next: Selection = { ...selection }
+    if (valueId) next[charId] = valueId
+    else delete next[charId]
     const effect    = evaluateRules(state.data.rules, next, numericInputs)
     const withDef   = applyDefaultValues(next, effect, new Set([charId]), prevDefaultsRef.current)
     const sanitized = sanitizeSelection(withDef, effect)
@@ -148,7 +152,14 @@ export function Widget({ config, track, onThemeLoad }: Props) {
       }
       if (!selection[char.id]) continue
       const v = char.values.find(val => val.id === selection[char.id])
-      if (v) items.push({ characteristic_name: charName, value_label: pickTranslation(v.label_i18n, lang, v.label), price_modifier: v.price_modifier })
+      if (!v) continue
+      // Boolean: only the characteristic name is meaningful — the value's
+      // label is admin-only. Emit an empty value_label so renderers know to
+      // show just the name.
+      const valueLabel = char.display_type === 'boolean'
+        ? ''
+        : pickTranslation(v.label_i18n, lang, v.label)
+      items.push({ characteristic_name: charName, value_label: valueLabel, price_modifier: v.price_modifier })
     }
 
     return items
@@ -158,6 +169,9 @@ export function Widget({ config, track, onThemeLoad }: Props) {
     if (state.phase !== 'ready') return false
     return state.data.characteristics.every(c => {
       if (c.display_type === 'number') return numericInputs[c.id] !== undefined
+      // Boolean characteristics are always optional — leaving the box
+      // unchecked must not block submission.
+      if (c.display_type === 'boolean') return true
       return !!selection[c.id]
     })
   }, [state, selection, numericInputs])
@@ -270,8 +284,10 @@ export function Widget({ config, track, onThemeLoad }: Props) {
             if (!char) continue
             const charName = pickTranslation(char.name_i18n, lang, char.name)
             const value = char.values.find(v => v.id === opt.value_id)
-            const valueLabel = value ? pickTranslation(value.label_i18n, lang, value.label) : ''
-            rows.push({ label: `${charName}: ${valueLabel}`, amount: opt.amount })
+            const valueLabel = (char.display_type === 'boolean' || !value)
+              ? ''
+              : pickTranslation(value.label_i18n, lang, value.label)
+            rows.push({ label: valueLabel ? `${charName}: ${valueLabel}` : charName, amount: opt.amount })
           }
           for (const f of priceBreakdown.formulas) {
             if (f.amount === 0) continue
@@ -320,7 +336,7 @@ export function Widget({ config, track, onThemeLoad }: Props) {
               {lineItems.map((item, i) => (
                 <span class="cw-chip" key={i}>
                   <span class="cw-chip-key">{item.characteristic_name}</span>
-                  <span class="cw-chip-val">{item.value_label}</span>
+                  {item.value_label && <span class="cw-chip-val">{item.value_label}</span>}
                 </span>
               ))}
             </div>

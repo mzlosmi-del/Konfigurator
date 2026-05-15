@@ -348,7 +348,7 @@ async function buildQuotationPdf({
 
       const cfg = Array.isArray(item.configuration) ? item.configuration : []
       for (const c of cfg) {
-        const cfgText = `${c.characteristic_name}: ${c.value_label}`
+        const cfgText = c.value_label ? `${c.characteristic_name}: ${c.value_label}` : c.characteristic_name
         page.drawText(cfgText, { x: margin + 28, y, size: 8, font: fontRegular, color: muted })
         y -= 12
       }

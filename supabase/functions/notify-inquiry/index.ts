@@ -215,7 +215,7 @@ function buildEmailHtml({
   const configRows = config.map(item => `
     <tr>
       <td style="padding:6px 12px;color:#555;font-size:14px;">${esc(item.characteristic_name)}</td>
-      <td style="padding:6px 12px;font-size:14px;">${esc(item.value_label)}</td>
+      <td style="padding:6px 12px;font-size:14px;">${item.value_label ? esc(item.value_label) : '&#10003;'}</td>
       <td style="padding:6px 12px;font-size:14px;text-align:right;color:#555;">
         ${item.price_modifier !== 0
           ? (item.price_modifier > 0 ? '+' : '') + item.price_modifier.toFixed(2)

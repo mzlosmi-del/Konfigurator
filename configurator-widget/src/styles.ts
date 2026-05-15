@@ -280,6 +280,27 @@ export const WIDGET_STYLES = `
     text-decoration: line-through;
   }
 
+  /* Boolean (single checkbox) */
+  .cw-checkbox-row {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    font-family: var(--cw-font);
+    font-size: 14px;
+    color: var(--cw-text);
+    user-select: none;
+  }
+  .cw-checkbox-row.disabled { opacity: 0.5; cursor: not-allowed; }
+  .cw-checkbox {
+    width: 18px;
+    height: 18px;
+    margin: 0;
+    cursor: inherit;
+    accent-color: var(--cw-text-heading);
+  }
+  .cw-checkbox-label { line-height: 1.4; }
+
   /* Swatch — tile cards */
   .cw-swatch-group {
     display: grid;

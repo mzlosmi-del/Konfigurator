@@ -361,7 +361,7 @@ export async function buildQuotationTechSpecDocxBytes(args: BuildTechSpecArgs): 
       tocEntries.push({
         level:      2,
         number:     `${productNum}.${charIndex}`,
-        title:      `${c.entry.characteristic_name}: ${c.entry.value_label}`,
+        title:      c.entry.value_label ? `${c.entry.characteristic_name}: ${c.entry.value_label}` : c.entry.characteristic_name,
         bookmarkId: `ch-${productNum}-${charIndex}`,
       })
     })
@@ -414,7 +414,7 @@ export async function buildQuotationTechSpecDocxBytes(args: BuildTechSpecArgs): 
       const c             = s.children[j]
       const charIndex     = j + 1
       const chapterNumber = `${productNum}.${charIndex}`
-      const combinedTitle = `${c.entry.characteristic_name}: ${c.entry.value_label}`
+      const combinedTitle = c.entry.value_label ? `${c.entry.characteristic_name}: ${c.entry.value_label}` : c.entry.characteristic_name
       bodyChildren.push(new Paragraph({
         heading: HeadingLevel.HEADING_2,
         spacing: { before: 320, after: 120 },

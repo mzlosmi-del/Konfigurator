@@ -596,7 +596,9 @@ export function QuotationDetailPage() {
                         <div className="space-y-0.5">
                           {item.configuration.map((c, ci) => (
                             <div key={ci} className="text-xs text-muted-foreground">
-                              <span className="font-medium text-foreground">{c.characteristic_name}:</span> {c.value_label}
+                              {c.value_label
+                                ? <><span className="font-medium text-foreground">{c.characteristic_name}:</span> {c.value_label}</>
+                                : <span className="font-medium text-foreground">{c.characteristic_name}</span>}
                               {c.price_modifier !== 0 && (
                                 <span className={c.price_modifier > 0 ? 'text-emerald-600 ml-1' : 'text-red-600 ml-1'}>
                                   ({c.price_modifier > 0 ? '+' : ''}{c.price_modifier.toFixed(2)})

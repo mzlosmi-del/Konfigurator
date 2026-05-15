@@ -332,7 +332,7 @@ function buildLineItemsTable(
         productCol.push(new Paragraph({
           tabStops: [{ type: 'right', position: 5200 }],
           children: [
-            txt(`+ ${c.characteristic_name}: ${c.value_label}`, { size: SZ.small, color: HEX.muted }),
+            txt(c.value_label ? `+ ${c.characteristic_name}: ${c.value_label}` : `+ ${c.characteristic_name}`, { size: SZ.small, color: HEX.muted }),
             txt('\t', { size: SZ.small }),
             txt(modStr, { size: SZ.small, color: modColor }),
           ],

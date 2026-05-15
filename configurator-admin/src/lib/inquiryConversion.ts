@@ -82,6 +82,17 @@ export function mapInquiryConfiguration(
       selection[char.id] = String(num)
       continue
     }
+    // Boolean: the inquiry stores an empty value_label (label is admin-only).
+    // Map to the characteristic's first value, which represents "checked".
+    if (char.display_type === 'boolean') {
+      const value = [...char.characteristic_values].sort((a, b) => a.sort_order - b.sort_order)[0]
+      if (!value) {
+        dropped.push(item.characteristic_name)
+        continue
+      }
+      selection[char.id] = value.id
+      continue
+    }
     const value = char.characteristic_values.find(
       v => v.label.trim().toLowerCase() === item.value_label.trim().toLowerCase(),
     )
