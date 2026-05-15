@@ -241,10 +241,22 @@ export async function loadLogo(pdfDoc: PDFDocument, logoUrl: string | null | und
 export async function loadLogoBytes(logoUrl: string | null | undefined): Promise<
   { bytes: Uint8Array; extension: 'png' | 'jpg' | 'gif' | 'bmp'; width: number; height: number } | null
 > {
-  if (!logoUrl) return null
+  if (!logoUrl) {
+    console.warn('[loadLogoBytes] no logo URL set on the tenant; cover will fall back to the tenant name')
+    return null
+  }
+  let res: Response
   try {
-    const res = await fetch(logoUrl)
-    if (!res.ok) return null
+    res = await fetch(logoUrl)
+  } catch (err) {
+    console.warn('[loadLogoBytes] fetch threw — likely CORS or network error', { logoUrl, err })
+    return null
+  }
+  if (!res.ok) {
+    console.warn('[loadLogoBytes] fetch returned non-OK', { logoUrl, status: res.status, statusText: res.statusText })
+    return null
+  }
+  try {
     const ct  = res.headers.get('content-type') ?? ''
     const buf = await res.arrayBuffer()
     const bytes = new Uint8Array(buf)
@@ -262,8 +274,13 @@ export async function loadLogoBytes(logoUrl: string | null | undefined): Promise
       img.src = url
     })
 
+    if (bytes.length === 0) {
+      console.warn('[loadLogoBytes] fetched URL returned 0 bytes', { logoUrl })
+      return null
+    }
     return { bytes, extension, width, height }
-  } catch {
+  } catch (err) {
+    console.warn('[loadLogoBytes] decode failed', { logoUrl, err })
     return null
   }
 }
