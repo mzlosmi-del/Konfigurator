@@ -426,6 +426,19 @@ export const WIDGET_STYLES = `
     border-radius: 999px;
     border: 1px solid var(--cw-border);
   }
+  /* "Included" — rule-driven price waive on a locked value. Reads as a benefit,
+     so positive accent colour rather than the muted look of "Auto-set". */
+  .cw-included-badge {
+    font-size: 9px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #047857;
+    background: #ecfdf5;
+    padding: 2px 6px;
+    border-radius: 999px;
+    border: 1px solid #a7f3d0;
+  }
 
   /* ── Price breakdown ──────────────────────────────── */
   .cw-price-breakdown {

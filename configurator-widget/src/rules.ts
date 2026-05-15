@@ -70,6 +70,8 @@ function applyEffect(
       return
     case 'set_value_locked':
       result.lockedValues[effect.char_id] = effect.value_id
+      // "Free of charge" — waive the locked value's price contribution.
+      if (effect.waive_price) result.priceOverrides[effect.char_id] = 0
       return
     case 'set_numeric_default':
       result.defaultNumericValues[effect.char_id] = evalNumExpr(effect.expr, numericInputs)
