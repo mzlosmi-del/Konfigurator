@@ -145,28 +145,49 @@ function specParagraphs(content: string): Paragraph[] {
   return content.split(/\r?\n/).flatMap(line => {
     const trimmed = line.trim()
     if (!trimmed) return []
-    return [p([txt(line, { size: SZ.body, color: HEX.ink })], { lineSpacing: 320, spacingAfter: 60 })]
+    // 264 = 1.1 line spacing — tight executive density without feeling cramped.
+    // 80 = 4pt paragraph spacing — clear separation between bullets/lines.
+    return [p([txt(line, { size: SZ.body, color: HEX.ink })], { lineSpacing: 264, spacingAfter: 80 })]
   })
 }
 
 // ── Image embedding ─────────────────────────────────────────────────────────
 
-const MAX_IMG_W = 480 // pt — keeps the image well clear of the A4 margin
-const MAX_IMG_H = 360
+// Standard image canvas (px at 96 DPI). All images render fitted into this
+// box with proportional aspect ratio AND upscaling allowed — so a thumbnail
+// uploaded by the admin appears at the same visual weight as a full-size
+// render. This is the executive-doc convention: every figure looks like a
+// uniform plate, not a random collage of asset sizes.
+const IMG_TARGET_W = 480 // ~5" — comfortable on A4 with 0.75" side margins
+const IMG_TARGET_H = 320 // ~3.3" — caps tall portraits so they don't dominate
+
+function fitImage(natW: number, natH: number): { width: number; height: number } {
+  if (natW <= 0 || natH <= 0) {
+    // Unknown natural dims (e.g. probe failed) — fall back to a 3:2 plate
+    // at full target width.
+    return { width: IMG_TARGET_W, height: Math.round(IMG_TARGET_W * 2 / 3) }
+  }
+  // Fit within IMG_TARGET_W × IMG_TARGET_H, allowing upscale for visual
+  // consistency. min() with no `1` cap means small images get enlarged.
+  const ratio = Math.min(IMG_TARGET_W / natW, IMG_TARGET_H / natH)
+  return {
+    width:  Math.round(natW * ratio),
+    height: Math.round(natH * ratio),
+  }
+}
 
 async function imageParagraph(url: string): Promise<Paragraph | null> {
   const loaded = await loadLogoBytes(url) // reuses generic loader
-  if (!loaded || loaded.width === 0 || loaded.height === 0) return null
-  const ratio = Math.min(MAX_IMG_W / loaded.width, MAX_IMG_H / loaded.height, 1)
-  const w = Math.max(40, loaded.width  * ratio)
-  const h = Math.max(40, loaded.height * ratio)
+  if (!loaded) return null
+  const { width, height } = fitImage(loaded.width, loaded.height)
   return new Paragraph({
     alignment: AlignmentType.CENTER,
-    spacing: { before: 120, after: 160 },
+    // 80/100 twips = 4pt/5pt — tight gutter around the image.
+    spacing: { before: 80, after: 100 },
     children: [new ImageRun({
       data: loaded.bytes,
       type: loaded.extension,
-      transformation: { width: w, height: h },
+      transformation: { width, height },
     } as unknown as ConstructorParameters<typeof ImageRun>[0])],
   })
 }
@@ -221,7 +242,7 @@ export async function buildQuotationTechSpecDocxBytes(args: BuildTechSpecArgs): 
     const h       = hasDims ? Math.max(60, logo.height * ratio) : LOGO_MAX_H
     coverChildren.push(new Paragraph({
       alignment: AlignmentType.CENTER,
-      spacing: { before: 720, after: 600 },
+      spacing: { before: 600, after: 480 },
       children: [new ImageRun({
         data: logo.bytes,
         type: logo.extension,
@@ -233,7 +254,7 @@ export async function buildQuotationTechSpecDocxBytes(args: BuildTechSpecArgs): 
     // to the tenant name as the cover mark.
     coverChildren.push(new Paragraph({
       alignment: AlignmentType.CENTER,
-      spacing: { before: 720, after: 600 },
+      spacing: { before: 600, after: 480 },
       children: [txt(tenant.name.toUpperCase(), { bold: true, size: 36, color: HEX.ink })],
     }))
   }
@@ -241,7 +262,7 @@ export async function buildQuotationTechSpecDocxBytes(args: BuildTechSpecArgs): 
   // Big title
   coverChildren.push(p(
     [txt(L.title, { bold: true, size: SZ.cover_title, color: HEX.accent })],
-    { align: AlignmentType.CENTER, spacingAfter: 400 },
+    { align: AlignmentType.CENTER, spacingAfter: 280 },
   ))
 
   // Customer + reference
@@ -251,7 +272,7 @@ export async function buildQuotationTechSpecDocxBytes(args: BuildTechSpecArgs): 
         txt(`${L.preparedFor}: `, { size: SZ.cover_subtitle, color: HEX.muted }),
         txt(quotation.customer_name,  { bold: true, size: SZ.cover_subtitle, color: HEX.ink }),
       ],
-      { align: AlignmentType.CENTER, spacingAfter: 120 },
+      { align: AlignmentType.CENTER, spacingAfter: 80 },
     ))
   }
   if (quotation.reference_number) {
@@ -260,7 +281,7 @@ export async function buildQuotationTechSpecDocxBytes(args: BuildTechSpecArgs): 
         txt(`${L.refNumber}: `,           { size: SZ.cover_meta, color: HEX.muted }),
         txt(quotation.reference_number,    { size: SZ.cover_meta, color: HEX.ink }),
       ],
-      { align: AlignmentType.CENTER, spacingAfter: 80 },
+      { align: AlignmentType.CENTER, spacingAfter: 60 },
     ))
   }
   coverChildren.push(p(
@@ -268,7 +289,7 @@ export async function buildQuotationTechSpecDocxBytes(args: BuildTechSpecArgs): 
       txt(`${L.createdOn}: `,         { size: SZ.cover_meta, color: HEX.muted }),
       txt(fmtDate(new Date(), lang),  { size: SZ.cover_meta, color: HEX.ink }),
     ],
-    { align: AlignmentType.CENTER, spacingAfter: 80 },
+    { align: AlignmentType.CENTER, spacingAfter: 60 },
   ))
 
   // Tenant strip near the bottom — boxed shading for an executive feel.
@@ -370,9 +391,9 @@ export async function buildQuotationTechSpecDocxBytes(args: BuildTechSpecArgs): 
   // ── Table of contents page (static, with click-through bookmarks) ────────
   const tocChildren: Paragraph[] = [
     p([txt(L.toc, { bold: true, size: SZ.h1, color: HEX.ink })],
-      { spacingBefore: 240, spacingAfter: 320 }),
+      { spacingBefore: 200, spacingAfter: 240 }),
     ...tocEntries.map(entry => new Paragraph({
-      spacing: { after: 60 },
+      spacing: { after: 40, line: 264, lineRule: 'auto' },
       indent:  entry.level === 2 ? { left: 480 } : undefined,
       children: [new InternalHyperlink({
         anchor:   entry.bookmarkId,
@@ -396,9 +417,11 @@ export async function buildQuotationTechSpecDocxBytes(args: BuildTechSpecArgs): 
   for (let i = 0; i < survivors.length; i++) {
     const s          = survivors[i]
     const productNum = i + 1
+    // H1: subtle 1.5pt rule under the chapter title — clean executive section break.
     bodyChildren.push(new Paragraph({
       heading: HeadingLevel.HEADING_1,
-      spacing: { before: i === 0 ? 200 : 480, after: 160 },
+      spacing: { before: i === 0 ? 80 : 360, after: 100 },
+      border:  { bottom: { style: BorderStyle.SINGLE, size: 6, color: HEX.rule, space: 4 } },
       children: [new Bookmark({
         id: `ch-${productNum}`,
         children: [txt(`${productNum}. ${s.item.product_name}`, { bold: true, size: SZ.h1, color: HEX.ink })],
@@ -417,7 +440,7 @@ export async function buildQuotationTechSpecDocxBytes(args: BuildTechSpecArgs): 
       const combinedTitle = c.entry.value_label ? `${c.entry.characteristic_name}: ${c.entry.value_label}` : c.entry.characteristic_name
       bodyChildren.push(new Paragraph({
         heading: HeadingLevel.HEADING_2,
-        spacing: { before: 320, after: 120 },
+        spacing: { before: 220, after: 80 },
         children: [new Bookmark({
           id: `ch-${productNum}-${charIndex}`,
           children: [txt(`${chapterNumber}. ${combinedTitle}`, { bold: true, size: SZ.h2, color: HEX.ink })],
@@ -471,9 +494,14 @@ export async function buildQuotationTechSpecDocxBytes(args: BuildTechSpecArgs): 
     title:   `${L.title} — ${quotation.reference_number ?? ''}`.trim(),
     styles: {
       default: {
-        document: { run: { font: FONT, size: SZ.body } },
-        heading1: { run: headingRunStyle(SZ.h1), paragraph: { spacing: { before: 360, after: 160 } } },
-        heading2: { run: headingRunStyle(SZ.h2), paragraph: { spacing: { before: 280, after: 120 } } },
+        // 264 line + 80 after by default — every paragraph inherits the
+        // tight executive rhythm unless it explicitly overrides.
+        document: {
+          run:       { font: FONT, size: SZ.body },
+          paragraph: { spacing: { line: 264, lineRule: 'auto', after: 80 } },
+        },
+        heading1: { run: headingRunStyle(SZ.h1), paragraph: { spacing: { before: 360, after: 100 } } },
+        heading2: { run: headingRunStyle(SZ.h2), paragraph: { spacing: { before: 220, after: 80 } } },
       },
     },
     sections: [
