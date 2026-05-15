@@ -348,7 +348,9 @@ export function QuotationFormPage() {
           if (!valueId) continue
           const value = char.characteristic_values.find(v => v.id === valueId)
           if (!value) continue
-          const effective = ruleEffect.priceOverrides[value.id] ?? modOverrides[value.id] ?? Number(value.price_modifier)
+          // priceOverrides is keyed by char_id (one selection per char at a time).
+          // modOverrides (pricing schedules) is keyed by value_id.
+          const effective = ruleEffect.priceOverrides[char.id] ?? modOverrides[value.id] ?? Number(value.price_modifier)
           // Boolean: store an empty value_label so renderers display only the
           // characteristic name. The value's label is admin-only.
           const valueLabel = char.display_type === 'boolean' ? '' : value.label
@@ -774,7 +776,7 @@ function LineItemRow({
     if (!valueId) continue
     const v = char.characteristic_values.find(v => v.id === valueId)
     if (!v) continue
-    unitPrice += lineRuleEffect.priceOverrides[v.id] ?? Number(v.price_modifier)
+    unitPrice += lineRuleEffect.priceOverrides[char.id] ?? Number(v.price_modifier)
   }
   unitPrice += calculateFormulaTotal(formulas, buildFormulaCtxLocal(details, item.selection, product?.base_price ?? 0))
   unitPrice = Math.max(0, unitPrice)

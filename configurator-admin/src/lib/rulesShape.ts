@@ -49,7 +49,7 @@ export function emptyEffect(kind: RuleEffectKind = 'hide_value'): RuleEffect {
     case 'hide_value':          return { type: 'hide_value',          value_id: '' }
     case 'disable_value':       return { type: 'disable_value',       value_id: '' }
     case 'set_value_default':   return { type: 'set_value_default',   char_id: '', value_id: '' }
-    case 'set_value_locked':    return { type: 'set_value_locked',    char_id: '', value_id: '' }
+    case 'set_value_locked':    return { type: 'set_value_locked',    char_id: '', value_id: '', waive_price: false }
     case 'set_numeric_default': return { type: 'set_numeric_default', char_id: '', expr: literalExpr() }
     case 'set_numeric_locked':  return { type: 'set_numeric_locked',  char_id: '', expr: literalExpr() }
   }
@@ -143,7 +143,7 @@ export function describeEffect(
     case 'set_value_default':
       return `default ${charName(chars, e.char_id, lang)} = ${valueName(valuesMap, e.char_id, e.value_id, lang)}`
     case 'set_value_locked':
-      return `lock ${charName(chars, e.char_id, lang)} = ${valueName(valuesMap, e.char_id, e.value_id, lang)}`
+      return `lock ${charName(chars, e.char_id, lang)} = ${valueName(valuesMap, e.char_id, e.value_id, lang)}${e.waive_price ? ' (included)' : ''}`
     case 'set_numeric_default':
       return `default ${charName(chars, e.char_id, lang)} = ${describeNumExpr(e.expr, chars, lang)}`
     case 'set_numeric_locked':

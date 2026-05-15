@@ -75,12 +75,15 @@ export function CharacteristicInput({
     const lockedLabel   = lockedValue
       ? pickTranslation(lockedValue.label_i18n, lang, lockedValue.label)
       : '—'
+    // Rule waived the price for this lock → tell the customer it's bundled.
+    const isIncluded = ruleEffect.priceOverrides[id] === 0
     return (
       <div>
         <div class="cw-char-label">{charName}</div>
         <div class="cw-locked-value">
           <span class="cw-locked-label">{lockedLabel}</span>
           <span class="cw-locked-badge">{t('Auto-set')}</span>
+          {isIncluded && <span class="cw-included-badge">{t('Included')}</span>}
         </div>
       </div>
     )

@@ -58,7 +58,11 @@ function applyEffect(effect: RuleEffectV2, result: RuleEffect, numericInputs: Nu
     case 'hide_value':          result.hiddenValues.add(effect.value_id); return
     case 'disable_value':       result.disabledValues.add(effect.value_id); return
     case 'set_value_default':   result.defaultValues[effect.char_id] = effect.value_id; return
-    case 'set_value_locked':    result.lockedValues[effect.char_id]  = effect.value_id; return
+    case 'set_value_locked':
+      result.lockedValues[effect.char_id] = effect.value_id
+      // "Free of charge" — waive the locked value's price contribution.
+      if (effect.waive_price) result.priceOverrides[effect.char_id] = 0
+      return
     case 'set_numeric_default': result.defaultNumericValues[effect.char_id] = evalNumExpr(effect.expr, numericInputs); return
     case 'set_numeric_locked':  result.lockedNumericValues[effect.char_id]  = evalNumExpr(effect.expr, numericInputs); return
   }

@@ -569,6 +569,23 @@ function EffectRow({
         />
       )}
 
+      {/* "Free of charge" toggle — only for set_value_locked. When checked,
+          the locked value's price_modifier is overridden to 0 (bundled). */}
+      {value.type === 'set_value_locked' && (
+        <label
+          className="inline-flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer select-none"
+          title={t('When this rule auto-locks the value, its price modifier is treated as 0 (included with the parent selection).')}
+        >
+          <input
+            type="checkbox"
+            className="h-3.5 w-3.5"
+            checked={!!value.waive_price}
+            onChange={e => onChange({ ...value, waive_price: e.target.checked })}
+          />
+          {t('Free of charge (included)')}
+        </label>
+      )}
+
       <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={onRemove}>
         <X className="h-3.5 w-3.5" />
       </Button>

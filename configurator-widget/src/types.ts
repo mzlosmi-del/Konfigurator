@@ -124,7 +124,9 @@ export type RuleEffect =
   | { type: 'hide_value';          value_id: string }
   | { type: 'disable_value';       value_id: string }
   | { type: 'set_value_default';   char_id: string; value_id: string }
-  | { type: 'set_value_locked';    char_id: string; value_id: string }
+  // `waive_price`: when true and the rule fires, the locked value's
+  // price_modifier is overridden to 0 — for "bundled / included" combos.
+  | { type: 'set_value_locked';    char_id: string; value_id: string; waive_price?: boolean }
   | { type: 'set_numeric_default'; char_id: string; expr: NumExpr }
   | { type: 'set_numeric_locked';  char_id: string; expr: NumExpr }
 

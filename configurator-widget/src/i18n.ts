@@ -30,6 +30,7 @@ const sr: Record<string, string> = {
 
   // CharacteristicInput
   'Auto-set':                              'Automatski postavljeno',
+  'Included':                              'Uključeno',
   'No image available':                    'Nema dostupne slike',
   'Product visualization':                 'Vizualizacija proizvoda',
 }

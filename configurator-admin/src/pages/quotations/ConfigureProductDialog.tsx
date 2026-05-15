@@ -88,7 +88,7 @@ export function ConfigureProductDialog({
       if (!valueId) continue
       const val = char.characteristic_values.find(v => v.id === valueId)
       if (!val) continue
-      const effective = ruleEffect.priceOverrides[val.id] ?? Number(val.price_modifier)
+      const effective = ruleEffect.priceOverrides[char.id] ?? Number(val.price_modifier)
       price += effective
     }
     const formulaAdj = calculateFormulaTotal(formulas, {
