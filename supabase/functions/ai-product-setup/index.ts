@@ -202,101 +202,112 @@ function validate(obj: unknown): obj is AiProduct {
 // ── Handler ────────────────────────────────────────────────────────────────
 
 Deno.serve(async (req: Request) => {
-  if (req.method === 'OPTIONS') return new Response(null, { headers: CORS })
-  if (req.method !== 'POST') return new Response('Method not allowed', { status: 405, headers: CORS })
-
-  const token = req.headers.get('Authorization')?.replace('Bearer ', '')
-  if (!token) return new Response('Unauthorized', { status: 401, headers: CORS })
-
-  const supabase = createClient(
-    Deno.env.get('SUPABASE_URL')!,
-    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
-  )
-
-  // Auth
-  const { data: { user }, error: authErr } = await supabase.auth.getUser(token)
-  if (authErr || !user) return new Response('Unauthorized', { status: 401, headers: CORS })
-
-  const { data: profile } = await supabase
-    .from('profiles').select('tenant_id').eq('id', user.id).single()
-  if (!profile) return new Response('Profile not found', { status: 404, headers: CORS })
-  const tenantId = profile.tenant_id as string
-
-  // Plan gating — uses the shared loadPlanLimits + assertMonthlyLimit pair so
-  // every gated function speaks the same structured error shape.
-  const limits = await loadPlanLimits(supabase, tenantId)
-  if (!limits) return new Response('Tenant not found', { status: 404, headers: CORS })
-  if (limits.ai_setup_per_month === 0) {
-    return gateForbidden(makePlanError('ai_setup', limits.plan, 0, 0), CORS)
-  }
-  const used = await getMonthlyUsage(supabase, tenantId, 'ai_setup')
-  const monthlyGate = assertMonthlyLimit('ai_setup', limits.ai_setup_per_month, used, limits.plan, CORS)
-  if (monthlyGate) return monthlyGate
-
-  // Parse body
-  let description: string, vertical: string | undefined
   try {
-    const body = await req.json() as { description?: unknown; vertical?: unknown }
-    description = (typeof body.description === 'string' ? body.description : '').trim()
-    vertical    = typeof body.vertical === 'string' ? body.vertical.trim() : undefined
-  } catch {
-    return new Response('Bad request', { status: 400, headers: CORS })
-  }
+    if (req.method === 'OPTIONS') return new Response(null, { headers: CORS })
+    if (req.method !== 'POST') return new Response('Method not allowed', { status: 405, headers: CORS })
 
-  if (!description) {
-    return new Response(JSON.stringify({ error: 'description required' }), {
-      status: 400, headers: { ...CORS, 'Content-Type': 'application/json' },
-    })
-  }
+    const token = req.headers.get('Authorization')?.replace('Bearer ', '')
+    if (!token) return new Response('Unauthorized', { status: 401, headers: CORS })
 
-  const userMessage = vertical
-    ? `Vertical: ${vertical}\n\nDescription: ${description}`
-    : `Description: ${description}`
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+    )
 
-  // Call Claude — retry once on validation failure
-  const anthropic = new Anthropic({ apiKey: Deno.env.get('ANTHROPIC_API_KEY')! })
+    // Auth
+    const { data: { user }, error: authErr } = await supabase.auth.getUser(token)
+    if (authErr || !user) return new Response('Unauthorized', { status: 401, headers: CORS })
 
-  async function callClaude(messages: Anthropic.MessageParam[]): Promise<string> {
-    const msg = await anthropic.messages.create({
-      model:      'claude-sonnet-4-6',
-      max_tokens: 1024,
-      system:     SYSTEM_PROMPT,
-      messages,
-    })
-    return (msg.content[0] as { type: string; text: string }).text ?? ''
-  }
+    const { data: profile } = await supabase
+      .from('profiles').select('tenant_id').eq('id', user.id).single()
+    if (!profile) return new Response('Profile not found', { status: 404, headers: CORS })
+    const tenantId = profile.tenant_id as string
 
-  let result: AiProduct | null = null
-  let raw = ''
-
-  try {
-    raw = await callClaude([{ role: 'user', content: userMessage }])
-    const parsed = JSON.parse(raw)
-    if (validate(parsed)) {
-      result = parsed
-    } else {
-      // Retry with validation errors
-      raw = await callClaude([
-        { role: 'user', content: userMessage },
-        { role: 'assistant', content: raw },
-        { role: 'user', content: 'The JSON you returned failed schema validation. Fix it and return valid JSON only.' },
-      ])
-      const parsed2 = JSON.parse(raw)
-      if (validate(parsed2)) result = parsed2
+    // Plan gating — uses the shared loadPlanLimits + assertMonthlyLimit pair so
+    // every gated function speaks the same structured error shape.
+    const limits = await loadPlanLimits(supabase, tenantId)
+    if (!limits) return new Response('Tenant not found', { status: 404, headers: CORS })
+    if (limits.ai_setup_per_month === 0) {
+      return gateForbidden(makePlanError('ai_setup', limits.plan, 0, 0), CORS)
     }
-  } catch (e) {
-    console.error('ai-product-setup Claude error:', e)
-  }
+    const used = await getMonthlyUsage(supabase, tenantId, 'ai_setup')
+    const monthlyGate = assertMonthlyLimit('ai_setup', limits.ai_setup_per_month, used, limits.plan, CORS)
+    if (monthlyGate) return monthlyGate
 
-  if (!result) {
-    return new Response(JSON.stringify({ error: 'Failed to generate valid product config' }), {
-      status: 502, headers: { ...CORS, 'Content-Type': 'application/json' },
+    // Parse body
+    let description: string, vertical: string | undefined
+    try {
+      const body = await req.json() as { description?: unknown; vertical?: unknown }
+      description = (typeof body.description === 'string' ? body.description : '').trim()
+      vertical    = typeof body.vertical === 'string' ? body.vertical.trim() : undefined
+    } catch {
+      return new Response('Bad request', { status: 400, headers: CORS })
+    }
+
+    if (!description) {
+      return new Response(JSON.stringify({ error: 'description required' }), {
+        status: 400, headers: { ...CORS, 'Content-Type': 'application/json' },
+      })
+    }
+
+    const userMessage = vertical
+      ? `Vertical: ${vertical}\n\nDescription: ${description}`
+      : `Description: ${description}`
+
+    // Call Claude — retry once on validation failure
+    const anthropic = new Anthropic({ apiKey: Deno.env.get('ANTHROPIC_API_KEY')! })
+
+    async function callClaude(messages: Anthropic.MessageParam[]): Promise<string> {
+      const msg = await anthropic.messages.create({
+        model:      'claude-sonnet-4-6',
+        max_tokens: 1024,
+        system:     SYSTEM_PROMPT,
+        messages,
+      })
+      return (msg.content[0] as { type: string; text: string }).text ?? ''
+    }
+
+    let result: AiProduct | null = null
+    let raw = ''
+
+    try {
+      raw = await callClaude([{ role: 'user', content: userMessage }])
+      const parsed = JSON.parse(raw)
+      if (validate(parsed)) {
+        result = parsed
+      } else {
+        // Retry with validation errors
+        raw = await callClaude([
+          { role: 'user', content: userMessage },
+          { role: 'assistant', content: raw },
+          { role: 'user', content: 'The JSON you returned failed schema validation. Fix it and return valid JSON only.' },
+        ])
+        const parsed2 = JSON.parse(raw)
+        if (validate(parsed2)) result = parsed2
+      }
+    } catch (e) {
+      console.error('ai-product-setup Claude error:', e)
+    }
+
+    if (!result) {
+      return new Response(JSON.stringify({ error: 'Failed to generate valid product config' }), {
+        status: 502, headers: { ...CORS, 'Content-Type': 'application/json' },
+      })
+    }
+
+    await incrementMonthlyUsage(supabase, tenantId, 'ai_setup')
+
+    return new Response(JSON.stringify(result), {
+      headers: { ...CORS, 'Content-Type': 'application/json' },
     })
+
+  } catch (err) {
+    console.error(JSON.stringify({
+      severity: 'error',
+      function: 'ai-product-setup',
+      error:    err instanceof Error ? err.message : String(err),
+      stack:    err instanceof Error ? err.stack   : undefined,
+    }))
+    throw err
   }
-
-  await incrementMonthlyUsage(supabase, tenantId, 'ai_setup')
-
-  return new Response(JSON.stringify(result), {
-    headers: { ...CORS, 'Content-Type': 'application/json' },
-  })
 })

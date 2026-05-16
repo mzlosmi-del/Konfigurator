@@ -137,166 +137,177 @@ const corsHeaders = {
 // ── Main handler ───────────────────────────────────────────────────────────
 
 Deno.serve(async (req: Request) => {
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
-  }
-  if (req.method !== 'POST') {
-    return new Response('Method not allowed', { status: 405, headers: corsHeaders })
-  }
-
-  const supabaseUrl    = Deno.env.get('SUPABASE_URL')!
-  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-  const resendApiKey   = Deno.env.get('RESEND_API_KEY')!
-
-  // ── 1. Verify caller is an authenticated admin ──────────────────────────
-  const authHeader = req.headers.get('Authorization')
-  if (!authHeader) {
-    return new Response('Unauthorized', { status: 401, headers: corsHeaders })
-  }
-  const userClient = createClient(supabaseUrl, Deno.env.get('SUPABASE_ANON_KEY')!, {
-    global: { headers: { Authorization: authHeader } },
-  })
-  const { data: { user }, error: authErr } = await userClient.auth.getUser()
-  if (authErr || !user) {
-    return new Response('Unauthorized', { status: 401, headers: corsHeaders })
-  }
-
-  // ── 2. Parse request body ───────────────────────────────────────────────
-  let inquiry_id: string
-  let expires_at: string | null
   try {
-    const body = await req.json()
-    inquiry_id = body.inquiry_id
-    expires_at = body.expires_at ?? null
-    if (!inquiry_id) throw new Error('missing inquiry_id')
-  } catch {
-    return new Response('Bad request', { status: 400, headers: corsHeaders })
-  }
-
-  if (!resendApiKey) {
-    console.error('generate-quote: RESEND_API_KEY not set')
-    return new Response('Email provider not configured', { status: 500, headers: corsHeaders })
-  }
-
-  // Service-role client bypasses RLS for data fetching
-  const sb = createClient(supabaseUrl, serviceRoleKey)
-
-  try {
-    // ── 3. Fetch inquiry ──────────────────────────────────────────────────
-    const { data: inquiryData, error: inqErr } = await sb
-      .from('inquiries')
-      .select('id, tenant_id, product_id, customer_name, customer_email, message, configuration, total_price, currency, created_at')
-      .eq('id', inquiry_id)
-      .single()
-
-    if (inqErr || !inquiryData) {
-      console.error('generate-quote: inquiry not found', inqErr)
-      return new Response('Inquiry not found', { status: 404, headers: corsHeaders })
+    if (req.method === 'OPTIONS') {
+      return new Response('ok', { headers: corsHeaders })
     }
-    const inq = inquiryData as InquiryRow
+    if (req.method !== 'POST') {
+      return new Response('Method not allowed', { status: 405, headers: corsHeaders })
+    }
 
-    // ── 4. Fetch product & tenant ─────────────────────────────────────────
-    const [{ data: productData }, { data: tenantData }] = await Promise.all([
-      sb.from('products').select('name').eq('id', inq.product_id).single(),
-      sb.from('tenants').select('name').eq('id', inq.tenant_id).single(),
-    ])
+    const supabaseUrl    = Deno.env.get('SUPABASE_URL')!
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    const resendApiKey   = Deno.env.get('RESEND_API_KEY')!
 
-    const productName = (productData as ProductRow | null)?.name ?? 'Unknown product'
-    const tenantName  = (tenantData as TenantRow | null)?.name ?? 'Your store'
-
-    // ── Plan gate: quotations feature ─────────────────────────────────────
-    const limits = await loadPlanLimits(sb, inq.tenant_id)
-    if (!limits) return new Response('Tenant not found', { status: 404, headers: corsHeaders })
-    const featureGate = assertFeature('quotations', limits, corsHeaders)
-    if (featureGate) return featureGate
-
-    // ── 5. Generate PDF ───────────────────────────────────────────────────
-    const pdfBytes = await buildQuotePdf({
-      tenantName,
-      productName,
-      inquiry: inq,
-      expiresAt: expires_at,
+    // ── 1. Verify caller is an authenticated admin ──────────────────────────
+    const authHeader = req.headers.get('Authorization')
+    if (!authHeader) {
+      return new Response('Unauthorized', { status: 401, headers: corsHeaders })
+    }
+    const userClient = createClient(supabaseUrl, Deno.env.get('SUPABASE_ANON_KEY')!, {
+      global: { headers: { Authorization: authHeader } },
     })
+    const { data: { user }, error: authErr } = await userClient.auth.getUser()
+    if (authErr || !user) {
+      return new Response('Unauthorized', { status: 401, headers: corsHeaders })
+    }
 
-    // ── 6. Upload PDF to Supabase Storage ─────────────────────────────────
-    const quoteId  = crypto.randomUUID()
-    const filePath = `${inq.tenant_id}/${quoteId}.pdf`
+    // ── 2. Parse request body ───────────────────────────────────────────────
+    let inquiry_id: string
+    let expires_at: string | null
+    try {
+      const body = await req.json()
+      inquiry_id = body.inquiry_id
+      expires_at = body.expires_at ?? null
+      if (!inquiry_id) throw new Error('missing inquiry_id')
+    } catch {
+      return new Response('Bad request', { status: 400, headers: corsHeaders })
+    }
 
-    const { error: uploadErr } = await sb.storage
-      .from('quotes')
-      .upload(filePath, pdfBytes, {
-        contentType: 'application/pdf',
-        upsert: false,
+    if (!resendApiKey) {
+      console.error('generate-quote: RESEND_API_KEY not set')
+      return new Response('Email provider not configured', { status: 500, headers: corsHeaders })
+    }
+
+    // Service-role client bypasses RLS for data fetching
+    const sb = createClient(supabaseUrl, serviceRoleKey)
+
+    try {
+      // ── 3. Fetch inquiry ──────────────────────────────────────────────────
+      const { data: inquiryData, error: inqErr } = await sb
+        .from('inquiries')
+        .select('id, tenant_id, product_id, customer_name, customer_email, message, configuration, total_price, currency, created_at')
+        .eq('id', inquiry_id)
+        .single()
+
+      if (inqErr || !inquiryData) {
+        console.error('generate-quote: inquiry not found', inqErr)
+        return new Response('Inquiry not found', { status: 404, headers: corsHeaders })
+      }
+      const inq = inquiryData as InquiryRow
+
+      // ── 4. Fetch product & tenant ─────────────────────────────────────────
+      const [{ data: productData }, { data: tenantData }] = await Promise.all([
+        sb.from('products').select('name').eq('id', inq.product_id).single(),
+        sb.from('tenants').select('name').eq('id', inq.tenant_id).single(),
+      ])
+
+      const productName = (productData as ProductRow | null)?.name ?? 'Unknown product'
+      const tenantName  = (tenantData as TenantRow | null)?.name ?? 'Your store'
+
+      // ── Plan gate: quotations feature ─────────────────────────────────────
+      const limits = await loadPlanLimits(sb, inq.tenant_id)
+      if (!limits) return new Response('Tenant not found', { status: 404, headers: corsHeaders })
+      const featureGate = assertFeature('quotations', limits, corsHeaders)
+      if (featureGate) return featureGate
+
+      // ── 5. Generate PDF ───────────────────────────────────────────────────
+      const pdfBytes = await buildQuotePdf({
+        tenantName,
+        productName,
+        inquiry: inq,
+        expiresAt: expires_at,
       })
 
-    if (uploadErr) {
-      console.error('generate-quote: storage upload failed', uploadErr)
-      return new Response('Failed to store PDF', { status: 500, headers: corsHeaders })
-    }
+      // ── 6. Upload PDF to Supabase Storage ─────────────────────────────────
+      const quoteId  = crypto.randomUUID()
+      const filePath = `${inq.tenant_id}/${quoteId}.pdf`
 
-    const { data: { publicUrl } } = sb.storage.from('quotes').getPublicUrl(filePath)
+      const { error: uploadErr } = await sb.storage
+        .from('quotes')
+        .upload(filePath, pdfBytes, {
+          contentType: 'application/pdf',
+          upsert: false,
+        })
 
-    // ── 7. Insert quotes row ──────────────────────────────────────────────
-    const { data: quoteRow, error: insertErr } = await sb
-      .from('quotes')
-      .insert({
-        id:         quoteId,
-        inquiry_id: inq.id,
-        tenant_id:  inq.tenant_id,
-        pdf_url:    publicUrl,
-        expires_at: expires_at ?? null,
-        status:     'sent',
+      if (uploadErr) {
+        console.error('generate-quote: storage upload failed', uploadErr)
+        return new Response('Failed to store PDF', { status: 500, headers: corsHeaders })
+      }
+
+      const { data: { publicUrl } } = sb.storage.from('quotes').getPublicUrl(filePath)
+
+      // ── 7. Insert quotes row ──────────────────────────────────────────────
+      const { data: quoteRow, error: insertErr } = await sb
+        .from('quotes')
+        .insert({
+          id:         quoteId,
+          inquiry_id: inq.id,
+          tenant_id:  inq.tenant_id,
+          pdf_url:    publicUrl,
+          expires_at: expires_at ?? null,
+          status:     'sent',
+        })
+        .select()
+        .single()
+
+      if (insertErr) {
+        console.error('generate-quote: quote insert failed', insertErr)
+        return new Response('Failed to save quote record', { status: 500, headers: corsHeaders })
+      }
+
+      // ── 8. Send email to customer via Resend ──────────────────────────────
+      const config = Array.isArray(inq.configuration) ? inq.configuration : []
+      const html   = buildEmailHtml({ tenantName, productName, inquiry: inq, expiresAt: expires_at, pdfUrl: publicUrl })
+
+      const pdfBase64 = btoa(String.fromCharCode(...pdfBytes))
+
+      const emailRes = await fetch('https://api.resend.com/emails', {
+        method:  'POST',
+        headers: {
+          'Authorization': `Bearer ${resendApiKey}`,
+          'Content-Type':  'application/json',
+        },
+        body: JSON.stringify({
+          from:    await getFromAddress(sb, inq.tenant_id),
+          to:      [inq.customer_email],
+          subject: `Your quote for ${productName}`,
+          html,
+          attachments: [
+            {
+              filename: `quote-${quoteId.slice(0, 8)}.pdf`,
+              content:  pdfBase64,
+            },
+          ],
+        }),
       })
-      .select()
-      .single()
 
-    if (insertErr) {
-      console.error('generate-quote: quote insert failed', insertErr)
-      return new Response('Failed to save quote record', { status: 500, headers: corsHeaders })
+      if (!emailRes.ok) {
+        const body = await emailRes.text()
+        console.error('generate-quote: Resend error', emailRes.status, body)
+        // Don't fail the whole request — quote is saved, just email bounced
+        console.warn('generate-quote: email failed but quote was saved')
+      } else {
+        console.log(`generate-quote: quote ${quoteId} sent to ${inq.customer_email}`)
+      }
+
+      return new Response(JSON.stringify({ quote_id: quoteId, pdf_url: publicUrl, ...quoteRow }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+
+    } catch (err) {
+      console.error('generate-quote: unexpected error', err)
+      return new Response('Internal error', { status: 500, headers: corsHeaders })
     }
-
-    // ── 8. Send email to customer via Resend ──────────────────────────────
-    const config = Array.isArray(inq.configuration) ? inq.configuration : []
-    const html   = buildEmailHtml({ tenantName, productName, inquiry: inq, expiresAt: expires_at, pdfUrl: publicUrl })
-
-    const pdfBase64 = btoa(String.fromCharCode(...pdfBytes))
-
-    const emailRes = await fetch('https://api.resend.com/emails', {
-      method:  'POST',
-      headers: {
-        'Authorization': `Bearer ${resendApiKey}`,
-        'Content-Type':  'application/json',
-      },
-      body: JSON.stringify({
-        from:    await getFromAddress(sb, inq.tenant_id),
-        to:      [inq.customer_email],
-        subject: `Your quote for ${productName}`,
-        html,
-        attachments: [
-          {
-            filename: `quote-${quoteId.slice(0, 8)}.pdf`,
-            content:  pdfBase64,
-          },
-        ],
-      }),
-    })
-
-    if (!emailRes.ok) {
-      const body = await emailRes.text()
-      console.error('generate-quote: Resend error', emailRes.status, body)
-      // Don't fail the whole request — quote is saved, just email bounced
-      console.warn('generate-quote: email failed but quote was saved')
-    } else {
-      console.log(`generate-quote: quote ${quoteId} sent to ${inq.customer_email}`)
-    }
-
-    return new Response(JSON.stringify({ quote_id: quoteId, pdf_url: publicUrl, ...quoteRow }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
 
   } catch (err) {
-    console.error('generate-quote: unexpected error', err)
-    return new Response('Internal error', { status: 500, headers: corsHeaders })
+    console.error(JSON.stringify({
+      severity: 'error',
+      function: 'generate-quote',
+      error:    err instanceof Error ? err.message : String(err),
+      stack:    err instanceof Error ? err.stack   : undefined,
+    }))
+    throw err
   }
 })
 

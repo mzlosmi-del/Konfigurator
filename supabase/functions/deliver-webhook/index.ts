@@ -73,111 +73,122 @@ async function enrichInquiryPayload(
 }
 
 Deno.serve(async (req: Request) => {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: CORS })
-  }
-  if (req.method !== 'POST') {
-    return new Response('Method not allowed', { status: 405 })
-  }
-
-  let body: DeliverBody
   try {
-    body = await req.json()
-    if (!body.event || !body.tenant_id || !body.payload) throw new Error('missing fields')
-  } catch {
-    return new Response('Bad request', { status: 400, headers: CORS })
-  }
-
-  const supabaseUrl    = Deno.env.get('SUPABASE_URL')!
-  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-  const sb = createClient(supabaseUrl, serviceRoleKey)
-
-  // Plan gate: short-circuit if the tenant's plan no longer includes webhooks.
-  // Catches the stale-plan window between subscription change and downgrade
-  // cleanup (apply_plan_downgrade flips enabled=false, but a delivery in
-  // flight could still race past it).
-  const { data: featureCheck } = await sb.rpc('tenant_has_feature', {
-    p_tenant_id: body.tenant_id,
-    p_feature:   'webhooks',
-  })
-  if (featureCheck === false) {
-    return new Response(JSON.stringify({ ok: true, delivered: 0, skipped: 'feature_disabled' }), {
-      headers: { ...CORS, 'Content-Type': 'application/json' },
-    })
-  }
-
-  // Enrich payload for inquiry events before delivery
-  const outPayload = body.event === 'inquiry.created'
-    ? await enrichInquiryPayload(body.payload, sb)
-    : body.payload
-
-  // Fetch enabled endpoints subscribed to this event
-  const { data: endpoints } = await sb
-    .from('webhook_endpoints')
-    .select('id, url, secret, events')
-    .eq('tenant_id', body.tenant_id)
-    .eq('enabled', true)
-
-  if (!endpoints?.length) {
-    return new Response(JSON.stringify({ ok: true, delivered: 0 }), {
-      headers: { ...CORS, 'Content-Type': 'application/json' },
-    })
-  }
-
-  const relevant = (endpoints as EndpointRow[]).filter(
-    ep => ep.events.length === 0 || ep.events.includes(body.event)
-  )
-
-  const payloadJson = JSON.stringify(outPayload)
-  let delivered = 0
-
-  await Promise.allSettled(relevant.map(async (ep) => {
-    const sig        = await hmacSha256(ep.secret, payloadJson)
-    const deliveryId = crypto.randomUUID()
-
-    // Insert pending delivery record
-    await sb.from('webhook_deliveries').insert({
-      id:          deliveryId,
-      endpoint_id: ep.id,
-      event:       body.event,
-      payload:     outPayload,
-      status:      'pending',
-      attempts:    1,
-      last_attempt_at: new Date().toISOString(),
-    })
-
-    let httpStatus = 0
-    let status: 'success' | 'failed' = 'failed'
-
-    try {
-      const res = await fetch(ep.url, {
-        method: 'POST',
-        headers: {
-          'Content-Type':          'application/json',
-          'X-Webhook-Event':       body.event,
-          'X-Webhook-Delivery':    deliveryId,
-          'X-Webhook-Signature':   `sha256=${sig}`,
-        },
-        body: payloadJson,
-        signal: AbortSignal.timeout(10_000),
-      })
-      httpStatus = res.status
-      status     = res.ok ? 'success' : 'failed'
-      if (res.ok) delivered++
-    } catch (err) {
-      console.warn(`deliver-webhook: fetch failed for ${ep.url}`, err)
+    if (req.method === 'OPTIONS') {
+      return new Response(null, { headers: CORS })
+    }
+    if (req.method !== 'POST') {
+      return new Response('Method not allowed', { status: 405 })
     }
 
-    // Update delivery record
-    await sb.from('webhook_deliveries').update({
-      status,
-      http_status: httpStatus || null,
-    }).eq('id', deliveryId)
-  }))
+    let body: DeliverBody
+    try {
+      body = await req.json()
+      if (!body.event || !body.tenant_id || !body.payload) throw new Error('missing fields')
+    } catch {
+      return new Response('Bad request', { status: 400, headers: CORS })
+    }
 
-  console.log(`deliver-webhook: event=${body.event} tenant=${body.tenant_id} delivered=${delivered}/${relevant.length}`)
+    const supabaseUrl    = Deno.env.get('SUPABASE_URL')!
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    const sb = createClient(supabaseUrl, serviceRoleKey)
 
-  return new Response(JSON.stringify({ ok: true, delivered }), {
-    headers: { ...CORS, 'Content-Type': 'application/json' },
-  })
+    // Plan gate: short-circuit if the tenant's plan no longer includes webhooks.
+    // Catches the stale-plan window between subscription change and downgrade
+    // cleanup (apply_plan_downgrade flips enabled=false, but a delivery in
+    // flight could still race past it).
+    const { data: featureCheck } = await sb.rpc('tenant_has_feature', {
+      p_tenant_id: body.tenant_id,
+      p_feature:   'webhooks',
+    })
+    if (featureCheck === false) {
+      return new Response(JSON.stringify({ ok: true, delivered: 0, skipped: 'feature_disabled' }), {
+        headers: { ...CORS, 'Content-Type': 'application/json' },
+      })
+    }
+
+    // Enrich payload for inquiry events before delivery
+    const outPayload = body.event === 'inquiry.created'
+      ? await enrichInquiryPayload(body.payload, sb)
+      : body.payload
+
+    // Fetch enabled endpoints subscribed to this event
+    const { data: endpoints } = await sb
+      .from('webhook_endpoints')
+      .select('id, url, secret, events')
+      .eq('tenant_id', body.tenant_id)
+      .eq('enabled', true)
+
+    if (!endpoints?.length) {
+      return new Response(JSON.stringify({ ok: true, delivered: 0 }), {
+        headers: { ...CORS, 'Content-Type': 'application/json' },
+      })
+    }
+
+    const relevant = (endpoints as EndpointRow[]).filter(
+      ep => ep.events.length === 0 || ep.events.includes(body.event)
+    )
+
+    const payloadJson = JSON.stringify(outPayload)
+    let delivered = 0
+
+    await Promise.allSettled(relevant.map(async (ep) => {
+      const sig        = await hmacSha256(ep.secret, payloadJson)
+      const deliveryId = crypto.randomUUID()
+
+      // Insert pending delivery record
+      await sb.from('webhook_deliveries').insert({
+        id:          deliveryId,
+        endpoint_id: ep.id,
+        event:       body.event,
+        payload:     outPayload,
+        status:      'pending',
+        attempts:    1,
+        last_attempt_at: new Date().toISOString(),
+      })
+
+      let httpStatus = 0
+      let status: 'success' | 'failed' = 'failed'
+
+      try {
+        const res = await fetch(ep.url, {
+          method: 'POST',
+          headers: {
+            'Content-Type':          'application/json',
+            'X-Webhook-Event':       body.event,
+            'X-Webhook-Delivery':    deliveryId,
+            'X-Webhook-Signature':   `sha256=${sig}`,
+          },
+          body: payloadJson,
+          signal: AbortSignal.timeout(10_000),
+        })
+        httpStatus = res.status
+        status     = res.ok ? 'success' : 'failed'
+        if (res.ok) delivered++
+      } catch (err) {
+        console.warn(`deliver-webhook: fetch failed for ${ep.url}`, err)
+      }
+
+      // Update delivery record
+      await sb.from('webhook_deliveries').update({
+        status,
+        http_status: httpStatus || null,
+      }).eq('id', deliveryId)
+    }))
+
+    console.log(`deliver-webhook: event=${body.event} tenant=${body.tenant_id} delivered=${delivered}/${relevant.length}`)
+
+    return new Response(JSON.stringify({ ok: true, delivered }), {
+      headers: { ...CORS, 'Content-Type': 'application/json' },
+    })
+
+  } catch (err) {
+    console.error(JSON.stringify({
+      severity: 'error',
+      function: 'deliver-webhook',
+      error:    err instanceof Error ? err.message : String(err),
+      stack:    err instanceof Error ? err.stack   : undefined,
+    }))
+    throw err
+  }
 })

@@ -10,48 +10,59 @@ const CORS = {
 }
 
 Deno.serve(async (req: Request) => {
-  if (req.method === 'OPTIONS') return new Response(null, { headers: CORS })
+  try {
+    if (req.method === 'OPTIONS') return new Response(null, { headers: CORS })
 
-  // Slug is the last non-empty path segment: /functions/v1/public-preview/{slug}
-  const slug = new URL(req.url).pathname.split('/').filter(Boolean).pop()
-  if (!slug) return new Response('Not found', { status: 404, headers: CORS })
+    // Slug is the last non-empty path segment: /functions/v1/public-preview/{slug}
+    const slug = new URL(req.url).pathname.split('/').filter(Boolean).pop()
+    if (!slug) return new Response('Not found', { status: 404, headers: CORS })
 
-  const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
 
-  // Anon RLS policy allows this only for published+enabled products
-  const { data: product } = await supabase
-    .from('products')
-    .select('id, tenant_id, name, description, widget_theme')
-    .eq('public_slug', slug)
-    .eq('status', 'published')
-    .eq('public_preview_enabled', true)
-    .single()
+    // Anon RLS policy allows this only for published+enabled products
+    const { data: product } = await supabase
+      .from('products')
+      .select('id, tenant_id, name, description, widget_theme')
+      .eq('public_slug', slug)
+      .eq('status', 'published')
+      .eq('public_preview_enabled', true)
+      .single()
 
-  if (!product) {
-    return new Response(notFoundPage(), {
-      status: 404,
+    if (!product) {
+      return new Response(notFoundPage(), {
+        status: 404,
+        headers: { ...CORS, 'Content-Type': 'text/html; charset=utf-8' },
+      })
+    }
+
+    const { data: tenant } = await supabase
+      .from('tenants')
+      .select('name, plan, logo_url, favicon_url, public_page_title')
+      .eq('id', product.tenant_id)
+      .single()
+
+    const { data: limits } = await supabase
+      .from('plan_limits')
+      .select('remove_branding, white_label')
+      .eq('plan', tenant?.plan ?? 'free')
+      .single()
+
+    const showBranding = !(limits?.remove_branding ?? false)
+    const whiteLabel   = limits?.white_label ?? false
+
+    return new Response(buildPage(product, tenant, showBranding, whiteLabel), {
       headers: { ...CORS, 'Content-Type': 'text/html; charset=utf-8' },
     })
+
+  } catch (err) {
+    console.error(JSON.stringify({
+      severity: 'error',
+      function: 'public-preview',
+      error:    err instanceof Error ? err.message : String(err),
+      stack:    err instanceof Error ? err.stack   : undefined,
+    }))
+    throw err
   }
-
-  const { data: tenant } = await supabase
-    .from('tenants')
-    .select('name, plan, logo_url, favicon_url, public_page_title')
-    .eq('id', product.tenant_id)
-    .single()
-
-  const { data: limits } = await supabase
-    .from('plan_limits')
-    .select('remove_branding, white_label')
-    .eq('plan', tenant?.plan ?? 'free')
-    .single()
-
-  const showBranding = !(limits?.remove_branding ?? false)
-  const whiteLabel   = limits?.white_label ?? false
-
-  return new Response(buildPage(product, tenant, showBranding, whiteLabel), {
-    headers: { ...CORS, 'Content-Type': 'text/html; charset=utf-8' },
-  })
 })
 
 // ── HTML builders ─────────────────────────────────────────────────────────────

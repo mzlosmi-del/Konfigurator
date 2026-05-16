@@ -48,65 +48,76 @@ function json(payload: unknown, status = 200): Response {
 }
 
 Deno.serve(async (req: Request) => {
-  if (req.method === 'OPTIONS') return new Response(null, { headers: CORS })
-  if (req.method !== 'POST')    return json({ error: 'Method not allowed' }, 405)
-
-  const supabaseUrl    = Deno.env.get('SUPABASE_URL')!
-  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-  const resendApiKey   = Deno.env.get('RESEND_API_KEY')
-  if (!resendApiKey) return json({ error: 'RESEND_API_KEY not configured' }, 500)
-
-  // ── Auth ──────────────────────────────────────────────────────────────────
-  const authHeader = req.headers.get('Authorization')
-  if (!authHeader) return json({ error: 'Unauthorized' }, 401)
-
-  const userClient = createClient(supabaseUrl, Deno.env.get('SUPABASE_ANON_KEY')!, {
-    global: { headers: { Authorization: authHeader } },
-  })
-  const { data: { user } } = await userClient.auth.getUser()
-  if (!user) return json({ error: 'Unauthorized' }, 401)
-
-  const sb = createClient(supabaseUrl, serviceRoleKey)
-  const { data: profile } = await sb
-    .from('profiles').select('tenant_id, role').eq('id', user.id).single()
-  if (!profile) return json({ error: 'Profile not found' }, 404)
-  if ((profile as { role: string }).role !== 'admin') {
-    return json({ error: 'Admin only' }, 403)
-  }
-  const tenantId = (profile as { tenant_id: string }).tenant_id
-
-  // ── Plan gate (white_label feature) ───────────────────────────────────────
-  // Resolve plan + feature flag via the SQL helper. Mirrors the shape that
-  // _shared/planGate.ts produces for consistent client-side parsing.
-  const { data: tenantRow } = await sb
-    .from('tenants').select('plan').eq('id', tenantId).single()
-  const plan = (tenantRow as { plan: string } | null)?.plan ?? 'free'
-  const { data: hasFeature } = await sb.rpc('tenant_has_feature', {
-    p_tenant_id: tenantId,
-    p_feature:   'white_label',
-  })
-  if (hasFeature !== true) {
-    return json({
-      code:       'PLAN_LIMIT_EXCEEDED',
-      dimension:  'white_label',
-      plan,
-      upgrade_to: 'scale',
-    }, 403)
-  }
-
-  // ── Dispatch ──────────────────────────────────────────────────────────────
-  let body: { action?: string; domain?: string }
   try {
-    body = await req.json()
-  } catch {
-    return json({ error: 'Bad request' }, 400)
-  }
+    if (req.method === 'OPTIONS') return new Response(null, { headers: CORS })
+    if (req.method !== 'POST')    return json({ error: 'Method not allowed' }, 405)
 
-  switch (body.action) {
-    case 'register': return handleRegister(body.domain ?? '', sb, tenantId, resendApiKey)
-    case 'status':   return handleStatus(sb, tenantId, resendApiKey)
-    case 'remove':   return handleRemove(sb, tenantId, resendApiKey)
-    default:         return json({ error: 'Unknown action' }, 400)
+    const supabaseUrl    = Deno.env.get('SUPABASE_URL')!
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    const resendApiKey   = Deno.env.get('RESEND_API_KEY')
+    if (!resendApiKey) return json({ error: 'RESEND_API_KEY not configured' }, 500)
+
+    // ── Auth ──────────────────────────────────────────────────────────────────
+    const authHeader = req.headers.get('Authorization')
+    if (!authHeader) return json({ error: 'Unauthorized' }, 401)
+
+    const userClient = createClient(supabaseUrl, Deno.env.get('SUPABASE_ANON_KEY')!, {
+      global: { headers: { Authorization: authHeader } },
+    })
+    const { data: { user } } = await userClient.auth.getUser()
+    if (!user) return json({ error: 'Unauthorized' }, 401)
+
+    const sb = createClient(supabaseUrl, serviceRoleKey)
+    const { data: profile } = await sb
+      .from('profiles').select('tenant_id, role').eq('id', user.id).single()
+    if (!profile) return json({ error: 'Profile not found' }, 404)
+    if ((profile as { role: string }).role !== 'admin') {
+      return json({ error: 'Admin only' }, 403)
+    }
+    const tenantId = (profile as { tenant_id: string }).tenant_id
+
+    // ── Plan gate (white_label feature) ───────────────────────────────────────
+    // Resolve plan + feature flag via the SQL helper. Mirrors the shape that
+    // _shared/planGate.ts produces for consistent client-side parsing.
+    const { data: tenantRow } = await sb
+      .from('tenants').select('plan').eq('id', tenantId).single()
+    const plan = (tenantRow as { plan: string } | null)?.plan ?? 'free'
+    const { data: hasFeature } = await sb.rpc('tenant_has_feature', {
+      p_tenant_id: tenantId,
+      p_feature:   'white_label',
+    })
+    if (hasFeature !== true) {
+      return json({
+        code:       'PLAN_LIMIT_EXCEEDED',
+        dimension:  'white_label',
+        plan,
+        upgrade_to: 'scale',
+      }, 403)
+    }
+
+    // ── Dispatch ──────────────────────────────────────────────────────────────
+    let body: { action?: string; domain?: string }
+    try {
+      body = await req.json()
+    } catch {
+      return json({ error: 'Bad request' }, 400)
+    }
+
+    switch (body.action) {
+      case 'register': return handleRegister(body.domain ?? '', sb, tenantId, resendApiKey)
+      case 'status':   return handleStatus(sb, tenantId, resendApiKey)
+      case 'remove':   return handleRemove(sb, tenantId, resendApiKey)
+      default:         return json({ error: 'Unknown action' }, 400)
+    }
+
+  } catch (err) {
+    console.error(JSON.stringify({
+      severity: 'error',
+      function: 'verify-email-domain',
+      error:    err instanceof Error ? err.message : String(err),
+      stack:    err instanceof Error ? err.stack   : undefined,
+    }))
+    throw err
   }
 })
 

@@ -13,33 +13,44 @@ const IFRAME_HEADERS = {
 }
 
 Deno.serve(async (req: Request) => {
-  if (req.method === 'OPTIONS') return new Response(null, { headers: IFRAME_HEADERS })
+  try {
+    if (req.method === 'OPTIONS') return new Response(null, { headers: IFRAME_HEADERS })
 
-  // Slug is the last non-empty path segment: /functions/v1/embed/{slug}
-  const slug = new URL(req.url).pathname.split('/').filter(Boolean).pop()
-  if (!slug) return new Response('Not found', { status: 404, headers: IFRAME_HEADERS })
+    // Slug is the last non-empty path segment: /functions/v1/embed/{slug}
+    const slug = new URL(req.url).pathname.split('/').filter(Boolean).pop()
+    if (!slug) return new Response('Not found', { status: 404, headers: IFRAME_HEADERS })
 
-  const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
 
-  // Anon RLS policy allows this only for published+enabled products
-  const { data: product } = await supabase
-    .from('products')
-    .select('id, tenant_id, name')
-    .eq('public_slug', slug)
-    .eq('status', 'published')
-    .eq('public_preview_enabled', true)
-    .single()
+    // Anon RLS policy allows this only for published+enabled products
+    const { data: product } = await supabase
+      .from('products')
+      .select('id, tenant_id, name')
+      .eq('public_slug', slug)
+      .eq('status', 'published')
+      .eq('public_preview_enabled', true)
+      .single()
 
-  if (!product) {
-    return new Response('', {
-      status: 404,
+    if (!product) {
+      return new Response('', {
+        status: 404,
+        headers: { ...IFRAME_HEADERS, 'Content-Type': 'text/html; charset=utf-8' },
+      })
+    }
+
+    return new Response(buildEmbed(product as { id: string; tenant_id: string; name: string }), {
       headers: { ...IFRAME_HEADERS, 'Content-Type': 'text/html; charset=utf-8' },
     })
-  }
 
-  return new Response(buildEmbed(product as { id: string; tenant_id: string; name: string }), {
-    headers: { ...IFRAME_HEADERS, 'Content-Type': 'text/html; charset=utf-8' },
-  })
+  } catch (err) {
+    console.error(JSON.stringify({
+      severity: 'error',
+      function: 'embed',
+      error:    err instanceof Error ? err.message : String(err),
+      stack:    err instanceof Error ? err.stack   : undefined,
+    }))
+    throw err
+  }
 })
 
 function h(s: string): string {

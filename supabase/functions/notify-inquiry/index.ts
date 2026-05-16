@@ -53,149 +53,160 @@ interface UserRow    { email: string } // from auth.users
 // ── Main handler ───────────────────────────────────────────────────────────
 
 Deno.serve(async (req: Request) => {
-  // Only accept POST
-  if (req.method !== 'POST') {
-    return new Response('Method not allowed', { status: 405 })
-  }
-
-  let inquiry_id: string
   try {
-    const body = await req.json()
-    inquiry_id = body.inquiry_id
-    if (!inquiry_id) throw new Error('missing inquiry_id')
-  } catch {
-    return new Response('Bad request', { status: 400 })
-  }
-
-  const supabaseUrl     = Deno.env.get('SUPABASE_URL')!
-  const serviceRoleKey  = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-  const resendApiKey    = Deno.env.get('RESEND_API_KEY')!
-
-  if (!resendApiKey) {
-    console.error('notify-inquiry: RESEND_API_KEY not set')
-    return new Response('Email provider not configured', { status: 500 })
-  }
-
-  // Service role client — bypasses RLS to read all tenant data
-  const sb = createClient(supabaseUrl, serviceRoleKey)
-
-  try {
-    // ── 1. Fetch inquiry ────────────────────────────────────────────────────
-    const { data: inquiry, error: inqErr } = await sb
-      .from('inquiries')
-      .select('id, tenant_id, product_id, customer_name, customer_email, message, configuration, total_price, currency, created_at')
-      .eq('id', inquiry_id)
-      .single()
-
-    if (inqErr || !inquiry) {
-      console.error('notify-inquiry: inquiry not found', inqErr)
-      return new Response('Inquiry not found', { status: 404 })
+    // Only accept POST
+    if (req.method !== 'POST') {
+      return new Response('Method not allowed', { status: 405 })
     }
 
-    const inq = inquiry as InquiryRow
+    let inquiry_id: string
+    try {
+      const body = await req.json()
+      inquiry_id = body.inquiry_id
+      if (!inquiry_id) throw new Error('missing inquiry_id')
+    } catch {
+      return new Response('Bad request', { status: 400 })
+    }
 
-    // ── 2. Fetch product name ───────────────────────────────────────────────
-    const { data: product } = await sb
-      .from('products')
-      .select('name')
-      .eq('id', inq.product_id)
-      .single()
+    const supabaseUrl     = Deno.env.get('SUPABASE_URL')!
+    const serviceRoleKey  = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    const resendApiKey    = Deno.env.get('RESEND_API_KEY')!
 
-    const productName = (product as ProductRow | null)?.name ?? 'Unknown product'
+    if (!resendApiKey) {
+      console.error('notify-inquiry: RESEND_API_KEY not set')
+      return new Response('Email provider not configured', { status: 500 })
+    }
 
-    // ── 3. Resolve notification email ───────────────────────────────────────
-    // Priority: tenant.notification_email → admin user's auth email
-    const { data: tenant } = await sb
-      .from('tenants')
-      .select('name, notification_email')
-      .eq('id', inq.tenant_id)
-      .single()
+    // Service role client — bypasses RLS to read all tenant data
+    const sb = createClient(supabaseUrl, serviceRoleKey)
 
-    const tenantRow = tenant as TenantRow | null
-    let toEmail = tenantRow?.notification_email ?? null
-
-    if (!toEmail) {
-      // Fall back to the email of the first admin profile for this tenant
-      const { data: profile } = await sb
-        .from('profiles')
-        .select('id')
-        .eq('tenant_id', inq.tenant_id)
-        .eq('role', 'admin')
-        .order('created_at', { ascending: true })
-        .limit(1)
+    try {
+      // ── 1. Fetch inquiry ────────────────────────────────────────────────────
+      const { data: inquiry, error: inqErr } = await sb
+        .from('inquiries')
+        .select('id, tenant_id, product_id, customer_name, customer_email, message, configuration, total_price, currency, created_at')
+        .eq('id', inquiry_id)
         .single()
 
-      if (profile) {
-        const { data: { user } } = await sb.auth.admin.getUserById((profile as ProfileRow).id)
-        toEmail = (user as UserRow | null)?.email ?? null
+      if (inqErr || !inquiry) {
+        console.error('notify-inquiry: inquiry not found', inqErr)
+        return new Response('Inquiry not found', { status: 404 })
       }
-    }
 
-    if (!toEmail) {
-      console.error('notify-inquiry: no notification email found for tenant', inq.tenant_id)
-      return new Response('No recipient email configured', { status: 422 })
-    }
+      const inq = inquiry as InquiryRow
 
-    // ── 4. Build and send email ─────────────────────────────────────────────
-    const html = buildEmailHtml({
-      tenantName:    tenantRow?.name ?? 'Your store',
-      productName,
-      inquiry:       inq,
-    })
+      // ── 2. Fetch product name ───────────────────────────────────────────────
+      const { data: product } = await sb
+        .from('products')
+        .select('name')
+        .eq('id', inq.product_id)
+        .single()
 
-    const res = await fetch('https://api.resend.com/emails', {
-      method:  'POST',
-      headers: {
-        'Authorization': `Bearer ${resendApiKey}`,
-        'Content-Type':  'application/json',
-      },
-      body: JSON.stringify({
-        from:    await getFromAddress(sb, inq.tenant_id),
-        to:      [toEmail],
-        subject: `New inquiry: ${productName} from ${inq.customer_name}`,
-        html,
-      }),
-    })
+      const productName = (product as ProductRow | null)?.name ?? 'Unknown product'
 
-    if (!res.ok) {
-      const body = await res.text()
-      console.error('notify-inquiry: Resend error', res.status, body)
-      return new Response('Email send failed', { status: 502 })
-    }
+      // ── 3. Resolve notification email ───────────────────────────────────────
+      // Priority: tenant.notification_email → admin user's auth email
+      const { data: tenant } = await sb
+        .from('tenants')
+        .select('name, notification_email')
+        .eq('id', inq.tenant_id)
+        .single()
 
-    console.log(`notify-inquiry: sent for inquiry ${inquiry_id} to ${toEmail}`)
+      const tenantRow = tenant as TenantRow | null
+      let toEmail = tenantRow?.notification_email ?? null
 
-    // Fire-and-forget webhook delivery — don't block the response on this
-    fetch(`${supabaseUrl}/functions/v1/deliver-webhook`, {
-      method: 'POST',
-      headers: {
-        'Content-Type':  'application/json',
-        'Authorization': `Bearer ${serviceRoleKey}`,
-      },
-      body: JSON.stringify({
-        event:     'inquiry.created',
-        tenant_id: inq.tenant_id,
-        payload: {
-          inquiry_id:     inq.id,
-          customer_name:  inq.customer_name,
-          customer_email: inq.customer_email,
-          product_name:   productName,
-          product_id:     inq.product_id,
-          total_price:    inq.total_price,
-          currency:       inq.currency,
-          configuration:  inq.configuration,
-          created_at:     inq.created_at,
+      if (!toEmail) {
+        // Fall back to the email of the first admin profile for this tenant
+        const { data: profile } = await sb
+          .from('profiles')
+          .select('id')
+          .eq('tenant_id', inq.tenant_id)
+          .eq('role', 'admin')
+          .order('created_at', { ascending: true })
+          .limit(1)
+          .single()
+
+        if (profile) {
+          const { data: { user } } = await sb.auth.admin.getUserById((profile as ProfileRow).id)
+          toEmail = (user as UserRow | null)?.email ?? null
+        }
+      }
+
+      if (!toEmail) {
+        console.error('notify-inquiry: no notification email found for tenant', inq.tenant_id)
+        return new Response('No recipient email configured', { status: 422 })
+      }
+
+      // ── 4. Build and send email ─────────────────────────────────────────────
+      const html = buildEmailHtml({
+        tenantName:    tenantRow?.name ?? 'Your store',
+        productName,
+        inquiry:       inq,
+      })
+
+      const res = await fetch('https://api.resend.com/emails', {
+        method:  'POST',
+        headers: {
+          'Authorization': `Bearer ${resendApiKey}`,
+          'Content-Type':  'application/json',
         },
-      }),
-    }).catch(err => console.warn('notify-inquiry: deliver-webhook call failed', err))
+        body: JSON.stringify({
+          from:    await getFromAddress(sb, inq.tenant_id),
+          to:      [toEmail],
+          subject: `New inquiry: ${productName} from ${inq.customer_name}`,
+          html,
+        }),
+      })
 
-    return new Response(JSON.stringify({ ok: true }), {
-      headers: { 'Content-Type': 'application/json' },
-    })
+      if (!res.ok) {
+        const body = await res.text()
+        console.error('notify-inquiry: Resend error', res.status, body)
+        return new Response('Email send failed', { status: 502 })
+      }
+
+      console.log(`notify-inquiry: sent for inquiry ${inquiry_id} to ${toEmail}`)
+
+      // Fire-and-forget webhook delivery — don't block the response on this
+      fetch(`${supabaseUrl}/functions/v1/deliver-webhook`, {
+        method: 'POST',
+        headers: {
+          'Content-Type':  'application/json',
+          'Authorization': `Bearer ${serviceRoleKey}`,
+        },
+        body: JSON.stringify({
+          event:     'inquiry.created',
+          tenant_id: inq.tenant_id,
+          payload: {
+            inquiry_id:     inq.id,
+            customer_name:  inq.customer_name,
+            customer_email: inq.customer_email,
+            product_name:   productName,
+            product_id:     inq.product_id,
+            total_price:    inq.total_price,
+            currency:       inq.currency,
+            configuration:  inq.configuration,
+            created_at:     inq.created_at,
+          },
+        }),
+      }).catch(err => console.warn('notify-inquiry: deliver-webhook call failed', err))
+
+      return new Response(JSON.stringify({ ok: true }), {
+        headers: { 'Content-Type': 'application/json' },
+      })
+
+    } catch (err) {
+      console.error('notify-inquiry: unexpected error', err)
+      return new Response('Internal error', { status: 500 })
+    }
 
   } catch (err) {
-    console.error('notify-inquiry: unexpected error', err)
-    return new Response('Internal error', { status: 500 })
+    console.error(JSON.stringify({
+      severity: 'error',
+      function: 'notify-inquiry',
+      error:    err instanceof Error ? err.message : String(err),
+      stack:    err instanceof Error ? err.stack   : undefined,
+    }))
+    throw err
   }
 })
 

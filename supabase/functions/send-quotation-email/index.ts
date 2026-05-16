@@ -170,207 +170,218 @@ function buildEmailHtml(args: EmailArgs): string {
 // ── Handler ──────────────────────────────────────────────────────────────────
 
 Deno.serve(async (req: Request) => {
-  if (req.method === 'OPTIONS') return new Response(null, { headers: CORS })
-  if (req.method !== 'POST')    return json({ error: 'Method not allowed' }, 405)
-
-  const supabaseUrl    = Deno.env.get('SUPABASE_URL')!
-  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-  const resendApiKey   = Deno.env.get('RESEND_API_KEY')
-  const publicAppUrl   = (Deno.env.get('PUBLIC_APP_URL') ?? DEFAULT_APP).replace(/\/$/, '')
-  if (!resendApiKey) return json({ error: 'RESEND_API_KEY not configured' }, 500)
-
-  // ── Auth ──────────────────────────────────────────────────────────────────
-  const authHeader = req.headers.get('Authorization')
-  if (!authHeader) return json({ error: 'Unauthorized' }, 401)
-
-  const userClient = createClient(supabaseUrl, Deno.env.get('SUPABASE_ANON_KEY')!, {
-    global: { headers: { Authorization: authHeader } },
-  })
-  const { data: { user } } = await userClient.auth.getUser()
-  if (!user) return json({ error: 'Unauthorized' }, 401)
-
-  // ── Body ──────────────────────────────────────────────────────────────────
-  let body: {
-    quotation_id?:    string
-    lang?:            string
-    subject?:         string
-    intro_paragraph?: string
-    to_email?:        string
-  }
-  try { body = await req.json() } catch { return json({ error: 'Bad request' }, 400) }
-  const quotationId = String(body?.quotation_id ?? '').trim()
-  if (!quotationId) return json({ error: 'quotation_id required' }, 400)
-
-  // Optional UI overrides — admin user can tweak Subject / Intro / To from
-  // the "Send to customer" preview dialog before pressing Send.
-  const subjectOverride = typeof body.subject === 'string'
-    ? body.subject.trim().slice(0, 256)
-    : null
-  const introOverride = typeof body.intro_paragraph === 'string'
-    ? body.intro_paragraph.slice(0, 2000)
-    : null
-  const toOverride = typeof body.to_email === 'string' ? body.to_email.trim() : null
-  if (toOverride && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(toOverride)) {
-    return json({ error: 'Invalid to_email' }, 400)
-  }
-
-  // ── Load quotation through user client (RLS enforces tenancy) ─────────────
-  const { data: quotation, error: qErr } = await userClient
-    .from('quotations')
-    .select('id, tenant_id, reference_number, customer_name, customer_email, currency, total_price, valid_until, status, pdf_url, public_token, lang')
-    .eq('id', quotationId)
-    .single()
-  if (qErr || !quotation) return json({ error: 'Quotation not found' }, 404)
-
-  // Lang lives on the quotation (set during Confirm & Generate PDF). Body
-  // override is accepted for backwards compat with old callers.
-  const lang: 'en' | 'sr' = body?.lang === 'sr' || quotation.lang === 'sr' ? 'sr' : 'en'
-
-  if (!quotation.customer_email) {
-    return json({ error: 'Quotation has no customer email' }, 400)
-  }
-  if (!quotation.pdf_url) {
-    return json({ error: 'PDF not generated yet — confirm the quotation first' }, 400)
-  }
-  if (!quotation.public_token) {
-    return json({ error: 'Quotation token missing — re-confirm to assign one' }, 400)
-  }
-  if (quotation.status !== 'confirmed' && quotation.status !== 'sent') {
-    return json({ error: `Cannot send a quotation in status "${quotation.status}"` }, 400)
-  }
-
-  // ── Service-role for tenant lookup + from-address resolver ────────────────
-  const sb = createClient(supabaseUrl, serviceRoleKey)
-  const fromEmail = await getFromAddress(sb, quotation.tenant_id)
-
-  const { data: tenant } = await sb
-    .from('tenants')
-    .select('name')
-    .eq('id', quotation.tenant_id)
-    .single()
-  const tenantRow = tenant as { name: string } | null
-  const tenantName  = tenantRow?.name ?? 'Your store'
-
-  // Look up the `quotation_email_intro` slot from `tenant_texts` (migration
-  // 076). Falls back to the other language when the chosen one is empty.
-  const { data: introRows } = await sb
-    .from('tenant_texts')
-    .select('language, content')
-    .eq('tenant_id', quotation.tenant_id)
-    .eq('level', 'tenant')
-    .is('reference_id', null)
-    .eq('slot', 'quotation_email_intro')
-  const introList = (introRows ?? []) as { language: string; content: string }[]
-  const introByLang = (l: string) => introList.find(r => r.language === l && r.content.trim())?.content ?? null
-  const tenantIntro = introByLang(lang) ?? introByLang(lang === 'en' ? 'sr' : 'en')
-  // Per-send override (from the preview dialog) wins over the tenant default.
-  const customIntro = introOverride !== null ? introOverride : tenantIntro
-
-  // ── Fetch PDF bytes ───────────────────────────────────────────────────────
-  let pdfBytes: ArrayBuffer
   try {
-    const pdfRes = await fetch(quotation.pdf_url)
-    if (!pdfRes.ok) {
-      return json({ error: 'Failed to fetch stored PDF', detail: pdfRes.statusText }, 502)
-    }
-    pdfBytes = await pdfRes.arrayBuffer()
-  } catch (e) {
-    return json({ error: 'Failed to fetch stored PDF', detail: String(e) }, 502)
-  }
-  const pdfBase64 = arrayBufferToBase64(pdfBytes)
+    if (req.method === 'OPTIONS') return new Response(null, { headers: CORS })
+    if (req.method !== 'POST')    return json({ error: 'Method not allowed' }, 405)
 
-  // ── Extra attachments persisted on the quotation ─────────────────────────
-  // 20 MB total cap (PDF + all extra attachments) keeps every email under
-  // the size most receiving servers will accept and matches the limit we
-  // surface in the admin UI.
-  const MAX_EMAIL_BYTES = 20 * 1024 * 1024
-  const extraAttachments: { filename: string; content: string }[] = []
-  let totalBytes = pdfBytes.byteLength
+    const supabaseUrl    = Deno.env.get('SUPABASE_URL')!
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    const resendApiKey   = Deno.env.get('RESEND_API_KEY')
+    const publicAppUrl   = (Deno.env.get('PUBLIC_APP_URL') ?? DEFAULT_APP).replace(/\/$/, '')
+    if (!resendApiKey) return json({ error: 'RESEND_API_KEY not configured' }, 500)
 
-  const { data: attachmentRows } = await sb
-    .from('quotation_attachments')
-    .select('storage_path, filename, size_bytes')
-    .eq('quotation_id', quotation.id)
-  const rows = (attachmentRows ?? []) as { storage_path: string; filename: string; size_bytes: number }[]
+    // ── Auth ──────────────────────────────────────────────────────────────────
+    const authHeader = req.headers.get('Authorization')
+    if (!authHeader) return json({ error: 'Unauthorized' }, 401)
 
-  // Cheap up-front cap check using stored sizes.
-  totalBytes += rows.reduce((s, r) => s + Number(r.size_bytes || 0), 0)
-  if (totalBytes > MAX_EMAIL_BYTES) {
-    return json({
-      error:       'Email exceeds 20 MB size limit',
-      total_bytes: totalBytes,
-      max_bytes:   MAX_EMAIL_BYTES,
-    }, 413)
-  }
-
-  // Download each attachment through the service-role storage client and
-  // base64-encode it for Resend.
-  for (const row of rows) {
-    const { data: blob, error: dlErr } = await sb.storage
-      .from('quotation-attachments')
-      .download(row.storage_path)
-    if (dlErr || !blob) {
-      console.error('send-quotation-email attachment download failed', row.storage_path, dlErr)
-      return json({ error: 'Failed to fetch attachment', filename: row.filename }, 502)
-    }
-    const buf = await blob.arrayBuffer()
-    extraAttachments.push({
-      filename: row.filename,
-      content:  arrayBufferToBase64(buf),
+    const userClient = createClient(supabaseUrl, Deno.env.get('SUPABASE_ANON_KEY')!, {
+      global: { headers: { Authorization: authHeader } },
     })
+    const { data: { user } } = await userClient.auth.getUser()
+    if (!user) return json({ error: 'Unauthorized' }, 401)
+
+    // ── Body ──────────────────────────────────────────────────────────────────
+    let body: {
+      quotation_id?:    string
+      lang?:            string
+      subject?:         string
+      intro_paragraph?: string
+      to_email?:        string
+    }
+    try { body = await req.json() } catch { return json({ error: 'Bad request' }, 400) }
+    const quotationId = String(body?.quotation_id ?? '').trim()
+    if (!quotationId) return json({ error: 'quotation_id required' }, 400)
+
+    // Optional UI overrides — admin user can tweak Subject / Intro / To from
+    // the "Send to customer" preview dialog before pressing Send.
+    const subjectOverride = typeof body.subject === 'string'
+      ? body.subject.trim().slice(0, 256)
+      : null
+    const introOverride = typeof body.intro_paragraph === 'string'
+      ? body.intro_paragraph.slice(0, 2000)
+      : null
+    const toOverride = typeof body.to_email === 'string' ? body.to_email.trim() : null
+    if (toOverride && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(toOverride)) {
+      return json({ error: 'Invalid to_email' }, 400)
+    }
+
+    // ── Load quotation through user client (RLS enforces tenancy) ─────────────
+    const { data: quotation, error: qErr } = await userClient
+      .from('quotations')
+      .select('id, tenant_id, reference_number, customer_name, customer_email, currency, total_price, valid_until, status, pdf_url, public_token, lang')
+      .eq('id', quotationId)
+      .single()
+    if (qErr || !quotation) return json({ error: 'Quotation not found' }, 404)
+
+    // Lang lives on the quotation (set during Confirm & Generate PDF). Body
+    // override is accepted for backwards compat with old callers.
+    const lang: 'en' | 'sr' = body?.lang === 'sr' || quotation.lang === 'sr' ? 'sr' : 'en'
+
+    if (!quotation.customer_email) {
+      return json({ error: 'Quotation has no customer email' }, 400)
+    }
+    if (!quotation.pdf_url) {
+      return json({ error: 'PDF not generated yet — confirm the quotation first' }, 400)
+    }
+    if (!quotation.public_token) {
+      return json({ error: 'Quotation token missing — re-confirm to assign one' }, 400)
+    }
+    if (quotation.status !== 'confirmed' && quotation.status !== 'sent') {
+      return json({ error: `Cannot send a quotation in status "${quotation.status}"` }, 400)
+    }
+
+    // ── Service-role for tenant lookup + from-address resolver ────────────────
+    const sb = createClient(supabaseUrl, serviceRoleKey)
+    const fromEmail = await getFromAddress(sb, quotation.tenant_id)
+
+    const { data: tenant } = await sb
+      .from('tenants')
+      .select('name')
+      .eq('id', quotation.tenant_id)
+      .single()
+    const tenantRow = tenant as { name: string } | null
+    const tenantName  = tenantRow?.name ?? 'Your store'
+
+    // Look up the `quotation_email_intro` slot from `tenant_texts` (migration
+    // 076). Falls back to the other language when the chosen one is empty.
+    const { data: introRows } = await sb
+      .from('tenant_texts')
+      .select('language, content')
+      .eq('tenant_id', quotation.tenant_id)
+      .eq('level', 'tenant')
+      .is('reference_id', null)
+      .eq('slot', 'quotation_email_intro')
+    const introList = (introRows ?? []) as { language: string; content: string }[]
+    const introByLang = (l: string) => introList.find(r => r.language === l && r.content.trim())?.content ?? null
+    const tenantIntro = introByLang(lang) ?? introByLang(lang === 'en' ? 'sr' : 'en')
+    // Per-send override (from the preview dialog) wins over the tenant default.
+    const customIntro = introOverride !== null ? introOverride : tenantIntro
+
+    // ── Fetch PDF bytes ───────────────────────────────────────────────────────
+    let pdfBytes: ArrayBuffer
+    try {
+      const pdfRes = await fetch(quotation.pdf_url)
+      if (!pdfRes.ok) {
+        return json({ error: 'Failed to fetch stored PDF', detail: pdfRes.statusText }, 502)
+      }
+      pdfBytes = await pdfRes.arrayBuffer()
+    } catch (e) {
+      return json({ error: 'Failed to fetch stored PDF', detail: String(e) }, 502)
+    }
+    const pdfBase64 = arrayBufferToBase64(pdfBytes)
+
+    // ── Extra attachments persisted on the quotation ─────────────────────────
+    // 20 MB total cap (PDF + all extra attachments) keeps every email under
+    // the size most receiving servers will accept and matches the limit we
+    // surface in the admin UI.
+    const MAX_EMAIL_BYTES = 20 * 1024 * 1024
+    const extraAttachments: { filename: string; content: string }[] = []
+    let totalBytes = pdfBytes.byteLength
+
+    const { data: attachmentRows } = await sb
+      .from('quotation_attachments')
+      .select('storage_path, filename, size_bytes')
+      .eq('quotation_id', quotation.id)
+    const rows = (attachmentRows ?? []) as { storage_path: string; filename: string; size_bytes: number }[]
+
+    // Cheap up-front cap check using stored sizes.
+    totalBytes += rows.reduce((s, r) => s + Number(r.size_bytes || 0), 0)
+    if (totalBytes > MAX_EMAIL_BYTES) {
+      return json({
+        error:       'Email exceeds 20 MB size limit',
+        total_bytes: totalBytes,
+        max_bytes:   MAX_EMAIL_BYTES,
+      }, 413)
+    }
+
+    // Download each attachment through the service-role storage client and
+    // base64-encode it for Resend.
+    for (const row of rows) {
+      const { data: blob, error: dlErr } = await sb.storage
+        .from('quotation-attachments')
+        .download(row.storage_path)
+      if (dlErr || !blob) {
+        console.error('send-quotation-email attachment download failed', row.storage_path, dlErr)
+        return json({ error: 'Failed to fetch attachment', filename: row.filename }, 502)
+      }
+      const buf = await blob.arrayBuffer()
+      extraAttachments.push({
+        filename: row.filename,
+        content:  arrayBufferToBase64(buf),
+      })
+    }
+
+    // ── Build + send ──────────────────────────────────────────────────────────
+    const publicUrl = `${publicAppUrl}/q/${quotation.public_token}`
+    const html      = buildEmailHtml({
+      tenantName,
+      customerName:    quotation.customer_name,
+      referenceNumber: quotation.reference_number,
+      totalPrice:      quotation.total_price,
+      currency:        quotation.currency,
+      validUntil:      quotation.valid_until,
+      publicUrl,
+      lang,
+      customIntro,
+    })
+    const subject = subjectOverride && subjectOverride.length > 0
+      ? subjectOverride
+      : COPY[lang].subject(quotation.reference_number, tenantName)
+    const toEmail = toOverride ?? quotation.customer_email
+
+    const emailRes = await fetch('https://api.resend.com/emails', {
+      method:  'POST',
+      headers: {
+        'Authorization': `Bearer ${resendApiKey}`,
+        'Content-Type':  'application/json',
+      },
+      body: JSON.stringify({
+        from:    fromEmail,
+        to:      [toEmail],
+        subject,
+        html,
+        attachments: [
+          {
+            filename: `quotation-${quotation.reference_number}.pdf`,
+            content:  pdfBase64,
+          },
+          ...extraAttachments,
+        ],
+      }),
+    })
+
+    if (!emailRes.ok) {
+      const text = await emailRes.text()
+      console.error('send-quotation-email Resend error', text)
+      return json({ error: 'Resend send failed', detail: text }, 502)
+    }
+
+    // Flip status to 'sent'. Idempotent on resend — the row was already
+    // 'sent' in that case so this just bumps updated_at.
+    await sb
+      .from('quotations')
+      .update({ status: 'sent', updated_at: new Date().toISOString() })
+      .eq('id', quotation.id)
+
+    return json({ ok: true, sent_to: toEmail, public_url: publicUrl })
+
+  } catch (err) {
+    console.error(JSON.stringify({
+      severity: 'error',
+      function: 'send-quotation-email',
+      error:    err instanceof Error ? err.message : String(err),
+      stack:    err instanceof Error ? err.stack   : undefined,
+    }))
+    throw err
   }
-
-  // ── Build + send ──────────────────────────────────────────────────────────
-  const publicUrl = `${publicAppUrl}/q/${quotation.public_token}`
-  const html      = buildEmailHtml({
-    tenantName,
-    customerName:    quotation.customer_name,
-    referenceNumber: quotation.reference_number,
-    totalPrice:      quotation.total_price,
-    currency:        quotation.currency,
-    validUntil:      quotation.valid_until,
-    publicUrl,
-    lang,
-    customIntro,
-  })
-  const subject = subjectOverride && subjectOverride.length > 0
-    ? subjectOverride
-    : COPY[lang].subject(quotation.reference_number, tenantName)
-  const toEmail = toOverride ?? quotation.customer_email
-
-  const emailRes = await fetch('https://api.resend.com/emails', {
-    method:  'POST',
-    headers: {
-      'Authorization': `Bearer ${resendApiKey}`,
-      'Content-Type':  'application/json',
-    },
-    body: JSON.stringify({
-      from:    fromEmail,
-      to:      [toEmail],
-      subject,
-      html,
-      attachments: [
-        {
-          filename: `quotation-${quotation.reference_number}.pdf`,
-          content:  pdfBase64,
-        },
-        ...extraAttachments,
-      ],
-    }),
-  })
-
-  if (!emailRes.ok) {
-    const text = await emailRes.text()
-    console.error('send-quotation-email Resend error', text)
-    return json({ error: 'Resend send failed', detail: text }, 502)
-  }
-
-  // Flip status to 'sent'. Idempotent on resend — the row was already
-  // 'sent' in that case so this just bumps updated_at.
-  await sb
-    .from('quotations')
-    .update({ status: 'sent', updated_at: new Date().toISOString() })
-    .eq('id', quotation.id)
-
-  return json({ ok: true, sent_to: toEmail, public_url: publicUrl })
 })

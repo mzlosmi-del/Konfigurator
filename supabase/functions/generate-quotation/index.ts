@@ -135,92 +135,103 @@ interface TenantRow { name: string }
 // ── Main handler ───────────────────────────────────────────────────────────
 
 Deno.serve(async (req: Request) => {
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
-  }
-  if (req.method !== 'POST') {
-    return new Response('Method not allowed', { status: 405, headers: corsHeaders })
-  }
-
-  const supabaseUrl    = Deno.env.get('SUPABASE_URL')!
-  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-
-  // Require authentication — callers must pass a valid user JWT
-  const authHeader = req.headers.get('Authorization')
-  if (!authHeader?.startsWith('Bearer ')) {
-    return new Response('Unauthorized', { status: 401, headers: corsHeaders })
-  }
-  const userClient = createClient(supabaseUrl, Deno.env.get('SUPABASE_ANON_KEY')!, {
-    global: { headers: { Authorization: authHeader } },
-  })
-  const { data: { user }, error: authErr } = await userClient.auth.getUser()
-  if (authErr || !user) {
-    return new Response('Unauthorized', { status: 401, headers: corsHeaders })
-  }
-
-  const sb = createClient(supabaseUrl, serviceRoleKey)
-
-  let quotation_id: string
   try {
-    const body = await req.json()
-    quotation_id = body.quotation_id
-    if (!quotation_id) throw new Error('missing quotation_id')
-  } catch {
-    return new Response('Bad request', { status: 400, headers: corsHeaders })
-  }
-
-  try {
-    const { data: qData, error: qErr } = await sb
-      .from('quotations')
-      .select('*')
-      .eq('id', quotation_id)
-      .single()
-
-    if (qErr || !qData) {
-      return new Response('Quotation not found', { status: 404, headers: corsHeaders })
+    if (req.method === 'OPTIONS') {
+      return new Response('ok', { headers: corsHeaders })
     }
-    const quotation = qData as QuotationRow
+    if (req.method !== 'POST') {
+      return new Response('Method not allowed', { status: 405, headers: corsHeaders })
+    }
 
-    const { data: tenantData } = await sb
-      .from('tenants')
-      .select('name')
-      .eq('id', quotation.tenant_id)
-      .single()
-    const tenantName = (tenantData as TenantRow | null)?.name ?? 'Your store'
+    const supabaseUrl    = Deno.env.get('SUPABASE_URL')!
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 
-    // ── Plan gate: quotations feature ──────────────────────────────────────
-    const limits = await loadPlanLimits(sb, quotation.tenant_id)
-    if (!limits) return new Response('Tenant not found', { status: 404, headers: corsHeaders })
-    const featureGate = assertFeature('quotations', limits, corsHeaders)
-    if (featureGate) return featureGate
+    // Require authentication — callers must pass a valid user JWT
+    const authHeader = req.headers.get('Authorization')
+    if (!authHeader?.startsWith('Bearer ')) {
+      return new Response('Unauthorized', { status: 401, headers: corsHeaders })
+    }
+    const userClient = createClient(supabaseUrl, Deno.env.get('SUPABASE_ANON_KEY')!, {
+      global: { headers: { Authorization: authHeader } },
+    })
+    const { data: { user }, error: authErr } = await userClient.auth.getUser()
+    if (authErr || !user) {
+      return new Response('Unauthorized', { status: 401, headers: corsHeaders })
+    }
 
-    const pdfBytes = await buildQuotationPdf({ tenantName, quotation })
+    const sb = createClient(supabaseUrl, serviceRoleKey)
 
-    const filePath = `${quotation.tenant_id}/quotations/${quotation_id}.pdf`
+    let quotation_id: string
+    try {
+      const body = await req.json()
+      quotation_id = body.quotation_id
+      if (!quotation_id) throw new Error('missing quotation_id')
+    } catch {
+      return new Response('Bad request', { status: 400, headers: corsHeaders })
+    }
 
-    const { error: uploadErr } = await sb.storage
-      .from('quotes')
-      .upload(filePath, pdfBytes, {
-        contentType: 'application/pdf',
-        upsert: true,
+    try {
+      const { data: qData, error: qErr } = await sb
+        .from('quotations')
+        .select('*')
+        .eq('id', quotation_id)
+        .single()
+
+      if (qErr || !qData) {
+        return new Response('Quotation not found', { status: 404, headers: corsHeaders })
+      }
+      const quotation = qData as QuotationRow
+
+      const { data: tenantData } = await sb
+        .from('tenants')
+        .select('name')
+        .eq('id', quotation.tenant_id)
+        .single()
+      const tenantName = (tenantData as TenantRow | null)?.name ?? 'Your store'
+
+      // ── Plan gate: quotations feature ──────────────────────────────────────
+      const limits = await loadPlanLimits(sb, quotation.tenant_id)
+      if (!limits) return new Response('Tenant not found', { status: 404, headers: corsHeaders })
+      const featureGate = assertFeature('quotations', limits, corsHeaders)
+      if (featureGate) return featureGate
+
+      const pdfBytes = await buildQuotationPdf({ tenantName, quotation })
+
+      const filePath = `${quotation.tenant_id}/quotations/${quotation_id}.pdf`
+
+      const { error: uploadErr } = await sb.storage
+        .from('quotes')
+        .upload(filePath, pdfBytes, {
+          contentType: 'application/pdf',
+          upsert: true,
+        })
+
+      if (uploadErr) {
+        console.error('generate-quotation: storage upload failed', uploadErr)
+        return new Response('Failed to store PDF', { status: 500, headers: corsHeaders })
+      }
+
+      const { data: { publicUrl } } = sb.storage.from('quotes').getPublicUrl(filePath)
+
+      await sb.from('quotations').update({ pdf_url: publicUrl }).eq('id', quotation_id)
+
+      return new Response(JSON.stringify({ pdf_url: publicUrl }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
 
-    if (uploadErr) {
-      console.error('generate-quotation: storage upload failed', uploadErr)
-      return new Response('Failed to store PDF', { status: 500, headers: corsHeaders })
+    } catch (err) {
+      console.error('generate-quotation: unexpected error', err)
+      return new Response('Internal error', { status: 500, headers: corsHeaders })
     }
 
-    const { data: { publicUrl } } = sb.storage.from('quotes').getPublicUrl(filePath)
-
-    await sb.from('quotations').update({ pdf_url: publicUrl }).eq('id', quotation_id)
-
-    return new Response(JSON.stringify({ pdf_url: publicUrl }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
-
   } catch (err) {
-    console.error('generate-quotation: unexpected error', err)
-    return new Response('Internal error', { status: 500, headers: corsHeaders })
+    console.error(JSON.stringify({
+      severity: 'error',
+      function: 'generate-quotation',
+      error:    err instanceof Error ? err.message : String(err),
+      stack:    err instanceof Error ? err.stack   : undefined,
+    }))
+    throw err
   }
 })
 
