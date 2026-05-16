@@ -166,6 +166,7 @@ export interface Database {
           email_from_verified: boolean
           resend_domain_id:    string | null
           favicon_url:         string | null
+          show_powered_by:     boolean
           paid_until:          string | null
           current_period_end:  string | null
           cancel_at_period_end: boolean

@@ -113,6 +113,8 @@ export function SettingsPage() {
   const [faviconUrl,       setFaviconUrl]       = useState(tenant?.favicon_url ?? '')
   const [publicPageTitle,  setPublicPageTitle]  = useState('')
   const [savingPublicBrand, setSavingPublicBrand] = useState(false)
+  const [showPoweredBy,    setShowPoweredBy]    = useState(tenant?.show_powered_by ?? true)
+  const [savingShowPoweredBy, setSavingShowPoweredBy] = useState(false)
 
   const [emailIntroEn,    setEmailIntroEn]    = useState('')
   const [emailIntroSr,    setEmailIntroSr]    = useState('')
@@ -127,6 +129,7 @@ export function SettingsPage() {
     (tenant?.email_from_address ?? '').split('@')[1] ?? ''
   )
   const [emailDomainRecords, setEmailDomainRecords] = useState<Array<{ name: string; type: string; value: string; status?: string }>>([])
+  const [emailDomainStatus,  setEmailDomainStatus]  = useState<string | null>(null)
   const [savingDomain, setSavingDomain]     = useState(false)
   const [checkingDomain, setCheckingDomain] = useState(false)
   const [removingDomain, setRemovingDomain] = useState(false)
@@ -190,8 +193,9 @@ export function SettingsPage() {
         body: { action: 'register', domain },
       })
       if (error) throw error
-      const records = (data as { records?: Array<{ name: string; type: string; value: string; status?: string }> })?.records ?? []
-      setEmailDomainRecords(records)
+      const payload = data as { records?: Array<{ name: string; type: string; value: string; status?: string }>; status?: string }
+      setEmailDomainRecords(payload?.records ?? [])
+      setEmailDomainStatus(payload?.status ?? null)
       setEmailFromVerified(false)
       toast({ title: t('Domain registered. Add the DNS records below, then click Re-check.') })
     } catch (e) {
@@ -212,10 +216,11 @@ export function SettingsPage() {
         body: { action: 'status' },
       })
       if (error) throw error
-      const verified = (data as { verified?: boolean })?.verified === true
-      const records  = (data as { records?: Array<{ name: string; type: string; value: string; status?: string }> })?.records ?? []
+      const payload = data as { verified?: boolean; status?: string; records?: Array<{ name: string; type: string; value: string; status?: string }> }
+      const verified = payload?.verified === true
       setEmailFromVerified(verified)
-      setEmailDomainRecords(records)
+      setEmailDomainRecords(payload?.records ?? [])
+      setEmailDomainStatus(payload?.status ?? null)
       toast({ title: verified ? t('Domain verified') : t('Domain still pending verification') })
     } catch (e) {
       toast({
@@ -240,6 +245,7 @@ export function SettingsPage() {
       setEmailDomain('')
       setEmailFromVerified(false)
       setEmailDomainRecords([])
+      setEmailDomainStatus(null)
       toast({ title: t('Email domain removed') })
     } catch (e) {
       toast({
@@ -275,6 +281,38 @@ export function SettingsPage() {
       })
     } finally {
       setSavingFromAddress(false)
+    }
+  }
+
+  async function handleSaveShowPoweredBy(next: boolean) {
+    if (!tenant) return
+    setSavingShowPoweredBy(true)
+    const previous = showPoweredBy
+    setShowPoweredBy(next)
+    try {
+      const { error } = await supabase
+        .from('tenants')
+        .update({ show_powered_by: next } as unknown as never)
+        .eq('id', tenant.id)
+      if (error) throw error
+      logChange({
+        entityType: 'settings',
+        entityId:   tenant.id,
+        entityName: tenant.name ?? null,
+        changeType: 'update',
+        diff:       { [t("Show 'Powered by' footer")]: { old: previous, new: next } },
+        changedByName: userName,
+      })
+      toast({ title: t('Widget footer setting saved') })
+    } catch (e) {
+      setShowPoweredBy(previous)
+      toast({
+        title: t('Failed to save'),
+        description: e instanceof Error ? e.message : undefined,
+        variant: 'destructive',
+      })
+    } finally {
+      setSavingShowPoweredBy(false)
     }
   }
 
@@ -1215,6 +1253,36 @@ export function SettingsPage() {
 
         <Card>
           <CardHeader>
+            <CardTitle className="text-base">{t('Widget footer')}</CardTitle>
+            <CardDescription>
+              {planLimits?.remove_branding
+                ? t('Hide the "Powered by Configureout" footer in your embedded widget.')
+                : t('Available on Growth and Scale plans. The "Powered by Configureout" footer is shown on all widgets on this plan.')}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <label className="flex items-start gap-2 text-sm">
+              <input
+                type="checkbox"
+                className="mt-1"
+                checked={showPoweredBy}
+                disabled={!planLimits?.remove_branding || savingShowPoweredBy}
+                onChange={e => handleSaveShowPoweredBy(e.target.checked)}
+              />
+              <span>
+                {t('Show "Powered by Configureout" footer in widget')}
+                {!planLimits?.remove_branding && (
+                  <span className="block text-xs text-muted-foreground">
+                    {t('Locked on Free and Starter plans.')}
+                  </span>
+                )}
+              </span>
+            </label>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
             <CardTitle className="text-base">{t('Public page branding')}</CardTitle>
             <CardDescription>
               {planLimits?.white_label
@@ -1310,11 +1378,19 @@ export function SettingsPage() {
               </div>
             )}
 
-            {emailFromVerified && (
+            {emailFromVerified ? (
               <div className="rounded-md border-l-2 border-green-600 bg-green-50 dark:bg-green-950/40 px-3 py-2 text-xs">
                 {t('Domain verified. Emails will send from your address below.')}
               </div>
-            )}
+            ) : emailDomainRecords.length > 0 && (emailDomainStatus === 'failure' || emailDomainStatus === 'failed') ? (
+              <div className="rounded-md border-l-2 border-red-600 bg-red-50 dark:bg-red-950/40 px-3 py-2 text-xs">
+                {t('Verification failed. Double-check the DNS records, then re-check — or remove and re-register the domain.')}
+              </div>
+            ) : emailDomainRecords.length > 0 ? (
+              <div className="rounded-md border-l-2 border-amber-500 bg-amber-50 dark:bg-amber-950/40 px-3 py-2 text-xs">
+                {t('DNS records detected, waiting for propagation. This can take up to 48 hours — re-check periodically.')}
+              </div>
+            ) : null}
 
             <div className="flex flex-col sm:flex-row gap-2">
               <Input
@@ -1652,9 +1728,9 @@ export function SettingsPage() {
             {/* Plan cards */}
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               {([
-                { plan: 'starter', label: 'Starter', monthly: '49', annual: '490', features: ['25 products', '250 inquiries/mo', '3 team members', '3D models', 'Quotations'] },
-                { plan: 'growth',  label: 'Growth',  monthly: '149', annual: '1490', features: ['Unlimited products', '2000 inquiries/mo', '10 team members', 'Webhooks', 'Advanced analytics', 'Remove branding'] },
-                { plan: 'scale',   label: 'Scale',   monthly: '399', annual: '3990', features: ['Everything unlimited', 'White-label', 'Priority support'] },
+                { plan: 'starter', label: 'Starter', monthly: '49',  annual: '490',  features: ['10 products', 'Unlimited inquiries', '1 team member', 'Quotations'] },
+                { plan: 'growth',  label: 'Growth',  monthly: '129', annual: '1290', features: ['50 products', 'Unlimited inquiries', '3 team members', '3D models', 'Webhooks', 'Advanced analytics', 'Remove branding'] },
+                { plan: 'scale',   label: 'Scale',   monthly: '349', annual: '3490', features: ['Unlimited products', '10 team members', 'Full white-label', 'Priority support'] },
               ] as const).map(({ plan, label, monthly, annual, features }) => {
                 const isCurrent = tenant?.plan === plan
                 return (
