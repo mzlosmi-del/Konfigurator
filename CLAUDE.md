@@ -66,6 +66,9 @@ Multi-tenant SaaS product configurator. Three main pieces:
 ### Multi-tenancy & RLS
 Every data table has a `tenant_id uuid` column. All Supabase RLS policies gate access through `auth_tenant_id()`, a SQL function that resolves the current JWT's `tenant_id` claim. There are no application-level tenant filters — the DB enforces isolation automatically. When adding a new table, always add `tenant_id` + an RLS policy using `auth_tenant_id()`.
 
+### Plans & pricing
+Four tiers: **Free / Starter €49 / Growth €129 / Scale €349** (monthly; annual = ×10 = two months free). Limits live in `plan_limits` (migration 080 is the latest authoritative seed; migrations 029 + 039 set up the table). Stripe price IDs are passed to `stripe-webhook` as env vars `STRIPE_PRICE_<PLAN>_<MONTHLY|ANNUAL>`. The widget "Powered by Configureout" footer is gated by `plan_limits.remove_branding` (Growth+ can hide) **and** `tenants.show_powered_by` (per-tenant override, default true; Scale tenants default to false). Free/Starter cannot hide the footer regardless of the toggle — this is enforced inside the `get_widget_branding()` SQL function (migration 081).
+
 ### Database types
 `configurator-admin/src/types/database.ts` is hand-written (not generated). It must be updated manually whenever a migration adds or removes columns. Migrations are numbered sequentially as `migrations/NNN_description.sql`. There are no auto-generation scripts.
 
