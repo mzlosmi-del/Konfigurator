@@ -3,6 +3,7 @@ import {
   AlignmentType, BorderStyle,
   PageBreak, PageNumber, Footer,
   Bookmark, InternalHyperlink,
+  Table, TableRow, TableCell, WidthType,
 } from 'docx'
 import type {
   Quotation, TenantText, QuotationLineItem, QuotationConfigItem,
@@ -147,7 +148,7 @@ function specParagraphs(content: string): Paragraph[] {
     if (!trimmed) return []
     // 264 = 1.1 line spacing — tight executive density without feeling cramped.
     // 80 = 4pt paragraph spacing — clear separation between bullets/lines.
-    return [p([txt(line, { size: SZ.body, color: HEX.ink })], { lineSpacing: 264, spacingAfter: 80 })]
+    return [p([txt(line, { size: SZ.body, color: HEX.ink })], { lineSpacing: 264, spacingAfter: 80, align: AlignmentType.BOTH })]
   })
 }
 
@@ -158,51 +159,84 @@ function specParagraphs(content: string): Paragraph[] {
 // uploaded by the admin appears at the same visual weight as a full-size
 // render. This is the executive-doc convention: every figure looks like a
 // uniform plate, not a random collage of asset sizes.
-const IMG_TARGET_W = 480 // ~5" — comfortable on A4 with 0.75" side margins
-const IMG_TARGET_H = 320 // ~3.3" — caps tall portraits so they don't dominate
+const IMG_TARGET_W   = 480 // ~5" — comfortable on A4 with 0.75" side margins
+const IMG_TARGET_H   = 320 // ~3.3" — caps tall portraits so they don't dominate
+const IMG_PAIR_W     = 330 // per-image max width when two share a row (~3.4")
+const IMG_PAIR_H     = 280 // per-image max height in a 2-up row
+const IMAGES_PER_ROW = 2   // cap at 2; at 3 per row each slot is too narrow (~213px)
 
-function fitImage(natW: number, natH: number): { width: number; height: number } {
+function fitImage(
+  natW: number, natH: number,
+  maxW = IMG_TARGET_W, maxH = IMG_TARGET_H,
+): { width: number; height: number } {
   if (natW <= 0 || natH <= 0) {
-    // Unknown natural dims (e.g. probe failed) — fall back to a 3:2 plate
-    // at full target width.
-    return { width: IMG_TARGET_W, height: Math.round(IMG_TARGET_W * 2 / 3) }
+    return { width: maxW, height: Math.round(maxW * 2 / 3) }
   }
-  // Fit within IMG_TARGET_W × IMG_TARGET_H, allowing upscale for visual
-  // consistency. min() with no `1` cap means small images get enlarged.
-  const ratio = Math.min(IMG_TARGET_W / natW, IMG_TARGET_H / natH)
+  const ratio = Math.min(maxW / natW, maxH / natH)
   return {
     width:  Math.round(natW * ratio),
     height: Math.round(natH * ratio),
   }
 }
 
-async function imageParagraph(url: string): Promise<Paragraph | null> {
-  const loaded = await loadLogoBytes(url) // reuses generic loader
-  if (!loaded) return null
-  const { width, height } = fitImage(loaded.width, loaded.height)
-  return new Paragraph({
-    alignment: AlignmentType.CENTER,
-    // 80/100 twips = 4pt/5pt — tight gutter around the image.
-    spacing: { before: 80, after: 100 },
-    children: [new ImageRun({
-      data: loaded.bytes,
-      type: loaded.extension,
-      transformation: { width, height },
-    } as unknown as ConstructorParameters<typeof ImageRun>[0])],
-  })
-}
+const NIL_BORDER = { style: BorderStyle.NIL, size: 0, color: 'FFFFFF' }
 
-async function imagesForAssets(assets: VisualizationAsset[]): Promise<Paragraph[]> {
+async function imagesRowElements(assets: VisualizationAsset[]): Promise<(Paragraph | Table)[]> {
   const ordered = [...assets].sort((a, b) => {
     if (a.is_default !== b.is_default) return a.is_default ? -1 : 1
     return (a.sort_order ?? 0) - (b.sort_order ?? 0)
   })
-  const paragraphs: Paragraph[] = []
-  for (const asset of ordered) {
-    const para = await imageParagraph(asset.url)
-    if (para) paragraphs.push(para)
+
+  // Load all in parallel — avoids the sequential latency of the old for-loop.
+  const loaded = await Promise.all(ordered.map(a => loadLogoBytes(a.url)))
+  const valid  = loaded.filter((x): x is NonNullable<typeof x> => x !== null)
+  if (valid.length === 0) return []
+
+  const elements: (Paragraph | Table)[] = []
+
+  for (let i = 0; i < valid.length; i += IMAGES_PER_ROW) {
+    const chunk = valid.slice(i, i + IMAGES_PER_ROW)
+
+    if (chunk.length === 1) {
+      // Single image — full-width slot, same as the original behaviour.
+      const { width, height } = fitImage(chunk[0].width, chunk[0].height)
+      elements.push(new Paragraph({
+        alignment: AlignmentType.CENTER,
+        spacing: { before: 80, after: 100 },
+        children: [new ImageRun({
+          data: chunk[0].bytes,
+          type: chunk[0].extension,
+          transformation: { width, height },
+        } as unknown as ConstructorParameters<typeof ImageRun>[0])],
+      }))
+    } else {
+      // Two images — borderless table so both cells top-align independently
+      // of their heights (inline siblings in one paragraph would baseline-align).
+      elements.push(new Table({
+        width:   { size: 100, type: WidthType.PERCENTAGE },
+        borders: { top: NIL_BORDER, bottom: NIL_BORDER, left: NIL_BORDER, right: NIL_BORDER, insideHorizontal: NIL_BORDER, insideVertical: NIL_BORDER },
+        rows: [new TableRow({
+          children: chunk.map(img => {
+            const { width, height } = fitImage(img.width, img.height, IMG_PAIR_W, IMG_PAIR_H)
+            return new TableCell({
+              borders: { top: NIL_BORDER, bottom: NIL_BORDER, left: NIL_BORDER, right: NIL_BORDER },
+              margins: { top: 80, bottom: 100 },
+              children: [new Paragraph({
+                alignment: AlignmentType.CENTER,
+                children: [new ImageRun({
+                  data: img.bytes,
+                  type: img.extension,
+                  transformation: { width, height },
+                } as unknown as ConstructorParameters<typeof ImageRun>[0])],
+              })],
+            })
+          }),
+        })],
+      }))
+    }
   }
-  return paragraphs
+
+  return elements
 }
 
 // ── Builder ────────────────────────────────────────────────────────────────
@@ -412,7 +446,7 @@ export async function buildQuotationTechSpecDocxBytes(args: BuildTechSpecArgs): 
   ]
 
   // ── Body chapters (matching the surviving structure) ────────────────────
-  const bodyChildren: Paragraph[] = []
+  const bodyChildren: (Paragraph | Table)[] = []
 
   for (let i = 0; i < survivors.length; i++) {
     const s          = survivors[i]
@@ -430,7 +464,7 @@ export async function buildQuotationTechSpecDocxBytes(args: BuildTechSpecArgs): 
 
     bodyChildren.push(...specParagraphs(s.productSpec))
     if (s.hasProductImages) {
-      bodyChildren.push(...(await imagesForAssets(productImages[s.item.product_id] ?? [])))
+      bodyChildren.push(...(await imagesRowElements(productImages[s.item.product_id] ?? [])))
     }
 
     for (let j = 0; j < s.children.length; j++) {
@@ -450,7 +484,7 @@ export async function buildQuotationTechSpecDocxBytes(args: BuildTechSpecArgs): 
       bodyChildren.push(...specParagraphs(c.charSpec))
       bodyChildren.push(...specParagraphs(c.valueSpec))
       if (c.hasValueImages) {
-        bodyChildren.push(...(await imagesForAssets(valueImages[c.entry.value_id] ?? [])))
+        bodyChildren.push(...(await imagesRowElements(valueImages[c.entry.value_id] ?? [])))
       }
     }
   }
