@@ -91,6 +91,7 @@ ${_}`}class V extends Error{constructor({message:e,code:r,cause:s,name:n}){var i
     border: 1px solid var(--cw-border);
     border-radius: var(--cw-radius);
     max-width: 720px;
+    margin: 0 auto;
     position: relative;
   }
 
