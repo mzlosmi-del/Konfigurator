@@ -1416,6 +1416,154 @@ const sr: Record<string, string> = {
   'Open Audit log':                        'Otvori Dnevnik izmena',
   'A detailed walkthrough for this chapter is on the way. For now, the page itself is mostly self-explanatory once you\'re there.':
     'Detaljan vodič za ovo poglavlje stiže uskoro. Za sada, sama stranica je uglavnom samoobjašnjavajuća kada je otvorite.',
+
+  // ── User manual: Rules sub-chapter ─────────────────────────────────────
+  'What it does:':                         'Šta radi:',
+  'When it fires:':                        'Kada se aktivira:',
+  'Deep dive below — editor anatomy, the six effect kinds, and three worked examples.':
+    'Detaljan prikaz ispod — anatomija editora, šest tipova efekata i tri primera iz prakse.',
+  'Deep dive below — editor anatomy, the available nodes and operators, and three worked examples.':
+    'Detaljan prikaz ispod — anatomija editora, dostupni čvorovi i operatori, i tri primera iz prakse.',
+  'Anatomy of a rule':                     'Anatomija pravila',
+  'Every rule is a pair: an IF block (the condition) and a THEN block (one or more effects).':
+    'Svako pravilo je par: IF blok (uslov) i THEN blok (jedan ili više efekata).',
+  'Rules editor — IF / THEN structure with a mode toggle, predicate rows, and effect rows.':
+    'Editor pravila — IF / THEN struktura sa biračem moda, redovima predikata i redovima efekata.',
+  'ALL match (AND)':                       'SVI ispunjeni (I)',
+  'ANY match (OR)':                        'BILO KOJI ispunjen (ILI)',
+  'Add predicate':                         'Dodaj predikat',
+  'ALL vs ANY':                            'SVI vs BILO KOJI',
+  'Effect kind':                           'Tip efekta',
+  'Delete row':                            'Obriši red',
+  'Predicates can be Value conditions (characteristic = / ≠ value) or Numeric conditions (numeric expression compared with > ≥ < ≤ = ≠). Add more predicates and pick ALL or ANY to combine them. Add as many effects as the rule needs — they all fire when the condition is met.':
+    'Predikati mogu biti uslovi po vrednosti (karakteristika = / ≠ vrednost) ili numerički uslovi (numerički izraz upoređen sa > ≥ < ≤ = ≠). Dodajte više predikata i odaberite SVI ili BILO KOJI da ih kombinujete. Dodajte koliko god efekata pravilo zahteva — svi se aktiviraju kada je uslov ispunjen.',
+
+  'The six effect kinds':                  'Šest tipova efekata',
+  'the value disappears from the widget UI as if it didn\'t exist.':
+    'vrednost nestaje iz vidžeta kao da ne postoji.',
+  'the value is still visible but greyed out — useful when you want the customer to see why an option is unavailable.':
+    'vrednost je i dalje vidljiva ali zasivljena — korisno kada želite da kupac vidi zašto opcija nije dostupna.',
+  'Set default (value)':                   'Postavi podrazumevano (vrednost)',
+  'auto-selects a value the moment the condition is met. The customer can still change it.':
+    'automatski bira vrednost čim je uslov ispunjen. Kupac i dalje može da je promeni.',
+  'forces a value and makes it read-only. Tick "Free of charge (included)" to waive its price modifier — useful when the locked value is bundled into another option\'s premium.':
+    'prinudno bira vrednost i čini je samo za čitanje. Označite "Bez naknade (uključeno)" da se odustane od modifikatora cene — korisno kada je zaključana vrednost uračunata u premiju druge opcije.',
+  'Set default (number)':                  'Postavi podrazumevano (broj)',
+  'sets a numeric input to the result of an expression (can reference other characteristics and constants).':
+    'postavlja numeričko polje na rezultat izraza (može da koristi druge karakteristike i konstante).',
+  'Lock number':                           'Zaključaj broj',
+  'same as above, but the field is read-only.':
+    'isto kao gore, ali polje je samo za čitanje.',
+
+  'Example 1 — hide impossible combinations': 'Primer 1 — sakrij nemoguće kombinacije',
+  'Removes the Triple glazing option from the widget entirely.':
+    'U potpunosti uklanja opciju Trostruko staklo iz vidžeta.',
+  'The instant the customer picks Opening = Fixed. If they switch back to a different opening, the Triple option reappears.':
+    'Čim kupac izabere Otvaranje = Fiksno. Ako se vrati na drugo otvaranje, Trostruka opcija se ponovo pojavljuje.',
+  'Why: fixed windows can\'t physically take triple glazing — the glazing needs a casement or tilt-turn mechanism. Hiding rather than disabling keeps the UI clean for the most common workflow.':
+    'Zašto: fiksni prozori fizički ne mogu da prime trostruko staklo — staklu je potreban krilni ili tilt-turn mehanizam. Sakrivanje umesto onemogućavanja čuva UI jednostavnim za najčešći tok rada.',
+  'Example 2 — lock a dependent default for free': 'Primer 2 — zaključaj zavisni podrazumevani izbor bez naknade',
+  'Forces the Handle to Brass and waives its +€20 modifier. The customer sees Brass pre-selected and read-only.':
+    'Prinudno postavlja Kvaku na Mesing i odustaje od modifikatora od +€20. Kupac vidi Mesing kao već izabran i samo za čitanje.',
+  'Whenever Wood is the selected Material. Switching to a different material releases the lock and the handle becomes editable again.':
+    'Svaki put kada je Drvo izabran Materijal. Prelazak na drugi materijal otpušta zaključavanje i kvaka ponovo postaje izmenjiva.',
+  'Why: the brass handle is bundled into the wood premium — charging again would double-bill. The "Free of charge (included)" checkbox on Lock value is exactly for this case.':
+    'Zašto: mesingana kvaka je uračunata u premiju za drvo — ponovna naplata bi bila duplo. Polje "Bez naknade (uključeno)" na Zaključaj vrednost je upravo za ovaj slučaj.',
+  'Example 3 — numeric guard':             'Primer 3 — numerički štit',
+  'Greys out the Single glazing option (still visible, not clickable).':
+    'Zasivljuje opciju Jednostruko staklo (i dalje vidljiva, ne može da se klikne).',
+  'Whenever the Width numeric input crosses 1200 mm. Drop it back below 1200 and Single glazing becomes selectable again.':
+    'Svaki put kada numerički unos Širine pređe 1200 mm. Vratite ga ispod 1200 i Jednostruko staklo ponovo postaje izborivo.',
+  'Why: single glazing isn\'t structurally sound for wide units. Disabling rather than hiding keeps the option visible so the customer understands why it\'s unavailable — better UX than silent removal.':
+    'Zašto: jednostruko staklo nije strukturno dovoljno za široke jedinice. Onemogućavanje umesto sakrivanja čuva opciju vidljivom kako bi kupac razumeo zašto nije dostupna — bolji UX od tihog uklanjanja.',
+
+  'Quick tips':                            'Brze beleške',
+  'Rules re-evaluate on every selection change — no save needed in the widget.':
+    'Pravila se ponovo procenjuju pri svakoj promeni izbora — nije potrebno čuvanje u vidžetu.',
+  'A single rule can have multiple effects — they all fire together when the condition is met.':
+    'Jedno pravilo može imati više efekata — svi se aktiviraju zajedno kada je uslov ispunjen.',
+  'Numeric conditions read the current value of the numeric input, not the modifier.':
+    'Numerički uslovi čitaju trenutnu vrednost numeričkog polja, ne modifikator.',
+  'If a rule\'s condition is not met, none of its effects apply — there\'s no "ELSE" — write a second rule with the opposite condition if you need one.':
+    'Ako uslov pravila nije ispunjen, nijedan efekat se ne primenjuje — nema "ELSE" — napišite drugo pravilo sa suprotnim uslovom ako vam treba.',
+  'Rules never affect price directly. To waive a price modifier, use Lock value with "Free of charge".':
+    'Pravila nikada ne utiču direktno na cenu. Da se odustane od modifikatora cene, koristite Zaključaj vrednost sa "Bez naknade".',
+
+  // ── User manual: Formula pricing sub-chapter ──────────────────────────
+  'Anatomy of a formula':                  'Anatomija formule',
+  'A formula is a tree of nodes — values at the leaves, operators at the branches. Add as many formulas as you need; their results are summed into the widget\'s total price.':
+    'Formula je stablo čvorova — vrednosti na listovima, operatori na granama. Dodajte koliko god formula vam treba; njihovi rezultati se sabiraju u ukupnu cenu vidžeta.',
+  'Formula editor — existing formulas listed on top, the new-formula card below with a template picker and the node-type tree builder.':
+    'Editor formula — postojeće formule navedene na vrhu, kartica za novu formulu ispod sa biračem šablona i graditeljem stabla čvorova.',
+  'NEW':                                   'NOVO',
+  'Template:':                             'Šablon:',
+  'Add node':                              'Dodaj čvor',
+  'Name your formula':                     'Imenujte formulu',
+  'Quick-start templates':                 'Brzi šabloni',
+  'Tree builder':                          'Graditelj stabla',
+  'Toggle active':                         'Uključi/isključi aktivno',
+  'Pick a template to scaffold a common shape, then edit the nodes to fit. Each non-leaf node has a dropdown to change its operator (× to +, > to =, etc.); each leaf has a dropdown to choose what value to read (base price, a modifier, a numeric input, a constant, another formula\'s result).':
+    'Odaberite šablon da napravite uobičajeni oblik, pa uredite čvorove po potrebi. Svaki čvor koji nije list ima padajući meni za promenu operatora (× u +, > u =, itd.); svaki list ima padajući meni za izbor koju vrednost da čita (osnovna cena, modifikator, numerički unos, konstanta, rezultat druge formule).',
+
+  'What nodes can you combine':            'Koje čvorove možete da kombinujete',
+  'Values (leaves)':                       'Vrednosti (listovi)',
+  'a constant like 200 or 1.21':           'konstanta poput 200 ili 1.21',
+  'the product\'s base price':             'osnovna cena proizvoda',
+  'the price modifier of the value selected in a given characteristic':
+    'modifikator cene vrednosti izabrane u datoj karakteristici',
+  'the current value of a numeric characteristic (Width, Height, Quantity)':
+    'trenutna vrednost numeričke karakteristike (Širina, Visina, Količina)',
+  'true/false: does the customer have a specific value selected':
+    'tačno/netačno: da li kupac ima izabranu određenu vrednost',
+  'the computed result of another formula on this product':
+    'izračunati rezultat druge formule na ovom proizvodu',
+  'Operators (branches)':                  'Operatori (grane)',
+  'arithmetic':                            'aritmetika',
+  'comparisons (return true/false)':       'poređenja (vraćaju tačno/netačno)',
+  'combine comparisons':                   'kombinovanje poređenja',
+  'pick one of two sub-expressions based on a condition':
+    'bira jedan od dva pod-izraza na osnovu uslova',
+
+  'Example 1 — sum of modifiers (the default shape)':
+    'Primer 1 — zbir modifikatora (podrazumevani oblik)',
+  'Every time the customer changes any of the three characteristics, the total recomputes live. If they pick a smaller size (+€0) and a different material (+€0), the total drops accordingly.':
+    'Svaki put kada kupac promeni bilo koju od tri karakteristike, ukupna cena se preračunava uživo. Ako izabere manju veličinu (+€0) i drugi materijal (+€0), ukupna cena pada srazmerno.',
+  'Use this whenever each option independently nudges the price. It\'s the same idea as ticking checkboxes on a buy form — modifiers add up, no math required.':
+    'Koristite ovo kada svaka opcija nezavisno pomera cenu. Ista ideja kao štikliranje polja na narudžbenici — modifikatori se sabiraju, bez računice.',
+  'Example 2 — size-based pricing (Base price × Width × Height)':
+    'Primer 2 — cena po veličini (Osnovna cena × Širina × Visina)',
+  'Multiplies the base price by two numeric characteristics — typically Width and Height in metres — giving an area-based price.':
+    'Množi osnovnu cenu sa dve numeričke karakteristike — obično Širina i Visina u metrima — dajući cenu po površini.',
+  'Recomputes the moment either number changes in the widget. Made width 1.5 instead of 1.2? Total jumps from €48 to €60 immediately.':
+    'Preračunava se čim se bilo koji broj promeni u vidžetu. Promenili širinu na 1.5 umesto 1.2? Ukupno odmah skoči sa €48 na €60.',
+  'Use for products priced by area: glass panels, banners, table tops, fabric. Pair with a second formula for fixed surcharges (cuts, edges, delivery) — both formulas sum into the total.':
+    'Koristite za proizvode čija cena ide po površini: stakleni paneli, baneri, stolne ploče, tkanina. Uparite sa drugom formulom za fiksne doplate (sečenje, ivice, dostava) — obe formule se sabiraju u ukupnu cenu.',
+  'Example 3 — conditional surcharge (IF / THEN / ELSE)':
+    'Primer 3 — uslovna doplata (IF / THEN / ELSE)',
+  'Adds a flat €200 surcharge to the base price, but only when the customer picks Steel as the material. Any other material returns the base price unchanged.':
+    'Dodaje fiksnu doplatu od €200 na osnovnu cenu, ali samo kada kupac odabere Čelik kao materijal. Bilo koji drugi materijal vraća osnovnu cenu nepromenjenu.',
+  'Every time the Material selection changes. Pick Steel → +€200 added. Switch to Wood → the +€200 disappears.':
+    'Svaki put kada se promeni izbor Materijala. Izaberite Čelik → +€200 dodato. Pređite na Drvo → +€200 nestaje.',
+  'Use IF / THEN / ELSE when one option needs special-case price logic that doesn\'t fit a simple modifier. Keep configuration logic (hide / disable / lock) in Rules and price logic in Formulas — they\'re separate systems for a reason.':
+    'Koristite IF / THEN / ELSE kada jedna opcija zahteva posebnu logiku cene koja se ne uklapa u jednostavan modifikator. Logiku konfiguracije (sakrij / onemogući / zaključaj) držite u Pravilima, a logiku cena u Formulama — to su posebni sistemi sa razlogom.',
+
+  'Active vs draft':                       'Aktivno vs skica',
+  'The widget evaluates every active formula on the product and adds the results into the total. Toggling a formula to inactive keeps it in the editor but stops it from affecting the price — useful for staging price changes before going live.':
+    'Vidžet izvršava svaku aktivnu formulu na proizvodu i sabira rezultate u ukupnu cenu. Prebacivanje formule na neaktivno čuva je u editoru ali sprečava da utiče na cenu — korisno za pripremu promena cena pre objavljivanja.',
+  'Formulas can also reference each other via formula_result, so you can build a "subtotal" formula and reuse it inside a "tax" formula. The widget evaluates them in sort order.':
+    'Formule mogu i da se međusobno pozivaju preko formula_result, tako da možete napraviti "međuzbir" formulu i ponovo je koristiti unutar "porez" formule. Vidžet ih izvršava po redosledu sortiranja.',
+
+  'Formula vs Rule vs price modifier — when to use which':
+    'Formula vs Pravilo vs modifikator cene — kada koristiti koji',
+  'Price modifier on a value':             'Modifikator cene na vrednosti',
+  'set in the Characteristics tab':        'podešen u kartici Karakteristike',
+  'use for "this option adds +€X". Covers 80% of pricing cases with zero math.':
+    'koristite za "ova opcija dodaje +€X". Pokriva 80% slučajeva sa cenom bez ikakve računice.',
+  'use when the price depends on numeric inputs (m², width × height), interactions between characteristics, or conditional logic.':
+    'koristite kada cena zavisi od numeričkih unosa (m², širina × visina), interakcija između karakteristika ili uslovne logike.',
+  'Rule':                                  'Pravilo',
+  'never about price (except Lock value + Free of charge for waiving). Use Rules for visibility, defaults, and constraints — what the customer can see and pick.':
+    'nikad o ceni (osim Zaključaj vrednost + Bez naknade za odustajanje). Koristite Pravila za vidljivost, podrazumevane vrednosti i ograničenja — šta kupac vidi i može da izabere.',
 }
 
 export const LANGS = ['en', 'sr'] as const

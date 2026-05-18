@@ -1,10 +1,17 @@
+import { Fragment } from 'react'
 import { Link } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { ManualMockup, MockupHotspot } from '@/components/docs/ManualMockup'
+import { RulesSection } from './sections/RulesSection'
+import { FormulaPricingSection } from './sections/FormulaPricingSection'
 import { t } from '@/i18n'
 
-interface TabSpec { label: string; body: string }
+interface TabSpec {
+  label: string
+  body?: string                       // present for lightweight tabs
+  deepDive?: 'rules' | 'formula'      // present for deep-dive tabs
+}
 
 const TABS: TabSpec[] = [
   {
@@ -15,14 +22,8 @@ const TABS: TabSpec[] = [
     label: 'Characteristics',
     body: 'The options customers pick from. Four types: text (free input), single-select (one of N values), numeric (a number with optional min/max), and boolean (a single checkbox). Each value can carry a price modifier — flat amount or percent — applied to the running total.',
   },
-  {
-    label: 'Rules',
-    body: 'If/then logic. Conditions look at characteristic selections; effects can show, hide, or lock other characteristics. Useful for dependent options (e.g. "Glass thickness" only appears when "Material = Glass"). Rules evaluate every time a customer changes a selection.',
-  },
-  {
-    label: 'Formula pricing',
-    body: 'Surcharges computed from characteristic values — e.g. price per m² × width × height. Build expressions from characteristic IDs, constants, and the standard math operators. Use the Pricing center for tax and discount logic at the product or quotation level.',
-  },
+  { label: 'Rules',           deepDive: 'rules'   },
+  { label: 'Formula pricing', deepDive: 'formula' },
   {
     label: 'Visualization',
     body: 'Image assets tied to characteristic values. When a customer picks a value, the matching image layers into the widget preview. For 3D models, mesh rules map characteristic values to visible meshes inside a single GLB file.',
@@ -90,15 +91,31 @@ export function ProductsChapter() {
         </CardContent>
       </Card>
 
-      {TABS.map(({ label, body }) => (
-        <Card key={label}>
-          <CardHeader>
-            <CardTitle className="text-base">{t(label)}</CardTitle>
-          </CardHeader>
-          <CardContent className="text-sm text-muted-foreground">
-            {t(body)}
-          </CardContent>
-        </Card>
+      {TABS.map(tab => (
+        <Fragment key={tab.label}>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">{t(tab.label)}</CardTitle>
+            </CardHeader>
+            {tab.body && (
+              <CardContent className="text-sm text-muted-foreground">
+                {t(tab.body)}
+              </CardContent>
+            )}
+            {tab.deepDive === 'rules' && (
+              <CardContent className="text-sm text-muted-foreground">
+                {t('Deep dive below — editor anatomy, the six effect kinds, and three worked examples.')}
+              </CardContent>
+            )}
+            {tab.deepDive === 'formula' && (
+              <CardContent className="text-sm text-muted-foreground">
+                {t('Deep dive below — editor anatomy, the available nodes and operators, and three worked examples.')}
+              </CardContent>
+            )}
+          </Card>
+          {tab.deepDive === 'rules'   && <RulesSection />}
+          {tab.deepDive === 'formula' && <FormulaPricingSection />}
+        </Fragment>
       ))}
 
       <div className="flex flex-wrap gap-2">
