@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { NavLink } from 'react-router-dom'
-import { LayoutDashboard, Package, Inbox, Settings, LogOut, Layers, FileText, BarChart2, Code2, X, DollarSign, History, Shield, Table } from 'lucide-react'
+import { LayoutDashboard, Package, Inbox, Settings, LogOut, Layers, FileText, BarChart2, Code2, X, DollarSign, History, Shield, Table, HelpCircle } from 'lucide-react'
 import { Logo } from '@/components/ui/Logo'
 import { cn } from '@/lib/utils'
 import { useAuthContext } from '@/components/auth/AuthContext'
@@ -109,6 +109,23 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
       {/* Footer */}
       <div className="p-2">
         <Separator className="mb-2" />
+
+        {/* User manual */}
+        <NavLink
+          to="/docs/manual"
+          onClick={onClose}
+          className={({ isActive }) =>
+            cn(
+              'flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors mb-1',
+              isActive
+                ? 'bg-primary text-primary-foreground font-medium'
+                : 'text-muted-foreground hover:bg-accent hover:text-foreground'
+            )
+          }
+        >
+          <HelpCircle className="h-4 w-4 shrink-0" />
+          <span>{t('User manual')}</span>
+        </NavLink>
 
         {/* Language switcher */}
         <div className="flex gap-1 px-3 py-1 mb-1">

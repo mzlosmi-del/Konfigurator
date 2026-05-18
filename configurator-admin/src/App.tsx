@@ -33,6 +33,7 @@ import { PublicPreviewPage } from '@/pages/public/PublicPreviewPage'
 import { PublicQuotationPage } from '@/pages/public/PublicQuotationPage'
 import { AuditLogPage } from '@/pages/admin/AuditLogPage'
 import { SuperAdminTenantsPage } from '@/pages/admin/SuperAdminTenantsPage'
+import { UserManualPage } from '@/pages/docs/UserManualPage'
 
 export function App() {
   const [lang, setLangState] = useState<Lang>(getLang())
@@ -110,6 +111,9 @@ export function App() {
               <Route element={<ProtectedRoute functionality="settings" />}>
                 <Route path="/settings" element={<SettingsPage />} />
               </Route>
+
+              {/* User manual — login-only, no functionality gate */}
+              <Route path="/docs/manual" element={<UserManualPage />} />
 
               {/* Audit log — admin-only (page enforces it) */}
               <Route path="/audit-log" element={<AuditLogPage />} />

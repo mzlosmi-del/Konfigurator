@@ -1210,6 +1210,212 @@ const sr: Record<string, string> = {
   'Page':                                  'Strana',
   'Previous':                              'Prethodno',
   'Company registration number':           'Matični broj',
+
+  // ── User manual ────────────────────────────────────────────────────────
+  'User manual':                           'Uputstvo za korisnike',
+  'How to set up products, handle inquiries, send quotations, and embed the widget.':
+    'Kako da podesite proizvode, obrađujete upite, šaljete ponude i ugradite vidžet na sajt.',
+  'Getting started':                       'Prvi koraci',
+  'Products & configuration':              'Proizvodi i konfiguracija',
+  'Inquiries & quotations':                'Upiti i ponude',
+  'Branding, email, team, plan':           'Brendiranje, email, tim, plan',
+  'Embedding the widget':                  'Ugradnja vidžeta',
+  'Pricing center':                        'Centar za cene',
+  'Library & texts':                       'Biblioteka i tekstovi',
+
+  // Getting started
+  'Welcome to Configureout':               'Dobrodošli u Configureout',
+  'This guide walks you from sign in to a published configurator embedded on your website. Plan on 10–15 minutes for the basics.':
+    'Ovo uputstvo vas vodi od prijave do objavljenog konfiguratora ugrađenog na vaš sajt. Računajte na 10–15 minuta za osnove.',
+  'Signing in':                            'Prijava',
+  'Open the admin at your workspace URL and enter the email and password you registered with. If you forgot your password, click "Forgot password?" on the sign-in screen — we email you a reset link.':
+    'Otvorite admin na URL-u vašeg radnog prostora i unesite e-mail i lozinku sa kojom ste se registrovali. Ako ste zaboravili lozinku, kliknite "Zaboravljena lozinka?" na ekranu za prijavu — poslaćemo vam link za reset.',
+  'Workspace owners can invite teammates from Settings → Team. Invitees get an email with a link that auto-creates their account.':
+    'Vlasnici radnog prostora mogu pozvati saradnike iz Podešavanja → Tim. Pozvani dobijaju email sa linkom koji automatski kreira njihov nalog.',
+  'Dashboard tour':                        'Pregled kontrolne table',
+  'After signing in, the dashboard summarises your workspace at a glance.':
+    'Nakon prijave, kontrolna tabla pruža pregled vašeg radnog prostora.',
+  'Dashboard — three stat cards and the recent-inquiries table':
+    'Kontrolna tabla — tri kartice sa statistikom i tabela skorašnjih upita',
+  'Stat cards — click any to drill in':    'Kartice — kliknite na bilo koju za detalje',
+  'Click a row to open the inquiry':       'Kliknite na red da otvorite upit',
+  'Each stat card is a shortcut: click "Published products" to jump to the Products page, "New inquiries" to filter inquiries to unread, and so on.':
+    'Svaka kartica je prečica: kliknite "Objavljeni proizvodi" da odete na stranicu Proizvodi, "Novi upiti" da filtrirate nepročitane, i tako dalje.',
+  'First product in 5 minutes':            'Prvi proizvod za 5 minuta',
+  'A minimal walkthrough — one product, one characteristic, one embed snippet.':
+    'Minimalni vodič — jedan proizvod, jedna karakteristika, jedan snippet za ugradnju.',
+  'Open Products and click "New product"': 'Otvorite Proizvodi i kliknite "Novi proizvod"',
+  'From the sidebar choose Products, then the green "New product" button in the top-right of the list.':
+    'Iz bočne trake odaberite Proizvodi, zatim zeleno dugme "Novi proizvod" gore desno u listi.',
+  'Fill in the Details tab':               'Popunite karticu Detalji',
+  'Name, base price, currency. The SKU is optional. Status stays as Draft until you publish.':
+    'Naziv, osnovna cena, valuta. SKU je opciono. Status ostaje "Skica" dok ne objavite.',
+  'Add one Characteristic with two values': 'Dodajte jednu Karakteristiku sa dve vrednosti',
+  'Switch to the Characteristics tab. Add a characteristic (e.g. "Color"), then add two values (e.g. "Black" +€0, "White" +€20). Customers will pick from these in the widget.':
+    'Otvorite karticu Karakteristike. Dodajte karakteristiku (npr. "Boja"), zatim dodajte dve vrednosti (npr. "Crna" +€0, "Bela" +€20). Kupci će birati iz ovih opcija u vidžetu.',
+  'Click Publish in the top-right of the product editor. The status flips to Published and the product becomes embeddable.':
+    'Kliknite Objavi gore desno u editoru proizvoda. Status se menja na "Objavljeno" i proizvod postaje spreman za ugradnju.',
+  'Grab the embed snippet':                'Preuzmite snippet za ugradnju',
+  'Open the Embed tab on the same product. Copy the Script tag snippet and paste it into any HTML page on your website — the widget will mount automatically where the snippet sits.':
+    'Otvorite karticu Ugradnja na istom proizvodu. Kopirajte Script tag snippet i nalepite ga na bilo koju HTML stranicu vašeg sajta — vidžet će se automatski prikazati tu gde stoji snippet.',
+  'Open Products':                         'Otvori Proizvode',
+  'Full embed reference':                  'Kompletno uputstvo za ugradnju',
+  "What's next":                           'Šta dalje',
+  'Once the widget is live, customer inquiries land in the Inquiries tab. See the Inquiries & quotations chapter to learn the reply workflow.':
+    'Kada je vidžet aktivan, upiti kupaca stižu u karticu Upiti. Pogledajte poglavlje Upiti i ponude da naučite tok odgovora.',
+  'For a custom From-address on quotation emails, see Settings → Email. For team invites, see Settings → Team.':
+    'Za prilagođenu Od-adresu na e-mailovima ponuda, vidite Podešavanja → Email. Za pozive u tim, vidite Podešavanja → Tim.',
+
+  // Products & configuration
+  'Each product has nine tabs in the editor. Work through them roughly in order — Details first, then Characteristics, then everything else as needed.':
+    'Svaki proizvod ima devet kartica u editoru. Prođite kroz njih redom — najpre Detalji, pa Karakteristike, pa sve ostalo po potrebi.',
+  'The nine tabs':                         'Devet kartica',
+  'Product editor — tabs across the top, Publish button on the right':
+    'Editor proizvoda — kartice na vrhu, dugme Objavi sa desne strane',
+  'Publish here':                          'Objavi ovde',
+  'Tabs in suggested order':               'Kartice po preporučenom redosledu',
+  'Name, description, base price, currency and SKU. The Status field controls visibility: Draft is editor-only, Published is live and embeddable, Archived hides the product without deleting data.':
+    'Naziv, opis, osnovna cena, valuta i SKU. Polje Status kontroliše vidljivost: Skica je samo u editoru, Objavljeno je uživo i može se ugraditi, Arhivirano sakriva proizvod bez brisanja podataka.',
+  'The options customers pick from. Four types: text (free input), single-select (one of N values), numeric (a number with optional min/max), and boolean (a single checkbox). Each value can carry a price modifier — flat amount or percent — applied to the running total.':
+    'Opcije koje kupci biraju. Četiri tipa: tekst (slobodan unos), izbor jedne vrednosti, broj (sa opcionim min/max), i logički (jedan čekboks). Svaka vrednost može imati modifikator cene — fiksni iznos ili procenat — koji se primenjuje na ukupnu cenu.',
+  'If/then logic. Conditions look at characteristic selections; effects can show, hide, or lock other characteristics. Useful for dependent options (e.g. "Glass thickness" only appears when "Material = Glass"). Rules evaluate every time a customer changes a selection.':
+    'Ako/onda logika. Uslovi gledaju izbore karakteristika; efekti mogu prikazati, sakriti ili zaključati druge karakteristike. Korisno za zavisne opcije (npr. "Debljina stakla" se pojavljuje samo kada je "Materijal = Staklo"). Pravila se izvršavaju svaki put kada kupac promeni izbor.',
+  'Surcharges computed from characteristic values — e.g. price per m² × width × height. Build expressions from characteristic IDs, constants, and the standard math operators. Use the Pricing center for tax and discount logic at the product or quotation level.':
+    'Dodaci na cenu izračunati iz vrednosti karakteristika — npr. cena po m² × širina × visina. Sastavite izraze od ID-jeva karakteristika, konstanti i standardnih matematičkih operatora. Za poreze i popuste koristite Centar za cene na nivou proizvoda ili ponude.',
+  'Image assets tied to characteristic values. When a customer picks a value, the matching image layers into the widget preview. For 3D models, mesh rules map characteristic values to visible meshes inside a single GLB file.':
+    'Slike vezane za vrednosti karakteristika. Kada kupac izabere vrednost, odgovarajuća slika se prikazuje u pregledu vidžeta. Za 3D modele, mesh pravila mapiraju vrednosti karakteristika na vidljive mesheve unutar jednog GLB fajla.',
+  'The fields shown in the inquiry form after the customer clicks "Request a quote". Toggle which fields appear (name, email, phone, company, message) and which are required.':
+    'Polja koja se prikazuju u formi za upit nakon što kupac klikne "Zatraži ponudu". Uključite ili isključite koja polja se pojavljuju (ime, email, telefon, firma, poruka) i koja su obavezna.',
+  'The snippet to paste on your site, plus a theme picker (Cloud, Forest, Slate, Sand, etc.) that changes the widget\'s visual style. Theme is stored per product so different products on the same site can look different.':
+    'Snippet za lepljenje na vaš sajt, plus birač teme (Cloud, Forest, Slate, Sand, itd.) koji menja vizualni stil vidžeta. Tema se čuva po proizvodu tako da različiti proizvodi na istom sajtu mogu izgledati drugačije.',
+  'Shortcut to Central Texts, pre-filtered to this product. Edit customer-facing strings (characteristic names, value labels, descriptions) in English and Serbian here.':
+    'Prečica do Centralnih tekstova, već filtriranih za ovaj proizvod. Ovde uređujete tekstove koje vide kupci (nazivi karakteristika, labele vrednosti, opisi) na engleskom i srpskom.',
+  'Audit log of every save and delete on this product, with a before/after diff. Admin-only.':
+    'Dnevnik svih izmena i brisanja na ovom proizvodu, sa pregledom pre/posle. Dostupno samo administratorima.',
+  'Library (reusable characteristic classes)': 'Biblioteka (klase karakteristika za višekratnu upotrebu)',
+
+  // Inquiries & quotations
+  'What happens when a customer asks for a quote, and how to send one back as a PDF or email.':
+    'Šta se dešava kada kupac zatraži ponudu, i kako poslati ponudu kao PDF ili email.',
+  'How an inquiry arrives':                'Kako stiže upit',
+  'Customer fills the widget':             'Kupac popunjava vidžet',
+  'Inquiry POSTed to your workspace':      'Upit se šalje u vaš radni prostor',
+  'Notification email (optional)':         'Email obaveštenje (opciono)',
+  'Appears in Inquiries with a red "new" dot': 'Pojavljuje se u Upitima sa crvenom "novo" tačkom',
+  'Set the notification email in Settings → Branding. Without it, you still see inquiries in the admin — you just don\'t get a heads-up.':
+    'Postavite email za obaveštenja u Podešavanja → Brendiranje. Bez njega i dalje vidite upite u adminu — samo nećete dobiti najavu.',
+  'Status workflow':                       'Tok statusa',
+  'Important:':                            'Važno:',
+  'Changing status via the dropdown does NOT send an email. To actually reply to the customer, use the "Reply by email" button on the inquiry detail page — that opens your mail client (or, if you\'ve created a quotation, lets you send the PDF directly).':
+    'Promena statusa preko padajućeg menija NE šalje email. Da biste zaista odgovorili kupcu, koristite dugme "Odgovori e-mailom" na strani sa detaljima upita — to otvara vaš mail klijent (ili, ako ste kreirali ponudu, omogućava direktno slanje PDF-a).',
+  'Creating a quotation from an inquiry':  'Kreiranje ponude iz upita',
+  'Open the inquiry from the Inquiries list.': 'Otvorite upit iz liste Upita.',
+  'Click "Create quotation". A draft quotation opens with line items pre-filled from the inquiry\'s configuration (product, quantity, selected options, computed price).':
+    'Kliknite "Kreiraj ponudu". Otvara se skica ponude sa stavkama unapred popunjenim iz konfiguracije upita (proizvod, količina, izabrane opcije, izračunata cena).',
+  'Edit the line items, add discount / tax adjustments at line or quotation level, and write any notes or terms.':
+    'Uredite stavke, dodajte popust / porez na nivou stavke ili ponude, i upišite napomene ili uslove.',
+  'Quotation lifecycle':                   'Životni ciklus ponude',
+  'Draft':                                 'Skica',
+  'Confirmed':                             'Potvrđeno',
+  'Locked':                                'Zaključano',
+  'Locked quotations are read-only — that\'s by design, so the version the customer received can never change retroactively. To revise a locked quotation, use Duplicate to make a new draft copy.':
+    'Zaključane ponude su samo za čitanje — to je namerno, kako se verzija koju je kupac dobio ne bi mogla naknadno menjati. Da biste izmenili zaključanu ponudu, koristite Dupliraj za novu skicu.',
+  'PDF preview dialog':                    'Dijalog za pregled PDF-a',
+  'Click "Preview PDF" on a quotation to fine-tune the layout before generating the final file.':
+    'Kliknite "Pregled PDF-a" na ponudi da finije podesite raspored pre generisanja finalnog fajla.',
+  'Left: section controls (drag to reorder, eye-icon to toggle). Right: live A4 preview of the actual quotation data.':
+    'Levo: kontrole sekcija (prevucite da promenite redosled, ikona oka da uključite/isključite). Desno: pregled A4 stranice sa stvarnim podacima ponude.',
+  'Header':                                'Zaglavlje',
+  'Bill-to':                               'Naplata',
+  'Line items':                            'Stavke',
+  'Drag to reorder':                       'Prevucite da promenite redosled',
+  'Toggle visibility':                     'Uključi/isključi vidljivost',
+  'Language switch':                       'Promena jezika',
+  'The right panel shows what the PDF will actually look like with your data. Toggle a section\'s eye icon to include or omit it without losing the content.':
+    'Desni panel pokazuje kako će PDF zaista izgledati sa vašim podacima. Uključite ili isključite sekciju ikonom oka bez gubljenja sadržaja.',
+  'Sending the quotation email':           'Slanje email-a sa ponudom',
+  'Click "Send to customer" on a confirmed quotation. We send the PDF and an HTML email with the intro text from Settings → Branding.':
+    'Kliknite "Pošalji kupcu" na potvrđenoj ponudi. Šaljemo PDF i HTML email sa uvodnim tekstom iz Podešavanja → Brendiranje.',
+  'The From address depends on your plan: on Scale with a verified domain you send from your own address; on lower plans the email goes from the platform default (replies still come to your notification email).':
+    'Od-adresa zavisi od vašeg plana: na Scale planu sa verifikovanim domenom šaljete sa svoje adrese; na nižim planovima email ide sa platformskog default-a (odgovori i dalje stižu na vašu adresu za obaveštenja).',
+  'Open Inquiries':                        'Otvori Upite',
+  'Open Quotations':                       'Otvori Ponude',
+
+  // Settings
+  'Branding, email, team & plan':          'Brendiranje, email, tim i plan',
+  'Everything under the Settings tab — the controls that change how your workspace looks to customers and who can access it.':
+    'Sve pod karticom Podešavanja — kontrole koje menjaju kako vaš radni prostor izgleda kupcima i ko mu može pristupiti.',
+  'PNG or JPG up to 2 MB. Appears on PDFs and on the public preview page. Square or wide is fine; we don\'t crop.':
+    'PNG ili JPG do 2 MB. Pojavljuje se na PDF-ovima i na javnoj stranici za pregled. Kvadrat ili širok format — ne sečemo.',
+  'PDF footer':                            'PDF futer',
+  'Replaces the "Configureout" attribution at the bottom of every quotation PDF.':
+    'Menja "Configureout" potpis u dnu svakog PDF-a sa ponudom.',
+  'Scale plan':                            'Scale plan',
+  'Widget footer':                         'Futer vidžeta',
+  'Toggle the "Powered by Configureout" footer in your embedded widget. Available on Growth and Scale; locked on Free and Starter.':
+    'Uključite ili isključite "Powered by Configureout" futer u ugrađenom vidžetu. Dostupno na Growth i Scale; zaključano na Free i Starter.',
+  'Where we send a heads-up when a new inquiry arrives. Defaults to your account email.':
+    'Adresa na koju šaljemo najavu kada stigne novi upit. Podrazumevano je email vašeg naloga.',
+  'Send quotation emails from your own domain (e.g. quotes@yourcompany.com) instead of the platform default.':
+    'Šaljite email-ove sa ponudama sa svog domena (npr. ponude@vasakompanija.com) umesto sa platformske podrazumevane adrese.',
+  'Three steps:':                          'Tri koraka:',
+  'Register your domain in Settings → Email from-address.':
+    'Registrujte svoj domen u Podešavanja → Email Od-adresa.',
+  'Copy the DNS records we show and add them at your domain registrar.':
+    'Kopirajte DNS zapise koje vam prikazujemo i dodajte ih kod vašeg registrara domena.',
+  'Click "Re-check verification" periodically until the banner turns green.':
+    'Kliknite "Ponovo proveri verifikaciju" povremeno dok banner ne postane zelen.',
+  'Three verification states — green when DNS records are detected and validated, amber while propagation is in flight, red if records are missing or wrong.':
+    'Tri stanja verifikacije — zeleno kada su DNS zapisi detektovani i potvrđeni, žuto dok propagacija traje, crveno ako zapisi nedostaju ili su pogrešni.',
+  'Propagation usually finishes within an hour, but some registrars cache for up to 48 hours. The amber state is normal — don\'t panic if it sits there.':
+    'Propagacija obično završi u roku od sat vremena, ali neki registrari keširaju do 48 sati. Žuto stanje je normalno — nemojte paničiti ako stoji.',
+  'Invite teammates by email and choose their role. They get an email with a link that auto-creates their account inside your workspace.':
+    'Pozovite saradnike e-mailom i odaberite njihovu ulogu. Dobijaju email sa linkom koji automatski kreira njihov nalog u vašem radnom prostoru.',
+  'Full access including team, plan, audit log, danger zone.':
+    'Puni pristup uključujući tim, plan, dnevnik izmena i opasnu zonu.',
+  'Edit products, inquiries, quotations. Cannot manage team or plan.':
+    'Uređivanje proizvoda, upita, ponuda. Ne može da upravlja timom ili planom.',
+  'Read-only access. Cannot save changes.': 'Pristup samo za čitanje. Ne može da sačuva izmene.',
+  'Fine-tune each role\'s access per feature in Settings → Authorizations (admin-only).':
+    'Detaljno podesite pristup svake uloge po funkcionalnosti u Podešavanja → Autorizacije (samo administrator).',
+  'See your current usage against plan limits and upgrade or downgrade via Stripe Checkout.':
+    'Pogledajte trenutnu potrošnju u odnosu na limite plana i pređite na viši ili niži plan preko Stripe Checkout-a.',
+  'Usage bars show how close you are to each plan limit.':
+    'Trake potrošnje pokazuju koliko ste blizu svakog limita plana.',
+  'At limit — upgrade to add more':        'Na limitu — pređite na viši plan za više',
+  'On downgrade, no data is deleted. Over-limit resources become read-only (e.g. excess products keep showing in the list but customers can\'t configure them); restore full access by upgrading again.':
+    'Pri prelasku na niži plan, podaci se ne brišu. Resursi iznad limita postaju samo za čitanje (npr. višak proizvoda i dalje se prikazuje u listi ali ih kupci ne mogu konfigurisati); puni pristup se vraća kada ponovo pređete na viši plan.',
+  'Open Settings':                         'Otvori Podešavanja',
+
+  // Embed chapter
+  'Three integration methods, all served from one widget bundle. Pick the one that fits your site.':
+    'Tri metoda integracije, svi iz jednog widget bundle-a. Odaberite onaj koji vam odgovara.',
+  'The three methods':                     'Tri metoda',
+  'Where to find the snippet':             'Gde se nalazi snippet',
+  'Open any published product, click the Embed tab. The snippet is ready to copy. Pick a theme to change the widget\'s visual style — the choice is saved per product, so different products on the same site can look different.':
+    'Otvorite bilo koji objavljen proizvod, kliknite karticu Ugradnja. Snippet je spreman za kopiranje. Odaberite temu da promenite vizualni stil vidžeta — izbor se čuva po proizvodu, tako da različiti proizvodi na istom sajtu mogu izgledati drugačije.',
+  'Embed tab on a product — copy the script, paste it into your HTML.':
+    'Kartica Ugradnja na proizvodu — kopirajte skriptu, nalepite je u svoj HTML.',
+  'Copy & paste':                          'Kopiraj i nalepi',
+  'The Embed tab on the product is the simplest path. For the full reference (Web Component + iFrame snippets, comparison table, copy buttons), open the Embed page from the sidebar.':
+    'Kartica Ugradnja na proizvodu je najjednostavniji put. Za kompletno uputstvo (Web Component + iFrame snippet-i, tabela poređenja, dugmad za kopiranje), otvorite stranicu Ugradnja iz bočne trake.',
+
+  // Stubs
+  'Edit base-price schedules, characteristic modifiers, tax presets and quotation-level adjustments in one place. Schedules carry valid_from / valid_to dates so you can prepare a price change in advance and have it activate on the right day.':
+    'Uređujte rasporede osnovnih cena, modifikatore karakteristika, poreske presete i prilagođavanja na nivou ponude na jednom mestu. Rasporedi imaju datume važi_od / važi_do tako da možete unapred pripremiti promenu cene i aktivirati je na pravi dan.',
+  'Open Pricing center':                   'Otvori Centar za cene',
+  'The Library page groups reusable characteristics into classes so you can reuse the same options across products. The Texts page is the central editor for every customer-facing string in English and Serbian — characteristic names, value labels, descriptions, post-inquiry messages.':
+    'Stranica Biblioteka grupiše karakteristike koje se mogu ponovo koristiti u klase, tako da iste opcije možete koristiti na više proizvoda. Stranica Tekstovi je centralni editor za sve tekstove koje vide kupci, na engleskom i srpskom — nazivi karakteristika, labele vrednosti, opisi, poruke nakon upita.',
+  'Open Library':                          'Otvori Biblioteku',
+  'Open Texts':                            'Otvori Tekstove',
+  'Per-product views, inquiries and conversion rate, plus revenue over time. The characteristic-value breakdown shows which options customers actually pick, and the inquiry-to-quotation funnel helps you spot leaks in the workflow.':
+    'Po-proizvodu pregledi, upiti i stopa konverzije, plus prihod tokom vremena. Razlaganje po vrednostima karakteristika pokazuje koje opcije kupci zaista biraju, a levak upit-do-ponude pomaže da uočite mesta gde se gubi prilika.',
+  'Open Analytics':                        'Otvori Analitiku',
+  'Admin-only. Every save and delete across products, quotations, characteristics, formulas and settings is logged with a before/after diff. Filter by entity type and date range. Use it to investigate who changed what.':
+    'Samo za administratore. Svako čuvanje i brisanje proizvoda, ponuda, karakteristika, formula i podešavanja se beleži sa razlikom pre/posle. Filtrirajte po tipu entiteta i opsegu datuma. Koristite ga da istražite ko je šta menjao.',
+  'Open Audit log':                        'Otvori Dnevnik izmena',
+  'A detailed walkthrough for this chapter is on the way. For now, the page itself is mostly self-explanatory once you\'re there.':
+    'Detaljan vodič za ovo poglavlje stiže uskoro. Za sada, sama stranica je uglavnom samoobjašnjavajuća kada je otvorite.',
 }
 
 export const LANGS = ['en', 'sr'] as const
