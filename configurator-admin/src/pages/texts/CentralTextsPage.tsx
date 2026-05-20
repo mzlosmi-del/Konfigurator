@@ -31,6 +31,7 @@ const LEVELS: { value: TextLevel; label: string }[] = [
   { value: 'product',              label: 'Product'              },
   { value: 'characteristic',       label: 'Characteristic'       },
   { value: 'characteristic_value', label: 'Characteristic value' },
+  { value: 'pricing_formula',      label: 'Pricing formula'      },
 ]
 
 const LEVEL_BADGE: Record<TextLevel, string> = {
@@ -38,6 +39,7 @@ const LEVEL_BADGE: Record<TextLevel, string> = {
   product:              'bg-blue-100 text-blue-700',
   characteristic:       'bg-violet-100 text-violet-700',
   characteristic_value: 'bg-emerald-100 text-emerald-700',
+  pricing_formula:      'bg-rose-100 text-rose-700',
 }
 
 const LANG_BADGE: Record<string, string> = {
@@ -125,6 +127,16 @@ export function CentralTextsPage() {
   }, [values])
   const productById        = useMemo(() => Object.fromEntries(products.map(p        => [p.id, p])), [products])
   const characteristicById = useMemo(() => Object.fromEntries(characteristics.map(c => [c.id, c])), [characteristics])
+  // Formula display name keyed by reference_id — resolved from the formula's
+  // own name rows (prefer EN, fall back to any language).
+  const formulaNameById = useMemo(() => {
+    const m: Record<string, string> = {}
+    for (const r of rows) {
+      if (r.level !== 'pricing_formula' || r.slot !== 'name' || !r.reference_id) continue
+      if (!m[r.reference_id] || r.language === 'en') m[r.reference_id] = r.content
+    }
+    return m
+  }, [rows])
 
   function referenceLabel(row: TenantText): string {
     switch (row.level) {
@@ -140,6 +152,10 @@ export function CentralTextsPage() {
         const charName = characteristicById[v.characteristic_id]?.name
         return charName ? `${charName} — ${v.label}` : v.label
       }
+      case 'pricing_formula':
+        // Resolve from the formula's own EN name row (no separate fetch needed —
+        // every formula has a backfilled English name row).
+        return formulaNameById[row.reference_id ?? ''] ?? row.reference_id ?? '?'
     }
   }
 
@@ -162,7 +178,7 @@ export function CentralTextsPage() {
       }
       return true
     })
-  }, [rows, filterLevel, filterLanguage, filterSlot, search, productById, characteristicById, valueById])
+  }, [rows, filterLevel, filterLanguage, filterSlot, search, productById, characteristicById, valueById, formulaNameById])
 
   function patchEdit(id: string, patch: Partial<EditState>) {
     setEdits(prev => {
@@ -537,8 +553,12 @@ function AddTextDialog({ open, onOpenChange, tenantId, products, characteristics
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs font-medium text-muted-foreground mb-1 block">{t('Level')}</label>
+              {/* Pricing-formula name rows are created in the product editor
+                  (which seeds the EN row), so the Add dialog omits that level —
+                  there's no formula picker here. Existing rows stay editable
+                  inline from the table. */}
               <Select value={level} onChange={e => setLevel(e.target.value as TextLevel)}>
-                {LEVELS.map(l => <option key={l.value} value={l.value}>{t(l.label)}</option>)}
+                {LEVELS.filter(l => l.value !== 'pricing_formula').map(l => <option key={l.value} value={l.value}>{t(l.label)}</option>)}
               </Select>
             </div>
             <div>

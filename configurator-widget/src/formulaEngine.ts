@@ -112,13 +112,14 @@ export function calculateFormulaTotal(
  * show the user how each named formula adds to (or subtracts from) the total.
  */
 export interface FormulaBreakdownEntry {
-  id:     string
-  name:   string
-  amount: number
+  id:         string
+  name:       string
+  name_i18n?: Record<string, string>
+  amount:     number
 }
 
 export function calculateFormulaBreakdown(
-  formulas: Array<{ id: string; name: string; formula: FormulaNode; is_active: boolean }>,
+  formulas: Array<{ id: string; name: string; name_i18n?: Record<string, string>; formula: FormulaNode; is_active: boolean }>,
   ctx: FormulaContext
 ): FormulaBreakdownEntry[] {
   const out: FormulaBreakdownEntry[] = []
@@ -128,7 +129,7 @@ export function calculateFormulaBreakdown(
     try {
       const result = evaluateFormula(f.formula, { ...ctx, formulaResults }) as number
       formulaResults[f.id] = result
-      out.push({ id: f.id, name: f.name, amount: result })
+      out.push({ id: f.id, name: f.name, name_i18n: f.name_i18n, amount: result })
     } catch {
       // Malformed formula — skip silently
     }

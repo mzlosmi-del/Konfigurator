@@ -18,6 +18,8 @@ import { fetchInquiry } from '@/lib/inquiries'
 import { fetchActivePricing, type ActivePricing } from '@/lib/pricing'
 import { inquiryToQuotationDraft } from '@/lib/inquiryConversion'
 import { evaluateRules } from '@/lib/configurationRules'
+import { fetchFormulaNameTexts } from '@/lib/formulas'
+import { resolveTextI18n } from '@/lib/texts'
 import { calculateFormulaBreakdown, calculateFormulaTotal, type FormulaContext } from '@/lib/formulaEngine'
 import { computeDiff, logChange } from '@/lib/auditLog'
 import { QUOTATION_LABELS } from '@/lib/auditLabels'
@@ -46,7 +48,7 @@ import { Separator } from '@/components/ui/separator'
 import { Spinner } from '@/components/ui/spinner'
 import { useToast } from '@/hooks/useToast'
 import { Toaster } from '@/components/ui/toast'
-import { t } from '@/i18n'
+import { t, getLang } from '@/i18n'
 
 // ── Internal draft types ──────────────────────────────────────────────────────
 
@@ -201,9 +203,16 @@ export function QuotationFormPage() {
         needRules    ? supabase.from('configuration_rules').select('*').eq('product_id', productId).eq('is_active', true) : Promise.resolve({ data: rulesCache[productId] }),
         needFormulas ? supabase.from('pricing_formulas').select('*').eq('product_id', productId).eq('is_active', true).order('sort_order') : Promise.resolve({ data: formulasCache[productId] }),
       ])
+      // Attach translated names so the quotation snapshot can capture the
+      // formula name in the right language.
+      let formulas = ((formulasData as any).data ?? []) as PricingFormula[]
+      if (needFormulas && formulas.length > 0) {
+        const nameRows = await fetchFormulaNameTexts(formulas.map(f => f.id))
+        formulas = formulas.map(f => ({ ...f, name_i18n: resolveTextI18n(nameRows, 'pricing_formula', f.id, 'name') }))
+      }
       setDetailsCache(prev      => ({ ...prev, [productId]: details }))
       setRulesCache(prev        => ({ ...prev, [productId]: ((rulesData as any).data ?? []) as ConfigurationRule[] }))
-      setFormulasCache(prev     => ({ ...prev, [productId]: ((formulasData as any).data ?? []) as PricingFormula[] }))
+      setFormulasCache(prev     => ({ ...prev, [productId]: formulas }))
     } catch {
       toast({ title: t('Failed to load product details'), variant: 'destructive' })
     }
@@ -315,6 +324,11 @@ export function QuotationFormPage() {
   }
 
   function buildLineItemData(): QuotationLineItem[] {
+    // Language to snapshot formula names in: the quotation's own language when
+    // editing an existing quote, otherwise the operator's current UI language.
+    // Falls back to 'en' if neither resolves to a supported language.
+    const rawLang = (loadedQuotation?.lang as string | undefined) ?? getLang()
+    const snapshotLang: 'en' | 'sr' = rawLang === 'sr' ? 'sr' : 'en'
     return lineItems
       .filter(li => li.product_id)
       .map(li => {
@@ -367,6 +381,12 @@ export function QuotationFormPage() {
 
         const formulaBreakdown = calculateFormulaBreakdown(formulas, buildFormulaCtx(chars, li.selection, product?.base_price ?? 0))
         const formulaAdj       = formulaBreakdown.reduce((s, e) => s + e.amount, 0)
+        // Snapshot the formula name in the operator's current language, falling
+        // back to the other language and finally the canonical plain name.
+        const formulaNameFor = (id: string, fallback: string): string => {
+          const i18n = formulas.find(f => f.id === id)?.name_i18n
+          return i18n?.[snapshotLang]?.trim() || i18n?.[snapshotLang === 'en' ? 'sr' : 'en']?.trim() || fallback
+        }
         return {
           product_id:      li.product_id,
           product_name:    product?.name ?? '',
@@ -376,7 +396,7 @@ export function QuotationFormPage() {
           unit_price:      Math.max(0, unitPrice + formulaAdj),
           configuration:   config,
           formulas:        formulaBreakdown.length > 0
-            ? formulaBreakdown.map(e => ({ formula_id: e.id, formula_name: e.name, amount: e.amount }))
+            ? formulaBreakdown.map(e => ({ formula_id: e.id, formula_name: formulaNameFor(e.id, e.name), amount: e.amount }))
             : undefined,
           adjustments:     buildAdjustmentData(li.adjustments),
         }

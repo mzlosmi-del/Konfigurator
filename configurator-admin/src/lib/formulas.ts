@@ -1,5 +1,6 @@
 import { supabase } from './supabase'
-import type { PricingFormula, FormulaNode } from '@/types/database'
+import { resolveTextI18n } from './texts'
+import type { PricingFormula, FormulaNode, TenantText } from '@/types/database'
 
 export async function fetchFormulas(productId: string): Promise<PricingFormula[]> {
   const { data, error } = await supabase
@@ -9,7 +10,31 @@ export async function fetchFormulas(productId: string): Promise<PricingFormula[]
     .order('sort_order', { ascending: true })
     .order('created_at', { ascending: true })
   if (error) throw new Error(error.message)
-  return (data ?? []) as PricingFormula[]
+  const formulas = (data ?? []) as PricingFormula[]
+
+  // Attach translated names from tenant_texts (level='pricing_formula').
+  if (formulas.length > 0) {
+    const rows = await fetchFormulaNameTexts(formulas.map(f => f.id))
+    for (const f of formulas) {
+      f.name_i18n = resolveTextI18n(rows, 'pricing_formula', f.id, 'name')
+    }
+  }
+  return formulas
+}
+
+/** All `pricing_formula` / slot='name' rows for the given formula ids, both
+ *  languages. Shared by the formula editor and the quotation snapshot builder. */
+export async function fetchFormulaNameTexts(formulaIds: string[]): Promise<TenantText[]> {
+  const ids = Array.from(new Set(formulaIds.filter(Boolean)))
+  if (ids.length === 0) return []
+  const { data, error } = await supabase
+    .from('tenant_texts')
+    .select('*')
+    .eq('level', 'pricing_formula')
+    .eq('slot', 'name')
+    .in('reference_id', ids)
+  if (error) throw new Error(error.message)
+  return (data ?? []) as TenantText[]
 }
 
 export async function createFormula(input: {

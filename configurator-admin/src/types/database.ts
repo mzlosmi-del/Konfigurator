@@ -10,7 +10,7 @@ export type Plan = 'free' | 'starter' | 'growth' | 'scale'
 /** Levels supported by the central `tenant_texts` table (see migration 076).
  *  Tenant rows have `reference_id = null`; the other three resolve against
  *  products / characteristics / characteristic_values respectively. */
-export type TextLevel = 'tenant' | 'product' | 'characteristic' | 'characteristic_value'
+export type TextLevel = 'tenant' | 'product' | 'characteristic' | 'characteristic_value' | 'pricing_formula'
 
 /** Canonical slot names used by the renderers when looking up text. The
  *  central editor accepts arbitrary strings so tenants can introduce custom
@@ -34,6 +34,7 @@ export const TEXT_SLOTS = {
   ],
   characteristic:       ['name', 'description', 'specification'] as const,
   characteristic_value: ['label', 'description', 'specification'] as const,
+  pricing_formula:      ['name'] as const,
 } as const
 
 /** Multi-row slots — i.e. ones whose `sort_order` matters and a single
@@ -377,10 +378,14 @@ export interface Database {
           formula: Json           // FormulaNode AST
           is_active: boolean
           sort_order: number
+          /** In-memory translation map populated from `tenant_texts`
+           *  (level='pricing_formula', slot='name'). Not a DB column —
+           *  resolved by the fetch helpers, never selected from PostgreSQL. */
+          name_i18n?:        Record<string, string>
           created_at: string
           updated_at: string
         }
-        Insert: Omit<Database['public']['Tables']['pricing_formulas']['Row'], 'id' | 'created_at' | 'updated_at'> & { id?: string }
+        Insert: Omit<Database['public']['Tables']['pricing_formulas']['Row'], 'id' | 'created_at' | 'updated_at' | 'name_i18n'> & { id?: string }
         Update: Partial<Database['public']['Tables']['pricing_formulas']['Insert']>
       }
       quotation_attachments: {

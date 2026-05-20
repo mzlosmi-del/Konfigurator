@@ -153,6 +153,7 @@ export type FormulaNode =
 export interface PricingFormula {
   id: string
   name: string
+  name_i18n?: Record<string, string>
   formula: FormulaNode
   is_active: boolean
   sort_order: number

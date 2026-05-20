@@ -291,7 +291,7 @@ export function Widget({ config, track, onThemeLoad }: Props) {
           }
           for (const f of priceBreakdown.formulas) {
             if (f.amount === 0) continue
-            rows.push({ label: f.name, amount: f.amount })
+            rows.push({ label: pickTranslation(f.name_i18n, lang, f.name), amount: f.amount })
           }
           // Only render if there's at least one modifier or formula contribution
           if (rows.length <= 1) return null

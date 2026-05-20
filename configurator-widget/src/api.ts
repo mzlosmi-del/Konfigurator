@@ -135,12 +135,13 @@ export async function loadProductConfig(config: WidgetConfig): Promise<FullProdu
   const rulesData    = rulesResult.data
   const formulasData = formulasResult.data
 
-  const valueIds = (valuesData ?? []).map((v: any) => v.id as string)
+  const valueIds   = (valuesData ?? []).map((v: any) => v.id as string)
+  const formulaIds = (formulasData ?? []).map((f: any) => f.id as string)
 
   // 4. Pull every text row this widget needs — tenant post-inquiry message,
-  //    product name/description, every characteristic name and every value
-  //    label — in a single query. RLS allows anonymous read of tenant_texts
-  //    (see migration 076).
+  //    product name/description, every characteristic name, every value
+  //    label, and every pricing-formula name — in a single query. RLS allows
+  //    anonymous read of tenant_texts (see migration 076).
   const textFilterParts: string[] = [
     `and(level.eq.tenant,reference_id.is.null,slot.eq.post_inquiry_message)`,
     `and(level.eq.product,reference_id.eq.${config.productId})`,
@@ -150,6 +151,9 @@ export async function loadProductConfig(config: WidgetConfig): Promise<FullProdu
   }
   if (valueIds.length > 0) {
     textFilterParts.push(`and(level.eq.characteristic_value,reference_id.in.(${valueIds.join(',')}))`)
+  }
+  if (formulaIds.length > 0) {
+    textFilterParts.push(`and(level.eq.pricing_formula,reference_id.in.(${formulaIds.join(',')}))`)
   }
   const { data: textsData } = await sb
     .from('tenant_texts')
@@ -238,7 +242,10 @@ export async function loadProductConfig(config: WidgetConfig): Promise<FullProdu
     characteristics,
     assets:    (assetsData    ?? []) as VisualizationAsset[],
     rules:     (rulesData     ?? []) as ConfigurationRule[],
-    formulas:  (formulasData  ?? []) as PricingFormula[],
+    formulas:  ((formulasData ?? []) as PricingFormula[]).map(f => ({
+      ...f,
+      name_i18n: textsToI18n(textRows, 'pricing_formula', f.id, 'name'),
+    })),
     removeBranding,
     postInquiryMessage: postInquiryRow?.content ?? null,
   }

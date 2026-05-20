@@ -159,6 +159,15 @@ const TEXT_SLOT_META: Record<TextLevel, Record<string, SlotMeta>> = {
       },
     },
   },
+  pricing_formula: {
+    name: {
+      label: { en: 'Formula name', sr: 'Naziv formule' },
+      description: {
+        en: 'Translated name of a pricing formula. Shown in the widget price breakdown and on the quotation PDF next to the formula\'s contribution.',
+        sr: 'Prevedeni naziv formule za cenu. Prikazuje se u razlaganju cene u vidžetu i u PDF ponudi pored doprinosa formule.',
+      },
+    },
+  },
   characteristic_value: {
     label: {
       label: { en: 'Value label', sr: 'Oznaka vrednosti' },
