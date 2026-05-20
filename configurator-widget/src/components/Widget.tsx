@@ -243,10 +243,31 @@ export function Widget({ config, track, onThemeLoad }: Props) {
 
   const { product, characteristics, assets, removeBranding } = state.data
 
+  // Display-only selection for the 3D preview: before the customer picks
+  // anything, mesh-visibility rules would hide every configurable mesh and the
+  // model would look empty. Fill each unset characteristic with one value —
+  // the rule-driven default if a rule sets one, otherwise the first value by
+  // sort order — so the model renders whole on first paint. This never feeds
+  // price, the form, or the "all selected" gate; it's purely what the 3D
+  // viewer shows. Real selections always take precedence.
+  const previewSelection = useMemo<Selection>(() => {
+    if (state.phase !== 'ready') return selection
+    const next: Selection = { ...selection }
+    for (const char of characteristics) {
+      if (char.display_type === 'number') continue
+      if (next[char.id]) continue
+      const ruleDefault = ruleEffect.defaultValues[char.id]
+      const fallback = char.values[0]?.id   // values arrive sorted by sort_order
+      const chosen = ruleDefault ?? fallback
+      if (chosen) next[char.id] = chosen
+    }
+    return next
+  }, [state, selection, characteristics, ruleEffect])
+
   return (
     <div class="cw-root">
       {/* Product image */}
-      <Visualization assets={assets} selection={selection} numericInputs={numericInputs} arEnabled={product.ar_enabled} arPlacement={product.ar_placement ?? 'floor'} />
+      <Visualization assets={assets} selection={selection} previewSelection={previewSelection} numericInputs={numericInputs} arEnabled={product.ar_enabled} arPlacement={product.ar_placement ?? 'floor'} />
 
       <div class="cw-body">
         {/* Product info */}

@@ -9,6 +9,11 @@ const MODEL_VIEWER_CDN = 'https://ajax.googleapis.com/ajax/libs/model-viewer/3.5
 interface Props {
   assets:         VisualizationAsset[]
   selection:      Selection
+  /** Display-only selection for the 3D viewer: the real selection with each
+   *  unset characteristic filled by a default value, so mesh-visibility rules
+   *  render a complete model before the customer picks anything. Falls back to
+   *  `selection` when not provided. Never used for the 2D image path. */
+  previewSelection?: Selection
   numericInputs?: NumericInputs
   arEnabled?:     boolean
   arPlacement?:   'floor' | 'wall'
@@ -705,8 +710,13 @@ function ModelViewer3D({
 
 // ── Visualization wrapper ─────────────────────────────────────────────────────
 
-export function Visualization({ assets, selection, numericInputs = {}, arEnabled = true, arPlacement = 'floor' }: Props) {
-  const url3d  = resolve3DAsset(assets, selection)
+export function Visualization({ assets, selection, previewSelection, numericInputs = {}, arEnabled = true, arPlacement = 'floor' }: Props) {
+  // The 3D path uses the preview selection (real selection + filled defaults)
+  // so the model resolves a variant and shows its meshes before the customer
+  // picks anything. The 2D image path keeps using the real selection — it
+  // already falls back to the is_default asset and shouldn't auto-compose.
+  const selection3d = previewSelection ?? selection
+  const url3d  = resolve3DAsset(assets, selection3d)
   const urlImg = resolveImage(assets, selection)
   const [failed, setFailed] = useState(false)
 
@@ -724,7 +734,7 @@ export function Visualization({ assets, selection, numericInputs = {}, arEnabled
         ? <ModelViewer3D
             url={url3d}
             rules={meshRules}
-            selection={selection}
+            selection={selection3d}
             numericInputs={numericInputs}
             arEnabled={arEnabled}
             arPlacement={arPlacement}
