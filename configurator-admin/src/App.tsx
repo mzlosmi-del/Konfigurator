@@ -17,6 +17,8 @@ import { ProductsImportPage } from '@/pages/products/ProductsImportPage'
 import { InquiriesPage } from '@/pages/inquiries/InquiriesPage'
 import { InquiryDetailPage } from '@/pages/inquiries/InquiryDetailPage'
 import { SettingsPage } from '@/pages/settings/SettingsPage'
+import { TemplatesPage } from '@/pages/templates/TemplatesPage'
+import { TemplateBuilderPage } from '@/pages/templates/TemplateBuilderPage'
 import { PreviewPage } from '@/pages/preview/PreviewPage'
 import { LibraryPage } from '@/pages/library/LibraryPage'
 import { QuotationsPage } from '@/pages/quotations/QuotationsPage'
@@ -110,6 +112,9 @@ export function App() {
 
               <Route element={<ProtectedRoute functionality="settings" />}>
                 <Route path="/settings" element={<SettingsPage />} />
+                {/* Custom document templates — additive, gated by settings */}
+                <Route path="/templates"     element={<TemplatesPage />} />
+                <Route path="/templates/:id" element={<TemplateBuilderPage />} />
               </Route>
 
               {/* User manual — login-only, no functionality gate */}

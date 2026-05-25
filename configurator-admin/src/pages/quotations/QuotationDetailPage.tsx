@@ -16,6 +16,7 @@ import { supabase } from '@/lib/supabase'
 import type { Quotation, QuotationStatus, QuotationLineItem, QuotationAdjustment, QuotationRejectionReason, TenantText } from '@/types/database'
 import { PdfLayoutDialog, type PdfSection, type ProductTextGroup, type PdfTextBlock, type ExportFormat } from './PdfLayoutDialog'
 import { SendEmailDialog } from './SendEmailDialog'
+import { CustomTemplateMenu } from './CustomTemplateMenu'
 import { AttachmentsPanel } from '@/components/quotations/AttachmentsPanel'
 import { STATUS_LABELS, statusVariant, STATUS_TRANSITIONS } from './quotationStatusConfig'
 import { PageHeader } from '@/components/layout/PageHeader'
@@ -426,6 +427,14 @@ export function QuotationDetailPage() {
               <FileText className="h-4 w-4 mr-1.5" />
               {t('Technical spec')}
             </Button>
+            {/* Custom document templates — additive export option. Existing
+                exports above are unchanged and remain the default. */}
+            <CustomTemplateMenu
+              quotation={quotation}
+              buildTenantProfile={buildTenantProfile}
+              lang={(quotation.lang as 'en' | 'sr') ?? 'en'}
+              onError={msg => toast({ title: t('Failed to generate document'), description: msg, variant: 'destructive' })}
+            />
             {canEdit && (quotation.status === 'confirmed' || quotation.status === 'sent') && quotation.pdf_url && (
               <Button
                 variant="outline"

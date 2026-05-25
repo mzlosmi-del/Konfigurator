@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { NavLink } from 'react-router-dom'
-import { LayoutDashboard, Package, Inbox, Settings, LogOut, Layers, FileText, BarChart2, Code2, X, DollarSign, History, Shield, Table, HelpCircle } from 'lucide-react'
+import { LayoutDashboard, Package, Inbox, Settings, LogOut, Layers, FileText, BarChart2, Code2, X, DollarSign, History, Shield, Table, HelpCircle, LayoutTemplate } from 'lucide-react'
 import { Logo } from '@/components/ui/Logo'
 import { cn } from '@/lib/utils'
 import { useAuthContext } from '@/components/auth/AuthContext'
@@ -48,6 +48,7 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
     { to: '/quotations', icon: FileText,        label: 'Quotations',  badge: 0,        visible: canViewQuotations },
     { to: '/analytics',  icon: BarChart2,       label: 'Analytics',   badge: 0,        visible: canViewAnalytics },
     { to: '/embed-docs', icon: Code2,           label: 'Embed',       badge: 0,        visible: canViewEmbed },
+    { to: '/templates', icon: LayoutTemplate,  label: 'Templates',   badge: 0,        visible: canViewSettings },
     { to: '/settings',   icon: Settings,        label: 'Settings',    badge: 0,        visible: canViewSettings },
     { to: '/audit-log',  icon: History,         label: 'Audit log',   badge: 0,        visible: isAdmin },
     { to: '/admin/tenants', icon: Shield,       label: 'Super admin', badge: 0,        visible: isSuperAdmin },

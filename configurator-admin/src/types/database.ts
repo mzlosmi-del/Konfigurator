@@ -560,6 +560,24 @@ export interface Database {
         }
         Update: Partial<Database['public']['Tables']['tenant_texts']['Insert']>
       }
+      document_templates: {
+        Row: {
+          id:          string
+          tenant_id:   string
+          name:        string
+          output_kind: 'pdf' | 'docx' | 'xlsx'
+          definition:  Json   // DocumentTemplateDefinition (see lib/docTemplate/types.ts)
+          is_default:  boolean
+          created_at:  string
+          updated_at:  string
+        }
+        Insert: Omit<Database['public']['Tables']['document_templates']['Row'], 'id' | 'created_at' | 'updated_at'> & {
+          id?:         string
+          definition?: Json
+          is_default?: boolean
+        }
+        Update: Partial<Database['public']['Tables']['document_templates']['Insert']>
+      }
     }
     Functions: {
       auth_tenant_id: {
@@ -629,6 +647,9 @@ export type Quotation                  = Database['public']['Tables']['quotation
 export type TenantText                 = Database['public']['Tables']['tenant_texts']['Row']
 export type TenantTextInsert           = Database['public']['Tables']['tenant_texts']['Insert']
 export type TenantTextUpdate           = Database['public']['Tables']['tenant_texts']['Update']
+export type DocumentTemplate           = Database['public']['Tables']['document_templates']['Row']
+export type DocumentTemplateInsert     = Database['public']['Tables']['document_templates']['Insert']
+export type DocumentTemplateUpdate     = Database['public']['Tables']['document_templates']['Update']
 export type QuotationRejectionReason   = Database['public']['Tables']['quotation_rejection_reasons']['Row']
 export type QuotationAttachment        = Database['public']['Tables']['quotation_attachments']['Row']
 export type RolePermission             = Database['public']['Tables']['role_permissions']['Row']
