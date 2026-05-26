@@ -8,6 +8,23 @@ async function getTenantId(): Promise<string> {
   return data as string
 }
 
+const PRODUCT_ASSETS_BUCKET = 'product-assets'
+const PUBLIC_URL_MARKER = `/storage/v1/object/public/${PRODUCT_ASSETS_BUCKET}/`
+
+/**
+ * If `url` is a Supabase public URL into our own `product-assets` bucket,
+ * return the bucket-relative storage path (`{tenantId}/{productId}/{file}`).
+ * Returns null for external / pasted URLs and URLs for any other bucket —
+ * those files are not ours to delete.
+ */
+export function storagePathForAssetUrl(url: string): string | null {
+  if (!url) return null
+  const idx = url.indexOf(PUBLIC_URL_MARKER)
+  if (idx === -1) return null
+  const path = url.slice(idx + PUBLIC_URL_MARKER.length)
+  return path.length > 0 ? path : null
+}
+
 export async function fetchAssetsForProduct(productId: string): Promise<VisualizationAsset[]> {
   const { data, error } = await supabase
     .from('visualization_assets')
