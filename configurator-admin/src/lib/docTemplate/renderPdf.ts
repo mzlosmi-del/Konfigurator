@@ -7,7 +7,7 @@
 // all walk the SAME tree against the SAME TemplateContext built by context.ts.
 
 import { PDFDocument, PDFPage, PDFFont } from 'pdf-lib'
-import { C, wrapText, loadFonts, loadLogo, type TenantProfile, type EmbeddedImage } from '@/lib/pdf/shared'
+import { C, wrapText, loadFonts, loadLogo, getFooterLabel, type TenantProfile, type EmbeddedImage } from '@/lib/pdf/shared'
 import type { Quotation, TenantText } from '@/types/database'
 import type { Lang } from '@/i18n'
 import type {
@@ -16,7 +16,8 @@ import type {
 import { buildTemplateContext, type ImageResolver, type TemplateContext } from './context'
 import { evaluateCondition } from './conditions'
 import { interpolate, resolveDisplay, resolveRaw, resolveCollection, type ScopeStack } from './resolvePath'
-import { SIZE_PT, HEADING_SIZE, COLOR_RGB, sizePt, isBold, alignOf, colorOf } from './style'
+import { SIZE_PT, HEADING_SIZE, COLOR_RGB, sizePt, isBold, alignOf, colorOf, lineSpacingOf } from './style'
+import { collectBindingImageUrls } from './collectImages'
 
 export interface RenderPdfArgs {
   definition: DocumentTemplateDefinition
@@ -81,6 +82,24 @@ export async function renderTemplateToPdf(args: RenderPdfArgs): Promise<Uint8Arr
     page.drawText(clean, { x, y, size, font, color })
   }
 
+  /** Draw one line stretched to the full content width by padding inter-word
+   *  gaps evenly (poor-man's justification). */
+  function drawJustified(str: string, size: number, font: PDFFont, color: ReturnType<typeof colorFor>) {
+    const clean = str.replace(/[\x00-\x09\x0b-\x1f\x7f]/g, ' ').trim()
+    const words = clean.split(/\s+/)
+    if (words.length < 2) { drawAligned(clean, size, font, color, 'left'); return }
+    const wordsW = words.reduce((s, w) => s + font.widthOfTextAtSize(w, size), 0)
+    const extra  = (COL - wordsW) / (words.length - 1)
+    // Don't stretch absurdly (e.g. a short last-but-one line) — cap the gap.
+    const spaceW = font.widthOfTextAtSize(' ', size)
+    if (extra <= 0 || extra > spaceW * 4) { drawAligned(clean, size, font, color, 'left'); return }
+    let x = MX
+    for (const w of words) {
+      page.drawText(w, { x, y, size, font, color })
+      x += font.widthOfTextAtSize(w, size) + extra
+    }
+  }
+
   // ── Block dispatch ──────────────────────────────────────────────────────
   function renderBlocks(blocks: Block[], scope: ScopeStack) {
     for (const block of blocks) {
@@ -93,15 +112,31 @@ export async function renderTemplateToPdf(args: RenderPdfArgs): Promise<Uint8Arr
     switch (block.kind) {
       case 'text':
       case 'heading': {
-        const size = block.kind === 'heading' ? SIZE_PT[HEADING_SIZE[block.level]] : sizePt(block.style)
-        const font = block.kind === 'heading' ? fontB : fontFor(block.style)
+        const isHeading = block.kind === 'heading'
+        const size = isHeading ? SIZE_PT[HEADING_SIZE[block.level]] : sizePt(block.style)
+        const font = isHeading ? fontB : fontFor(block.style)
+        const color = isHeading ? (block.style?.color ? colorFor(block.style) : C.ink) : colorFor(block.style)
+        const align = alignOf(block.style)
+        const gap = Math.round(size * (lineSpacingOf(block.style) - 1)) + LINE_GAP
+        if (isHeading) y -= block.level === 1 ? 8 : block.level === 2 ? 5 : 3
         const str  = interpolate(block.content, ctx, scope)
         const lines = wrapText(str, font, size, COL)
-        for (const line of lines) {
-          ensureSpace(size + LINE_GAP)
+        lines.forEach((line, i) => {
+          ensureSpace(size + gap)
           y -= size
-          drawAligned(line, size, font, colorFor(block.style), alignOf(block.style))
-          y -= LINE_GAP
+          // Justify only wrapped body lines (not the last line, not headings).
+          if (align === 'justify' && !isHeading && i < lines.length - 1) {
+            drawJustified(line, size, font, color)
+          } else {
+            drawAligned(line, size, font, color, align === 'justify' ? 'left' : align)
+          }
+          y -= gap
+        })
+        // H1 gets a thin rule beneath it (document-grade section break).
+        if (isHeading && block.level === 1) {
+          y -= 2
+          page.drawLine({ start: { x: MX, y }, end: { x: W - MX, y }, thickness: 0.75, color: C.rule })
+          y -= 6
         }
         break
       }
@@ -146,11 +181,16 @@ export async function renderTemplateToPdf(args: RenderPdfArgs): Promise<Uint8Arr
         y -= block.height
         break
 
+      case 'page-break':
+        newPage()
+        break
+
       case 'repeater': {
         const frames = resolveCollection(ctx, scope, block.over)
-        for (const frame of frames) {
+        frames.forEach((frame, i) => {
+          if (block.pageBreakBefore && i > 0) newPage()
           renderBlocks(block.children, [...scope, frame])
-        }
+        })
         break
       }
 
@@ -169,11 +209,15 @@ export async function renderTemplateToPdf(args: RenderPdfArgs): Promise<Uint8Arr
     for (const w of widths) { xs.push(acc); acc += w }
     const size = 9, rowH = 16
 
+    // Table cells never justify; map to a concrete horizontal alignment.
+    const cellAlign = (a: TableColumn['align']): 'left' | 'center' | 'right' =>
+      a === 'center' || a === 'right' ? a : 'left'
+
     // Header row
     ensureSpace(rowH + 4)
     y -= size
     columns.forEach((c, i) => {
-      drawAligned(interpolate(c.header, ctx, scope), size, fontB, C.muted, c.align ?? 'left', xs[i], xs[i] + widths[i])
+      drawAligned(interpolate(c.header, ctx, scope), size, fontB, C.muted, cellAlign(c.align), xs[i], xs[i] + widths[i])
     })
     y -= 4
     page.drawLine({ start: { x: MX, y }, end: { x: W - MX, y }, thickness: 0.5, color: C.rule })
@@ -192,7 +236,7 @@ export async function renderTemplateToPdf(args: RenderPdfArgs): Promise<Uint8Arr
         const v = resolveDisplay(ctx, rowScope, c.value)
         // Truncate to a single line per cell to keep the grid tidy.
         const truncated = truncateToWidth(v, fontR, size, widths[i] - 4)
-        drawAligned(truncated, size, fontR, C.ink, c.align ?? 'left', xs[i], xs[i] + widths[i])
+        drawAligned(truncated, size, fontR, C.ink, cellAlign(c.align), xs[i], xs[i] + widths[i])
       })
       y -= 6
     })
@@ -234,11 +278,17 @@ export async function renderTemplateToPdf(args: RenderPdfArgs): Promise<Uint8Arr
       }
       return
     }
-    const dims = img.scaleToFit(maxW, maxH)
-    ensureSpace(dims.height + 6)
+    // Binding (product/value) figures sized larger and centered like the
+    // hardcoded tech-spec; the logo stays its requested size, left-aligned.
+    const isFigure = source === 'binding'
+    const boxW = isFigure ? Math.max(maxW, 320) : maxW
+    const boxH = isFigure ? Math.max(maxH, 220) : maxH
+    const dims = img.scaleToFit(boxW, boxH)
+    ensureSpace(dims.height + 10)
     y -= dims.height
-    page.drawImage(img, { x: MX, y, width: dims.width, height: dims.height })
-    y -= 6
+    const x = isFigure ? MX + (COL - dims.width) / 2 : MX
+    page.drawImage(img, { x, y, width: dims.width, height: dims.height })
+    y -= 10
   }
 
   function label(en: string, sr: string): string {
@@ -246,6 +296,22 @@ export async function renderTemplateToPdf(args: RenderPdfArgs): Promise<Uint8Arr
   }
 
   renderBlocks(args.definition.blocks ?? [], [])
+
+  // ── Optional footer with page numbers (post-pass: total count is known now) ─
+  if (args.definition.page?.footer) {
+    const L = { page: args.lang === 'en' ? 'Page' : 'Strana', of: args.lang === 'en' ? 'of' : 'od' }
+    const footerLabel = (args.definition.page.footerLabel ?? '').trim()
+      || getFooterLabel(args.tenant, args.tenant.name, args.texts, args.lang)
+    const pages = pdfDoc.getPages()
+    pages.forEach((pg, i) => {
+      pg.drawLine({ start: { x: MX, y: FOOTER_BASELINE + 12 }, end: { x: W - MX, y: FOOTER_BASELINE + 12 }, thickness: 0.5, color: C.rule })
+      pg.drawText(footerLabel.replace(/[\x00-\x1f\x7f]/g, ' '), { x: MX, y: FOOTER_BASELINE, size: 8, font: fontR, color: C.muted })
+      const pageStr = `${L.page} ${i + 1} ${L.of} ${pages.length}`
+      const w = fontR.widthOfTextAtSize(pageStr, 8)
+      pg.drawText(pageStr, { x: W - MX - w, y: FOOTER_BASELINE, size: 8, font: fontR, color: C.muted })
+    })
+  }
+
   return pdfDoc.save()
 }
 
@@ -260,29 +326,6 @@ function truncateToWidth(str: string, font: PDFFont, size: number, maxWidth: num
     else hi = mid - 1
   }
   return clean.slice(0, lo) + '…'
-}
-
-/** Walk the block tree the same way the renderer does (entering repeaters and
- *  pushing scope frames) and collect every distinct URL referenced by a
- *  binding-sourced image block, so they can be embedded up front. */
-function collectBindingImageUrls(blocks: Block[], ctx: TemplateContext): Set<string> {
-  const urls = new Set<string>()
-  const walk = (bs: Block[], scope: ScopeStack) => {
-    for (const b of bs) {
-      // Note: we ignore `visible` here — over-collecting a few URLs is harmless
-      // and far cheaper than re-deriving visibility across all scope frames.
-      if (b.kind === 'image' && b.source === 'binding' && b.binding) {
-        const url = resolveRaw(ctx, scope, b.binding)
-        if (typeof url === 'string' && url) urls.add(url)
-      } else if (b.kind === 'repeater') {
-        for (const frame of resolveCollection(ctx, scope, b.over)) walk(b.children, [...scope, frame])
-      } else if (b.kind === 'group') {
-        walk(b.children, scope)
-      }
-    }
-  }
-  walk(blocks, [])
-  return urls
 }
 
 // Re-export so callers can build a context directly if needed.

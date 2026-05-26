@@ -3,7 +3,15 @@ import { useParams, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, Save, Type, Heading, Table2, Image as ImageIcon,
   Minus, MoveVertical, Repeat, Box, ListTree, Download, GripVertical,
+  SeparatorHorizontal, ChevronUp, ChevronDown,
 } from 'lucide-react'
+import {
+  DndContext, closestCenter, PointerSensor, useSensor, useSensors, type DragEndEvent,
+} from '@dnd-kit/core'
+import {
+  SortableContext, verticalListSortingStrategy, useSortable,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/spinner'
@@ -11,7 +19,7 @@ import { Toaster } from '@/components/ui/toast'
 import { useToast } from '@/hooks/useToast'
 import { useCanEdit } from '@/hooks/usePermission'
 import { t } from '@/i18n'
-import type { Block, BlockKind, DocumentTemplateDefinition } from '@/lib/docTemplate/types'
+import type { Block, BlockKind, DocumentTemplateDefinition, PageOptions } from '@/lib/docTemplate/types'
 import { buildTemplateContext } from '@/lib/docTemplate/context'
 import { fetchTemplate, updateTemplate, type DocumentTemplateRow } from '@/lib/docTemplate/templates'
 import { renderTemplateToPdf } from '@/lib/docTemplate/renderPdf'
@@ -23,6 +31,7 @@ import { TemplateCanvas } from './TemplateCanvas'
 import { BlockProperties } from './BlockProperties'
 import {
   makeBlock, updateBlock, removeBlock, addBlock, findBlock, activeScopesFor,
+  moveBlock, reorderSiblings, parentIdOf,
 } from './treeOps'
 
 const PALETTE: { kind: BlockKind; label: string; Icon: typeof Type }[] = [
@@ -35,6 +44,7 @@ const PALETTE: { kind: BlockKind; label: string; Icon: typeof Type }[] = [
   { kind: 'group',            label: 'Group',       Icon: Box },
   { kind: 'divider',          label: 'Divider',     Icon: Minus },
   { kind: 'spacer',           label: 'Spacer',      Icon: MoveVertical },
+  { kind: 'page-break',       label: 'Page break',  Icon: SeparatorHorizontal },
 ]
 
 export function TemplateBuilderPage() {
@@ -47,17 +57,20 @@ export function TemplateBuilderPage() {
   const [row, setRow]           = useState<DocumentTemplateRow | null>(null)
   const [name, setName]         = useState('')
   const [blocks, setBlocks]     = useState<Block[]>([])
+  const [page, setPage]         = useState<PageOptions>({})
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [previewLang, setPreviewLang] = useState<'en' | 'sr'>('en')
   const [saving, setSaving]     = useState(false)
   const [exporting, setExporting] = useState(false)
   const [dirty, setDirty]       = useState(false)
 
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }))
+
   useEffect(() => {
     if (!id) return
     setLoading(true)
     fetchTemplate(id)
-      .then(r => { setRow(r); setName(r.name); setBlocks(r.definition.blocks ?? []) })
+      .then(r => { setRow(r); setName(r.name); setBlocks(r.definition.blocks ?? []); setPage(r.definition.page ?? {}) })
       .catch(err => toast({ title: t('Failed to load template'), description: String(err), variant: 'destructive' }))
       .finally(() => setLoading(false))
   }, [id])
@@ -93,11 +106,28 @@ export function TemplateBuilderPage() {
     setSelectedId(null)
   }
 
+  function handleMove(blockId: string, dir: 'up' | 'down') {
+    mutate(moveBlock(blocks, blockId, dir))
+  }
+
+  function handleReorder(fromId: string, toId: string) {
+    if (fromId === toId) return
+    // Only reorder when both blocks share a parent (dnd is per-sibling-list).
+    const parent = parentIdOf(blocks, fromId)
+    if (parent === undefined || parent !== parentIdOf(blocks, toId)) return
+    mutate(reorderSiblings(blocks, parent, fromId, toId))
+  }
+
+  function setPageOpt(patch: Partial<PageOptions>) {
+    setPage(p => ({ ...p, ...patch }))
+    setDirty(true)
+  }
+
   async function handleSave() {
     if (!id) return
     setSaving(true)
     try {
-      const definition: DocumentTemplateDefinition = { version: 1, blocks }
+      const definition: DocumentTemplateDefinition = { version: 1, blocks, page }
       const updated = await updateTemplate(id, { name: name.trim() || t('Untitled'), definition })
       setRow(updated)
       setDirty(false)
@@ -113,7 +143,7 @@ export function TemplateBuilderPage() {
     if (!row) return
     setExporting(true)
     try {
-      const definition: DocumentTemplateDefinition = { version: 1, blocks }
+      const definition: DocumentTemplateDefinition = { version: 1, blocks, page }
       const args = { definition, quotation, tenant, texts, lang: previewLang }
       const fileBase = `${(name || 'template').replace(/\s+/g, '_')}_sample`
       if (row.output_kind === 'pdf')  downloadBytes(await renderTemplateToPdf(args),  'pdf',  fileBase)
@@ -177,9 +207,34 @@ export function TemplateBuilderPage() {
               </div>
             </div>
           )}
+          {canEdit && (
+            <div className="p-3 border-b">
+              <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">{t('Page')}</p>
+              <label className="flex items-center gap-2 text-xs">
+                <input type="checkbox" checked={!!page.footer} onChange={e => setPageOpt({ footer: e.target.checked })} />
+                {t('Footer with page numbers')}
+              </label>
+              {page.footer && (
+                <Input
+                  className="mt-2 h-8 text-xs"
+                  value={page.footerLabel ?? ''}
+                  placeholder={t('Footer label (default: company name)')}
+                  onChange={e => setPageOpt({ footerLabel: e.target.value })}
+                />
+              )}
+            </div>
+          )}
           <div className="p-3 flex-1">
             <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">{t('Structure')}</p>
-            <TreeView blocks={blocks} selectedId={selectedId} onSelect={setSelectedId} depth={0} />
+            <TreeView
+              blocks={blocks}
+              selectedId={selectedId}
+              onSelect={setSelectedId}
+              onMove={canEdit ? handleMove : undefined}
+              onReorder={canEdit ? handleReorder : undefined}
+              sensors={sensors}
+              depth={0}
+            />
           </div>
         </div>
 
@@ -208,34 +263,109 @@ export function TemplateBuilderPage() {
   )
 }
 
-// ── Tree view (flat indented list; selection only — reordering is via the
-//    add-into-selected flow and delete; full drag-reorder is a later polish) ──
+// ── Tree view — drag-to-reorder within a sibling list (@dnd-kit) plus ▲/▼
+//    buttons. Drag is scoped per sibling list; cross-parent moves aren't
+//    supported in v1 (use add-into-selected + delete to restructure). ──
 
-function TreeView({ blocks, selectedId, onSelect, depth }: {
-  blocks: Block[]; selectedId: string | null; onSelect: (id: string) => void; depth: number
-}) {
-  return (
+interface TreeProps {
+  blocks:     Block[]
+  selectedId: string | null
+  onSelect:   (id: string) => void
+  onMove?:    (id: string, dir: 'up' | 'down') => void
+  onReorder?: (fromId: string, toId: string) => void
+  sensors:    ReturnType<typeof useSensors>
+  depth:      number
+}
+
+function TreeView({ blocks, selectedId, onSelect, onMove, onReorder, sensors, depth }: TreeProps) {
+  function handleDragEnd(e: DragEndEvent) {
+    const { active, over } = e
+    if (over && active.id !== over.id) onReorder?.(String(active.id), String(over.id))
+  }
+
+  const list = (
     <div className="space-y-0.5">
-      {blocks.map(block => (
-        <div key={block.id}>
-          <button
-            onClick={() => onSelect(block.id)}
-            style={{ paddingLeft: 8 + depth * 14 }}
-            className={[
-              'w-full flex items-center gap-1.5 text-left text-xs rounded px-2 py-1 transition-colors',
-              block.id === selectedId ? 'bg-primary/10 text-primary font-medium' : 'hover:bg-muted/50',
-            ].join(' ')}
-          >
-            <GripVertical className="h-3 w-3 text-muted-foreground/40 shrink-0" />
-            <span className="capitalize truncate">{block.kind.replace('-', ' ')}</span>
-          </button>
-          {(block.kind === 'repeater' || block.kind === 'group') && (
-            <TreeView blocks={block.children} selectedId={selectedId} onSelect={onSelect} depth={depth + 1} />
-          )}
-        </div>
+      {blocks.map((block, i) => (
+        <TreeRow
+          key={block.id}
+          block={block}
+          index={i}
+          count={blocks.length}
+          selectedId={selectedId}
+          onSelect={onSelect}
+          onMove={onMove}
+          onReorder={onReorder}
+          sensors={sensors}
+          depth={depth}
+          draggable={!!onReorder}
+        />
       ))}
       {blocks.length === 0 && depth === 0 && (
         <p className="text-xs text-muted-foreground italic px-2 py-1">{t('Empty — add a block above.')}</p>
+      )}
+    </div>
+  )
+
+  if (!onReorder) return list
+  return (
+    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+      <SortableContext items={blocks.map(b => b.id)} strategy={verticalListSortingStrategy}>
+        {list}
+      </SortableContext>
+    </DndContext>
+  )
+}
+
+function TreeRow({ block, index, count, selectedId, onSelect, onMove, onReorder, sensors, depth, draggable }: {
+  block: Block; index: number; count: number; draggable: boolean
+} & Omit<TreeProps, 'blocks'>) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: block.id, disabled: !draggable })
+  const style: React.CSSProperties = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 }
+  const isContainer = block.kind === 'repeater' || block.kind === 'group'
+
+  return (
+    <div ref={setNodeRef} style={style}>
+      <div
+        className={[
+          'group/row w-full flex items-center gap-1 text-xs rounded px-1 py-1 transition-colors',
+          block.id === selectedId ? 'bg-primary/10 text-primary font-medium' : 'hover:bg-muted/50',
+        ].join(' ')}
+        style={{ paddingLeft: 4 + depth * 14 }}
+      >
+        {draggable ? (
+          <button {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing text-muted-foreground/50 hover:text-foreground shrink-0" aria-label={t('Drag to reorder')}>
+            <GripVertical className="h-3 w-3" />
+          </button>
+        ) : <GripVertical className="h-3 w-3 text-muted-foreground/30 shrink-0" />}
+
+        <button onClick={() => onSelect(block.id)} className="flex-1 text-left capitalize truncate">
+          {block.kind.replace('-', ' ')}
+        </button>
+
+        {onMove && (
+          <span className="flex items-center opacity-0 group-hover/row:opacity-100 transition-opacity">
+            <button onClick={() => onMove(block.id, 'up')} disabled={index === 0}
+              className="text-muted-foreground hover:text-foreground disabled:opacity-20 p-0.5" aria-label={t('Move up')}>
+              <ChevronUp className="h-3 w-3" />
+            </button>
+            <button onClick={() => onMove(block.id, 'down')} disabled={index === count - 1}
+              className="text-muted-foreground hover:text-foreground disabled:opacity-20 p-0.5" aria-label={t('Move down')}>
+              <ChevronDown className="h-3 w-3" />
+            </button>
+          </span>
+        )}
+      </div>
+
+      {isContainer && (
+        <TreeView
+          blocks={block.children}
+          selectedId={selectedId}
+          onSelect={onSelect}
+          onMove={onMove}
+          onReorder={onReorder}
+          sensors={sensors}
+          depth={depth + 1}
+        />
       )}
     </div>
   )

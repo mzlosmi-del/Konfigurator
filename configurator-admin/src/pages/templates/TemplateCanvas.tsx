@@ -5,11 +5,11 @@
 // goal — fast feedback on every edit is.
 
 import { Fragment } from 'react'
-import type { Block, BlockStyle, StyleAlign } from '@/lib/docTemplate/types'
+import type { Block, BlockStyle } from '@/lib/docTemplate/types'
 import type { TemplateContext } from '@/lib/docTemplate/context'
 import { evaluateCondition } from '@/lib/docTemplate/conditions'
 import { interpolate, resolveDisplay, resolveCollection, type ScopeStack } from '@/lib/docTemplate/resolvePath'
-import { SIZE_PT, HEADING_SIZE, colorHex, sizePt, isBold, alignOf, colorOf } from '@/lib/docTemplate/style'
+import { SIZE_PT, HEADING_SIZE, colorHex, sizePt, isBold, alignOf, colorOf, lineSpacingOf } from '@/lib/docTemplate/style'
 
 interface Props {
   blocks:        Block[]
@@ -23,7 +23,8 @@ function cssStyle(style: BlockStyle | undefined, ptOverride?: number): React.CSS
   return {
     fontSize:   `${ptOverride ?? sizePt(style)}px`,
     fontWeight: isBold(style) ? 700 : 400,
-    textAlign:  (alignOf(style) as StyleAlign),
+    textAlign:  alignOf(style) as React.CSSProperties['textAlign'],
+    lineHeight: lineSpacingOf(style),
     color:      `#${colorHex(colorOf(style))}`,
   }
 }
@@ -109,10 +110,21 @@ function BlockView({ block, ctx, scope, hidden, selectedId, onSelectBlock }: {
       return wrap(<div style={{ borderTop: '1px solid #D2D4D8', margin: '6px 0' }} />)
     case 'spacer':
       return wrap(<div style={{ height: block.height }} />)
+    case 'page-break':
+      return wrap(
+        <div className="flex items-center gap-2 my-2 text-[9px] uppercase tracking-widest text-[#ADB1B7] select-none">
+          <div className="flex-1 border-t border-dashed border-[#ADB1B7]" />
+          {'Page break'}
+          <div className="flex-1 border-t border-dashed border-[#ADB1B7]" />
+        </div>
+      )
     case 'repeater': {
       const frames = resolveCollection(ctx, scope, block.over)
       return wrap(
         <div className="border-l-2 border-dashed border-blue-200 pl-2">
+          {block.pageBreakBefore && (
+            <div className="text-[8px] uppercase tracking-wider text-[#ADB1B7] mb-0.5">{'↵ new page per item'}</div>
+          )}
           {frames.length === 0
             ? <Placeholder text={`repeat: ${block.over} (no items)`} />
             : frames.map((frame, i) => (

@@ -26,24 +26,27 @@ export type Condition =
 // All enums map to a single shared table (see style.ts) that gives concrete pt
 // sizes and palette colours, so PDF / DOCX / XLSX / HTML preview all agree.
 
-export type StyleSize   = 'sm' | 'base' | 'lg' | 'xl'
-export type StyleWeight = 'normal' | 'bold'
-export type StyleAlign  = 'left' | 'center' | 'right'
+export type StyleSize    = 'sm' | 'base' | 'lg' | 'xl'
+export type StyleWeight  = 'normal' | 'bold'
+export type StyleAlign   = 'left' | 'center' | 'right' | 'justify'
+/** Line spacing presets — mapped to concrete values per renderer in style.ts. */
+export type StyleSpacing = 'tight' | 'normal' | 'relaxed'
 /** Palette keys — resolved against the shared `C` palette from pdf/shared.ts. */
 export type StyleColor  = 'ink' | 'muted' | 'accent' | 'positive' | 'negative'
 
 export interface BlockStyle {
-  size?:   StyleSize
-  weight?: StyleWeight
-  align?:  StyleAlign
-  color?:  StyleColor
+  size?:        StyleSize
+  weight?:      StyleWeight
+  align?:       StyleAlign
+  color?:       StyleColor
+  lineSpacing?: StyleSpacing
 }
 
 // ── Blocks ──────────────────────────────────────────────────────────────────
 
 export type BlockKind =
   | 'text' | 'heading' | 'key-value' | 'line-items-table'
-  | 'image' | 'divider' | 'spacer' | 'repeater' | 'group'
+  | 'image' | 'divider' | 'spacer' | 'page-break' | 'repeater' | 'group'
 
 interface BlockBase {
   id:       string
@@ -113,6 +116,11 @@ export interface SpacerBlock extends BlockBase {
   height: number   // pt
 }
 
+/** Forces a new page in PDF/DOCX (a visible separator row in XLSX). */
+export interface PageBreakBlock extends BlockBase {
+  kind: 'page-break'
+}
+
 /** Collection paths a repeater may loop over. */
 export type CollectionPath = 'quotation.line_items' | 'line_item.configuration'
 
@@ -120,6 +128,8 @@ export interface RepeaterBlock extends BlockBase {
   kind:     'repeater'
   over:     CollectionPath
   children: Block[]
+  /** When true, each iteration after the first starts on a new page. */
+  pageBreakBefore?: boolean
 }
 
 export interface GroupBlock extends BlockBase {
@@ -129,13 +139,23 @@ export interface GroupBlock extends BlockBase {
 
 export type Block =
   | TextBlock | HeadingBlock | KeyValueBlock | LineItemsTableBlock
-  | ImageBlock | DividerBlock | SpacerBlock | RepeaterBlock | GroupBlock
+  | ImageBlock | DividerBlock | SpacerBlock | PageBreakBlock | RepeaterBlock | GroupBlock
+
+/** Document-level page options. */
+export interface PageOptions {
+  /** When true, render a footer with a label + "Page X of Y" on every page. */
+  footer?:      boolean
+  /** Footer label; defaults to the tenant footer / tenant name when omitted. */
+  footerLabel?: string
+}
 
 /** Top-level template definition (the `definition` JSONB column). */
 export interface DocumentTemplateDefinition {
   /** Schema version for forward migrations. */
   version: 1
   blocks:  Block[]
+  /** Optional page-level options (footer / page numbers). */
+  page?:   PageOptions
 }
 
 export type OutputKind = 'pdf' | 'docx' | 'xlsx'

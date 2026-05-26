@@ -25,6 +25,7 @@ export function makeBlock(kind: BlockKind): Block {
     case 'image':            return { id, kind, source: 'tenant_logo', maxHeight: 40, maxWidth: 160 }
     case 'divider':          return { id, kind }
     case 'spacer':           return { id, kind, height: 8 }
+    case 'page-break':       return { id, kind }
     case 'repeater':         return { id, kind, over: 'quotation.line_items', children: [] }
     case 'group':            return { id, kind, children: [] }
   }
@@ -89,6 +90,38 @@ export function reorderSiblings(blocks: Block[], parentId: string | null, fromId
     if (hasChildren(b)) return { ...b, children: reorderSiblings(b.children, parentId, fromId, toId) } as Block
     return b
   })
+}
+
+/** The parentId (null for top level) of the block with the given id, or
+ *  undefined if not found. Used to scope a sibling reorder/move to one list. */
+export function parentIdOf(blocks: Block[], id: string, parent: string | null = null): string | null | undefined {
+  for (const b of blocks) {
+    if (b.id === id) return parent
+    if (hasChildren(b)) {
+      const found = parentIdOf(b.children, id, b.id)
+      if (found !== undefined) return found
+    }
+  }
+  return undefined
+}
+
+/** Move a block up or down among its siblings (no reparenting). No-op at the
+ *  ends of the list. */
+export function moveBlock(blocks: Block[], id: string, dir: 'up' | 'down'): Block[] {
+  const swap = (arr: Block[]): Block[] => {
+    const i = arr.findIndex(b => b.id === id)
+    if (i < 0) return arr
+    const j = dir === 'up' ? i - 1 : i + 1
+    if (j < 0 || j >= arr.length) return arr
+    const next = [...arr]
+    ;[next[i], next[j]] = [next[j], next[i]]
+    return next
+  }
+  // Try the top level first, then recurse into containers.
+  if (blocks.some(b => b.id === id)) return swap(blocks)
+  return blocks.map(b =>
+    hasChildren(b) ? ({ ...b, children: moveBlock(b.children, id, dir) } as Block) : b,
+  )
 }
 
 /** Compute the set of binding scopes active at a block's position by walking the

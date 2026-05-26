@@ -80,38 +80,44 @@ export function makeTechSpecTemplate(): DocumentTemplateDefinition {
   _seq = 0
   return {
     version: 1,
+    // Footer with page numbers on every page, like the hardcoded tech-spec.
+    page: { footer: true },
     blocks: [
-      // Title block (cover-page content, flattened — no separate cover page).
-      { id: id(), kind: 'image', source: 'tenant_logo', maxHeight: 50, maxWidth: 200, style: { align: 'center' } },
+      // Title block (cover-page content). A page break after it gives the
+      // title its own opening page, then chapters start fresh.
+      { id: id(), kind: 'spacer', height: 80 },
+      { id: id(), kind: 'image', source: 'tenant_logo', maxHeight: 80, maxWidth: 260, style: { align: 'center' } },
       { id: id(), kind: 'heading', level: 1, content: 'Technical Specification', style: { color: 'accent', weight: 'bold', align: 'center' } },
       { id: id(), kind: 'key-value', rows: [
         { label: 'Prepared for', value: 'quotation.customer_name' },
         { label: 'Reference',    value: 'quotation.reference_number' },
         { label: 'Date',         value: 'quotation.created_at' },
       ] },
-      { id: id(), kind: 'divider' },
+      { id: id(), kind: 'page-break' },
 
-      // One chapter per product, then one sub-section per configuration item.
-      { id: id(), kind: 'repeater', over: 'quotation.line_items', children: [
-        { id: id(), kind: 'heading', level: 2, content: '{{line_item.product_name}}', style: { weight: 'bold' } },
+      // One chapter per product (each starts on its own page), then one
+      // sub-section per configuration item. Spec text is justified for a
+      // document-grade column.
+      { id: id(), kind: 'repeater', over: 'quotation.line_items', pageBreakBefore: true, children: [
+        { id: id(), kind: 'heading', level: 1, content: '{{line_item.product_name}}', style: { weight: 'bold' } },
         { id: id(), kind: 'group',
           visible: { type: 'cmp', field: 'line_item.specification', op: 'not-empty' },
           children: [
-            { id: id(), kind: 'text', content: '{{line_item.specification}}' },
+            { id: id(), kind: 'text', content: '{{line_item.specification}}', style: { align: 'justify' } },
           ],
         },
-        { id: id(), kind: 'image', source: 'binding', binding: 'line_item.product_image', maxWidth: 320, maxHeight: 240 },
+        { id: id(), kind: 'image', source: 'binding', binding: 'line_item.product_image', maxWidth: 420, maxHeight: 300 },
 
         { id: id(), kind: 'repeater', over: 'line_item.configuration', children: [
-          { id: id(), kind: 'heading', level: 3,
+          { id: id(), kind: 'heading', level: 2,
             content: '{{config_item.characteristic_name}}: {{config_item.value_label}}' },
           { id: id(), kind: 'group',
             visible: { type: 'cmp', field: 'config_item.specification', op: 'not-empty' },
             children: [
-              { id: id(), kind: 'text', content: '{{config_item.specification}}', style: { size: 'sm' } },
+              { id: id(), kind: 'text', content: '{{config_item.specification}}', style: { align: 'justify' } },
             ],
           },
-          { id: id(), kind: 'image', source: 'binding', binding: 'config_item.value_image', maxWidth: 240, maxHeight: 180 },
+          { id: id(), kind: 'image', source: 'binding', binding: 'config_item.value_image', maxWidth: 320, maxHeight: 220 },
         ] },
         { id: id(), kind: 'spacer', height: 10 },
       ] },

@@ -2,7 +2,7 @@
 // Binding pickers are filtered to the scopes active at the block's tree
 // position, so authors can never reference an invalid path.
 
-import type { Block, BlockStyle, Condition, CompareOp, StyleSize, StyleColor, StyleAlign, TableColumn, KeyValueRow } from '@/lib/docTemplate/types'
+import type { Block, BlockStyle, Condition, CompareOp, StyleSize, StyleColor, StyleAlign, StyleSpacing, TableColumn, KeyValueRow } from '@/lib/docTemplate/types'
 import type { BindingScope } from '@/lib/docTemplate/bindings'
 import { fieldsForScopes, bindingLabel } from '@/lib/docTemplate/bindings'
 import { Input } from '@/components/ui/input'
@@ -23,7 +23,9 @@ interface Props {
 
 const SIZES:  StyleSize[]  = ['sm', 'base', 'lg', 'xl']
 const COLORS: StyleColor[] = ['ink', 'muted', 'accent', 'positive', 'negative']
-const ALIGNS: StyleAlign[] = ['left', 'center', 'right']
+const ALIGNS: StyleAlign[] = ['left', 'center', 'right']           // table cells
+const TEXT_ALIGNS: StyleAlign[] = ['left', 'center', 'right', 'justify'] // text/headings
+const SPACINGS: StyleSpacing[] = ['tight', 'normal', 'relaxed']
 const OPS: CompareOp[] = ['is-empty', 'not-empty', 'eq', 'neq', 'gt', 'gte', 'lt', 'lte']
 
 export function BlockProperties({ block, scopes, onChange, onDelete, readOnly }: Props) {
@@ -101,6 +103,11 @@ export function BlockProperties({ block, scopes, onChange, onDelete, readOnly }:
               <option key={c} value={c}>{c === 'quotation.line_items' ? t('Line items') : t('Configuration of a line item')}</option>
             ))}
           </Select>
+          <label className="flex items-center gap-2 text-xs mt-2">
+            <input type="checkbox" checked={!!block.pageBreakBefore} disabled={disabled}
+              onChange={e => onChange({ pageBreakBefore: e.target.checked } as Partial<Block>)} />
+            {t('Start each item on a new page')}
+          </label>
         </Field>
       )}
 
@@ -128,12 +135,17 @@ export function BlockProperties({ block, scopes, onChange, onDelete, readOnly }:
           </Field>
           <Field label={t('Align')}>
             <Select value={block.style?.align ?? 'left'} disabled={disabled} onChange={e => setStyle({ align: e.target.value as StyleAlign })}>
-              {ALIGNS.map(a => <option key={a} value={a}>{a}</option>)}
+              {TEXT_ALIGNS.map(a => <option key={a} value={a}>{a}</option>)}
             </Select>
           </Field>
           <Field label={t('Color')}>
             <Select value={block.style?.color ?? 'ink'} disabled={disabled} onChange={e => setStyle({ color: e.target.value as StyleColor })}>
               {COLORS.map(c => <option key={c} value={c}>{c}</option>)}
+            </Select>
+          </Field>
+          <Field label={t('Line spacing')}>
+            <Select value={block.style?.lineSpacing ?? 'normal'} disabled={disabled} onChange={e => setStyle({ lineSpacing: e.target.value as StyleSpacing })}>
+              {SPACINGS.map(s => <option key={s} value={s}>{s}</option>)}
             </Select>
           </Field>
         </div>

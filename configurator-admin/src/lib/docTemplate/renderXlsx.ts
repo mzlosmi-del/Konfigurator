@@ -27,7 +27,10 @@ const FONT = 'Calibri'
 const COLS = 12              // A..L
 const COL_LETTERS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L']
 
-function alignH(a: StyleAlign): 'left' | 'center' | 'right' { return a }
+// Excel cells have no 'justify' for our purposes — treat it as left.
+function alignH(a: StyleAlign): 'left' | 'center' | 'right' {
+  return a === 'center' || a === 'right' ? a : 'left'
+}
 // exceljs ARGB wants an alpha prefix on the 6-digit hex.
 const argb = (color: BlockStyle['color']) => `FF${colorHex(color ?? 'ink')}`
 
@@ -95,9 +98,19 @@ export async function renderTemplateToXlsx(args: RenderXlsxArgs): Promise<Uint8A
         ws.getRow(row).height = Math.max(6, block.height)
         row += 1
         break
-      case 'repeater':
-        for (const frame of resolveCollection(ctx, scope, block.over)) emit(block.children, [...scope, frame])
+      case 'page-break':
+        // Print-time horizontal page break above the current row.
+        ws.getRow(row).addPageBreak?.()
+        row += 1
         break
+      case 'repeater': {
+        const frames = resolveCollection(ctx, scope, block.over)
+        frames.forEach((frame, i) => {
+          if (block.pageBreakBefore && i > 0) ws.getRow(row).addPageBreak?.()
+          emit(block.children, [...scope, frame])
+        })
+        break
+      }
       case 'group':
         emit(block.children, scope)
         break

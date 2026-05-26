@@ -9,8 +9,16 @@ import { renderTemplateToPdf } from '@/lib/docTemplate/renderPdf'
 import { renderTemplateToDocx } from '@/lib/docTemplate/renderDocx'
 import { renderTemplateToXlsx } from '@/lib/docTemplate/renderXlsx'
 import { makeSampleTemplate } from '@/lib/docTemplate/sampleTemplate'
-import { TEMPLATE_PRESETS } from '@/lib/docTemplate/presets'
+import { TEMPLATE_PRESETS, makeTechSpecTemplate } from '@/lib/docTemplate/presets'
+import type { ImageResolver } from '@/lib/docTemplate/context'
+import type { DocumentTemplateDefinition } from '@/lib/docTemplate/types'
 import { quotation, tenant, texts } from '@/__fixtures__/quotationFixture'
+
+// 1×1 transparent PNG (matches the fixture's asset data URL) served for any
+// non-font fetch so the image-embedding paths run end-to-end.
+const PIXEL_PNG = Uint8Array.from(atob(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=',
+), c => c.charCodeAt(0))
 
 // pdf-lib's loadFonts fetch('/fonts/..') has no server in jsdom; serve the real
 // font files from the public dir off disk instead.
@@ -23,11 +31,17 @@ beforeAll(() => {
       const bytes = readFileSync(resolve(__dirname, '../../public/fonts', file))
       return new Response(bytes, { headers: { 'content-type': 'font/ttf' } })
     }
-    // No logo / images in the fixture; any other fetch returns 404.
-    return new Response(null, { status: 404 })
+    // Any image URL → a valid PNG, so logo/binding image embedding runs.
+    return new Response(PIXEL_PNG, { headers: { 'content-type': 'image/png' } })
   }) as typeof fetch
 })
 afterAll(() => { globalThis.fetch = realFetch })
+
+// Resolve every product/value to the pixel PNG so binding images embed.
+const images: ImageResolver = {
+  productImage: () => 'https://example.test/product.png',
+  valueImage:   () => 'https://example.test/value.png',
+}
 
 const def = makeSampleTemplate()
 const args = { definition: def, quotation, tenant, texts, lang: 'en' as const }
@@ -76,4 +90,53 @@ describe('starter presets render to all three formats', () => {
       }
     })
   }
+})
+
+describe('tech-spec preset with footer + per-product pagination', () => {
+  // NOTE: image embedding can't be exercised under vitest — loadLogoBytes probes
+  // natural dimensions via `new Image()` on a blob URL, which never settles in
+  // jsdom (same reason the fixture sets tenant.logo_url = null). We therefore
+  // render WITHOUT an ImageResolver here; binding-image blocks resolve to no URL
+  // and are skipped. The browser path is covered manually. `images` is exported
+  // for completeness / future browser-backed tests.
+  it('renders DOCX and PDF with footer + page breaks', async () => {
+    const a = { definition: makeTechSpecTemplate(), quotation, tenant, texts, lang: 'en' as const }
+    const docx = await renderTemplateToDocx(a)
+    const pdf  = await renderTemplateToPdf(a)
+    expect(String.fromCharCode(docx[0], docx[1])).toBe('PK')
+    expect(String.fromCharCode(...pdf.slice(0, 4))).toBe('%PDF')
+    // The tech-spec preset paginates per product (pageBreakBefore) → multi-page.
+    expect(pdf.length).toBeGreaterThan(3000)
+  })
+
+  it('embeds binding images in the PDF (loadLogo path, no new Image probe)', async () => {
+    // PDF embedding uses pdf-lib loadLogo (no jsdom-incompatible Image probe),
+    // so the image path IS exercisable here. Rendering with the resolver should
+    // embed images and grow the file vs. the no-image render.
+    const base = { definition: makeTechSpecTemplate(), quotation, tenant, texts, lang: 'en' as const }
+    const withImages = await renderTemplateToPdf({ ...base, images })
+    const without    = await renderTemplateToPdf(base)
+    expect(String.fromCharCode(...withImages.slice(0, 4))).toBe('%PDF')
+    expect(withImages.length).toBeGreaterThan(without.length)
+  })
+})
+
+describe('page-break + footer primitives', () => {
+  const def: DocumentTemplateDefinition = {
+    version: 1,
+    page: { footer: true, footerLabel: 'Acme' },
+    blocks: [
+      { id: 'a', kind: 'heading', level: 1, content: 'Page one' },
+      { id: 'b', kind: 'page-break' },
+      { id: 'c', kind: 'heading', level: 1, content: 'Page two', style: { align: 'justify' } },
+      { id: 'd', kind: 'text', content: 'Body text that is fairly long so it can wrap and exercise the justification path across the column width nicely.', style: { align: 'justify', lineSpacing: 'relaxed' } },
+    ],
+  }
+  it('renders to PDF and DOCX without error', async () => {
+    const a = { definition: def, quotation, tenant, texts, lang: 'en' as const }
+    const pdf  = await renderTemplateToPdf(a)
+    const docx = await renderTemplateToDocx(a)
+    expect(String.fromCharCode(...pdf.slice(0, 4))).toBe('%PDF')
+    expect(String.fromCharCode(docx[0], docx[1])).toBe('PK')
+  })
 })
