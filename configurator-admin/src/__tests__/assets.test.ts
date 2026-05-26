@@ -202,4 +202,14 @@ describe('storagePathForAssetUrl', () => {
   it('returns null for empty / non-string input', () => {
     expect(storagePathForAssetUrl('')).toBeNull()
   })
+
+  it('strips a query string from the path', () => {
+    const url = `${PUBLIC}/product-assets/tenant-1/product-1/file.glb?t=1234`
+    expect(storagePathForAssetUrl(url)).toBe('tenant-1/product-1/file.glb')
+  })
+
+  it('returns null for a prefixed bucket name (product-assets-foo)', () => {
+    const url = `${PUBLIC}/product-assets-foo/tenant-1/file.glb`
+    expect(storagePathForAssetUrl(url)).toBeNull()
+  })
 })

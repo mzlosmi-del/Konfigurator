@@ -8,7 +8,7 @@ async function getTenantId(): Promise<string> {
   return data as string
 }
 
-const PRODUCT_ASSETS_BUCKET = 'product-assets'
+export const PRODUCT_ASSETS_BUCKET = 'product-assets'
 const PUBLIC_URL_MARKER = `/storage/v1/object/public/${PRODUCT_ASSETS_BUCKET}/`
 
 /**
@@ -21,7 +21,7 @@ export function storagePathForAssetUrl(url: string): string | null {
   if (!url) return null
   const idx = url.indexOf(PUBLIC_URL_MARKER)
   if (idx === -1) return null
-  const path = url.slice(idx + PUBLIC_URL_MARKER.length)
+  const path = url.slice(idx + PUBLIC_URL_MARKER.length).split('?')[0]
   return path.length > 0 ? path : null
 }
 
@@ -86,6 +86,8 @@ export async function updateAsset(
 
 export async function deleteAsset(id: string): Promise<void> {
   // Look up the URL first so we know whether a hosted file needs cleanup.
+  // The select error is intentionally ignored — cleanup is best-effort; a failed
+  // lookup just skips storage removal and the DB delete still proceeds.
   const { data: row } = await supabase
     .from('visualization_assets')
     .select('url')
