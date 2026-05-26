@@ -80,8 +80,9 @@ export function makeTechSpecTemplate(): DocumentTemplateDefinition {
   _seq = 0
   return {
     version: 1,
-    // Footer with page numbers on every page, like the hardcoded tech-spec.
-    page: { footer: true },
+    // Footer with page numbers + multilevel heading numbering, like the
+    // hardcoded tech-spec (1. Product, 1.1. Characteristic).
+    page: { footer: true, numbering: true },
     blocks: [
       // Title block (cover-page content). A page break after it gives the
       // title its own opening page, then chapters start fresh.
@@ -99,7 +100,7 @@ export function makeTechSpecTemplate(): DocumentTemplateDefinition {
       // sub-section per configuration item. Spec text is justified for a
       // document-grade column.
       { id: id(), kind: 'repeater', over: 'quotation.line_items', pageBreakBefore: true, children: [
-        { id: id(), kind: 'heading', level: 1, content: '{{line_item.product_name}}', style: { weight: 'bold' } },
+        { id: id(), kind: 'heading', level: 1, numbered: true, content: '{{line_item.product_name}}', style: { weight: 'bold' } },
         { id: id(), kind: 'group',
           visible: { type: 'cmp', field: 'line_item.specification', op: 'not-empty' },
           children: [
@@ -109,7 +110,7 @@ export function makeTechSpecTemplate(): DocumentTemplateDefinition {
         { id: id(), kind: 'image', source: 'binding', binding: 'line_item.product_image', maxWidth: 420, maxHeight: 300 },
 
         { id: id(), kind: 'repeater', over: 'line_item.configuration', children: [
-          { id: id(), kind: 'heading', level: 2,
+          { id: id(), kind: 'heading', level: 2, numbered: true,
             content: '{{config_item.characteristic_name}}: {{config_item.value_label}}' },
           { id: id(), kind: 'group',
             visible: { type: 'cmp', field: 'config_item.specification', op: 'not-empty' },

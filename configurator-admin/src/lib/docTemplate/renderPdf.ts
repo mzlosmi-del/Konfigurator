@@ -18,6 +18,7 @@ import { evaluateCondition } from './conditions'
 import { interpolate, resolveDisplay, resolveRaw, resolveCollection, type ScopeStack } from './resolvePath'
 import { SIZE_PT, HEADING_SIZE, COLOR_RGB, sizePt, isBold, alignOf, colorOf, lineSpacingOf } from './style'
 import { collectBindingImageUrls } from './collectImages'
+import { HeadingNumberer, headingIsNumbered, withNumber } from './numbering'
 
 export interface RenderPdfArgs {
   definition: DocumentTemplateDefinition
@@ -37,6 +38,8 @@ const LINE_GAP = 4                        // extra pt between text lines
 
 export async function renderTemplateToPdf(args: RenderPdfArgs): Promise<Uint8Array> {
   const ctx = buildTemplateContext(args.quotation, args.tenant, args.texts, args.lang, args.images)
+  const numberer = new HeadingNumberer()
+  const docNumbering = args.definition.page?.numbering
 
   const pdfDoc = await PDFDocument.create()
   const { fontR, fontB } = await loadFonts(pdfDoc)
@@ -119,7 +122,10 @@ export async function renderTemplateToPdf(args: RenderPdfArgs): Promise<Uint8Arr
         const align = alignOf(block.style)
         const gap = Math.round(size * (lineSpacingOf(block.style) - 1)) + LINE_GAP
         if (isHeading) y -= block.level === 1 ? 8 : block.level === 2 ? 5 : 3
-        const str  = interpolate(block.content, ctx, scope)
+        let str = interpolate(block.content, ctx, scope)
+        if (isHeading && headingIsNumbered(docNumbering, block.numbered)) {
+          str = withNumber(numberer.next(block.level), str)
+        }
         const lines = wrapText(str, font, size, COL)
         lines.forEach((line, i) => {
           ensureSpace(size + gap)

@@ -222,6 +222,10 @@ export function TemplateBuilderPage() {
                   onChange={e => setPageOpt({ footerLabel: e.target.value })}
                 />
               )}
+              <label className="flex items-center gap-2 text-xs mt-2">
+                <input type="checkbox" checked={!!page.numbering} onChange={e => setPageOpt({ numbering: e.target.checked })} />
+                {t('Number headings (1, 1.1, 1.1.1)')}
+              </label>
             </div>
           )}
           <div className="p-3 flex-1">
@@ -255,7 +259,7 @@ export function TemplateBuilderPage() {
 
         {/* Right: live preview */}
         <div className="flex-1 overflow-y-auto bg-[#E8E9EC] flex justify-center py-6 px-4">
-          <TemplateCanvas blocks={blocks} ctx={ctx} selectedId={selectedId ?? undefined} onSelectBlock={setSelectedId} />
+          <TemplateCanvas blocks={blocks} ctx={ctx} page={page} selectedId={selectedId ?? undefined} onSelectBlock={setSelectedId} />
         </div>
       </div>
       <Toaster toasts={toasts} onDismiss={dismiss} />

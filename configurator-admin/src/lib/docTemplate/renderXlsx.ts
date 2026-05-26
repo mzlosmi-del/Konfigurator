@@ -13,6 +13,7 @@ import type { DocumentTemplateDefinition } from './types'
 import { evaluateCondition } from './conditions'
 import { interpolate, resolveDisplay, resolveCollection, type ScopeStack } from './resolvePath'
 import { SIZE_PT, HEADING_SIZE, colorHex, sizePt, isBold, alignOf, colorOf } from './style'
+import { HeadingNumberer, headingIsNumbered, withNumber } from './numbering'
 
 export interface RenderXlsxArgs {
   definition: DocumentTemplateDefinition
@@ -36,6 +37,8 @@ const argb = (color: BlockStyle['color']) => `FF${colorHex(color ?? 'ink')}`
 
 export async function renderTemplateToXlsx(args: RenderXlsxArgs): Promise<Uint8Array> {
   const ctx = buildTemplateContext(args.quotation, args.tenant, args.texts, args.lang, args.images)
+  const numberer = new HeadingNumberer()
+  const docNumbering = args.definition.page?.numbering
   const wb = new ExcelJS.Workbook()
   const ws = wb.addWorksheet('Document', {
     pageSetup: { paperSize: 9, orientation: 'portrait', fitToPage: true, fitToWidth: 1, fitToHeight: 0 },
@@ -65,9 +68,12 @@ export async function renderTemplateToXlsx(args: RenderXlsxArgs): Promise<Uint8A
       case 'text':
         styledText(interpolate(block.content, ctx, scope), block.style)
         break
-      case 'heading':
-        styledText(interpolate(block.content, ctx, scope), { ...block.style, weight: 'bold' }, SIZE_PT[HEADING_SIZE[block.level]])
+      case 'heading': {
+        let htext = interpolate(block.content, ctx, scope)
+        if (headingIsNumbered(docNumbering, block.numbered)) htext = withNumber(numberer.next(block.level), htext)
+        styledText(htext, { ...block.style, weight: 'bold' }, SIZE_PT[HEADING_SIZE[block.level]])
         break
+      }
       case 'key-value':
         for (const kv of block.rows) {
           // label in A:C, value in D:L

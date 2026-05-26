@@ -19,6 +19,7 @@ import { evaluateCondition } from './conditions'
 import { interpolate, resolveDisplay, resolveRaw, resolveCollection, type ScopeStack } from './resolvePath'
 import { SIZE_PT, HEADING_SIZE, colorHex, sizePt, isBold, alignOf, colorOf, lineSpacingOf } from './style'
 import { collectBindingImageUrls } from './collectImages'
+import { HeadingNumberer, headingIsNumbered, withNumber } from './numbering'
 
 const FONT = 'Noto Sans'
 
@@ -57,6 +58,8 @@ function fitImage(natW: number, natH: number, maxW: number, maxH: number) {
 export async function renderTemplateToDocx(args: RenderDocxArgs): Promise<Uint8Array> {
   const ctx = buildTemplateContext(args.quotation, args.tenant, args.texts, args.lang, args.images)
   const L = PDF_LABELS[args.lang]
+  const numberer = new HeadingNumberer()
+  const docNumbering = args.definition.page?.numbering
 
   // ── Pre-pass: embed the logo + every binding image once (async). ──────────
   const logoLoaded = await loadLogoBytes(ctx.tenant.logo_url)
@@ -110,6 +113,8 @@ export async function renderTemplateToDocx(args: RenderDocxArgs): Promise<Uint8A
       }
       case 'heading': {
         const pt = SIZE_PT[HEADING_SIZE[block.level]]
+        let htext = interpolate(block.content, ctx, scope)
+        if (headingIsNumbered(docNumbering, block.numbered)) htext = withNumber(numberer.next(block.level), htext)
         body.push(new Paragraph({
           alignment: ALIGN[alignOf(block.style)],
           spacing: { before: block.level === 1 ? 240 : block.level === 2 ? 200 : 140, after: block.level === 1 ? 120 : 80 },
@@ -117,7 +122,7 @@ export async function renderTemplateToDocx(args: RenderDocxArgs): Promise<Uint8A
           border: block.level === 1
             ? { bottom: { style: BorderStyle.SINGLE, size: 6, color: 'D2D4D8', space: 4 } }
             : undefined,
-          children: [run(interpolate(block.content, ctx, scope), { ...block.style, weight: 'bold' }, pt)],
+          children: [run(htext, { ...block.style, weight: 'bold' }, pt)],
         }))
         break
       }

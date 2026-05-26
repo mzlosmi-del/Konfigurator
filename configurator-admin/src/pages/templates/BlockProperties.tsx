@@ -66,6 +66,11 @@ export function BlockProperties({ block, scopes, onChange, onDelete, readOnly }:
             onChange={e => onChange({ level: Number(e.target.value) as 1 | 2 | 3 } as Partial<Block>)}>
             <option value="1">H1</option><option value="2">H2</option><option value="3">H3</option>
           </Select>
+          <label className="flex items-center gap-2 text-xs mt-2">
+            <input type="checkbox" checked={!!block.numbered} disabled={disabled}
+              onChange={e => onChange({ numbered: e.target.checked } as Partial<Block>)} />
+            {t('Include in heading numbering')}
+          </label>
         </Field>
       )}
 

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
+import ExcelJS from 'exceljs'
 
 // context.ts → quotations.ts → supabase.ts throws without env vars; mock it.
 vi.mock('@/lib/supabase', () => ({ supabase: {} }))
@@ -138,5 +139,39 @@ describe('page-break + footer primitives', () => {
     const docx = await renderTemplateToDocx(a)
     expect(String.fromCharCode(...pdf.slice(0, 4))).toBe('%PDF')
     expect(String.fromCharCode(docx[0], docx[1])).toBe('PK')
+  })
+})
+
+describe('heading numbering reaches the output', () => {
+  // XLSX cells are easy to read back, so use it to prove the renderer actually
+  // prepends the multilevel number. The fixture has 2 products; the first
+  // (Studio Desk) has 3 configuration rows.
+  it('numbers product/characteristic headings in document order (XLSX)', async () => {
+    const def: DocumentTemplateDefinition = {
+      version: 1,
+      page: { numbering: true },
+      blocks: [
+        { id: 't', kind: 'heading', level: 1, content: 'Technical Specification' }, // NOT numbered
+        { id: 'r', kind: 'repeater', over: 'quotation.line_items', children: [
+          { id: 'p', kind: 'heading', level: 1, numbered: true, content: '{{line_item.product_name}}' },
+          { id: 'c', kind: 'repeater', over: 'line_item.configuration', children: [
+            { id: 'h', kind: 'heading', level: 2, numbered: true, content: '{{config_item.characteristic_name}}' },
+          ] },
+        ] },
+      ],
+    }
+    const bytes = await renderTemplateToXlsx({ definition: def, quotation, tenant, texts, lang: 'en' })
+    const wb = new ExcelJS.Workbook()
+    await wb.xlsx.load(bytes.buffer as ArrayBuffer)
+    const cells: string[] = []
+    wb.worksheets[0].eachRow(row => row.eachCell(c => { if (typeof c.value === 'string') cells.push(c.value) }))
+    const joined = cells.join('\n')
+
+    // Title heading stays unnumbered.
+    expect(cells).toContain('Technical Specification')
+    // First product is "1.", its first characteristic "1.1."; second product "2.".
+    expect(joined).toMatch(/1\.\s+Studio Desk 140/)
+    expect(joined).toMatch(/1\.1\.\s+Material/)
+    expect(joined).toMatch(/2\.\s+Office Chair Pro/)
   })
 })

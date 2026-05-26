@@ -5,18 +5,29 @@
 // goal — fast feedback on every edit is.
 
 import { Fragment } from 'react'
-import type { Block, BlockStyle } from '@/lib/docTemplate/types'
+import type { Block, BlockStyle, PageOptions } from '@/lib/docTemplate/types'
 import type { TemplateContext } from '@/lib/docTemplate/context'
 import { evaluateCondition } from '@/lib/docTemplate/conditions'
 import { interpolate, resolveDisplay, resolveCollection, type ScopeStack } from '@/lib/docTemplate/resolvePath'
 import { SIZE_PT, HEADING_SIZE, colorHex, sizePt, isBold, alignOf, colorOf, lineSpacingOf } from '@/lib/docTemplate/style'
+import { HeadingNumberer, headingIsNumbered, withNumber } from '@/lib/docTemplate/numbering'
 
 interface Props {
   blocks:        Block[]
   ctx:           TemplateContext
+  /** Document page options (for heading numbering). */
+  page?:         PageOptions
   /** Currently-selected block id, highlighted in the canvas. */
   selectedId?:   string
   onSelectBlock?: (id: string) => void
+}
+
+/** Shared mutable numbering state passed down the render walk. The walk happens
+ *  in document order during render, so advancing this as headings render yields
+ *  correct multilevel numbers — exactly like the renderers. */
+interface NumCtx {
+  numberer: HeadingNumberer
+  enabled:  boolean | undefined
 }
 
 function cssStyle(style: BlockStyle | undefined, ptOverride?: number): React.CSSProperties {
@@ -29,19 +40,22 @@ function cssStyle(style: BlockStyle | undefined, ptOverride?: number): React.CSS
   }
 }
 
-export function TemplateCanvas({ blocks, ctx, selectedId, onSelectBlock }: Props) {
+export function TemplateCanvas({ blocks, ctx, page, selectedId, onSelectBlock }: Props) {
+  // Fresh numberer per render; React renders children in document order so this
+  // tracks numbers consistently with the renderers.
+  const num: NumCtx = { numberer: new HeadingNumberer(), enabled: page?.numbering }
   return (
     <div
       className="bg-white shadow-md text-[#151928] font-sans p-8 mx-auto"
       style={{ width: 540, minHeight: 762, fontSize: 11 }}
     >
-      <BlockList blocks={blocks} ctx={ctx} scope={[]} selectedId={selectedId} onSelectBlock={onSelectBlock} />
+      <BlockList blocks={blocks} ctx={ctx} scope={[]} num={num} selectedId={selectedId} onSelectBlock={onSelectBlock} />
     </div>
   )
 }
 
-function BlockList({ blocks, ctx, scope, selectedId, onSelectBlock }: {
-  blocks: Block[]; ctx: TemplateContext; scope: ScopeStack; selectedId?: string; onSelectBlock?: (id: string) => void
+function BlockList({ blocks, ctx, scope, num, selectedId, onSelectBlock }: {
+  blocks: Block[]; ctx: TemplateContext; scope: ScopeStack; num: NumCtx; selectedId?: string; onSelectBlock?: (id: string) => void
 }) {
   return (
     <>
@@ -53,6 +67,7 @@ function BlockList({ blocks, ctx, scope, selectedId, onSelectBlock }: {
             block={block}
             ctx={ctx}
             scope={scope}
+            num={num}
             hidden={!visible}
             selectedId={selectedId}
             onSelectBlock={onSelectBlock}
@@ -63,8 +78,8 @@ function BlockList({ blocks, ctx, scope, selectedId, onSelectBlock }: {
   )
 }
 
-function BlockView({ block, ctx, scope, hidden, selectedId, onSelectBlock }: {
-  block: Block; ctx: TemplateContext; scope: ScopeStack; hidden: boolean; selectedId?: string; onSelectBlock?: (id: string) => void
+function BlockView({ block, ctx, scope, num, hidden, selectedId, onSelectBlock }: {
+  block: Block; ctx: TemplateContext; scope: ScopeStack; num: NumCtx; hidden: boolean; selectedId?: string; onSelectBlock?: (id: string) => void
 }) {
   const selected = block.id === selectedId
   const wrap = (children: React.ReactNode) => (
@@ -85,8 +100,13 @@ function BlockView({ block, ctx, scope, hidden, selectedId, onSelectBlock }: {
   switch (block.kind) {
     case 'heading': {
       const pt = SIZE_PT[HEADING_SIZE[block.level]]
+      let htext = interpolate(block.content, ctx, scope)
+      // Match the renderers: hidden headings don't consume a number.
+      if (!hidden && headingIsNumbered(num.enabled, block.numbered)) {
+        htext = withNumber(num.numberer.next(block.level), htext)
+      }
       return wrap(<div style={{ ...cssStyle({ ...block.style, weight: 'bold' }, pt), margin: '6px 0 3px' }}>
-        {interpolate(block.content, ctx, scope) || <Placeholder text="heading" />}
+        {htext || <Placeholder text="heading" />}
       </div>)
     }
     case 'text':
@@ -129,7 +149,7 @@ function BlockView({ block, ctx, scope, hidden, selectedId, onSelectBlock }: {
             ? <Placeholder text={`repeat: ${block.over} (no items)`} />
             : frames.map((frame, i) => (
                 <Fragment key={i}>
-                  <BlockList blocks={block.children} ctx={ctx} scope={[...scope, frame]}
+                  <BlockList blocks={block.children} ctx={ctx} scope={[...scope, frame]} num={num}
                     selectedId={selectedId} onSelectBlock={onSelectBlock} />
                 </Fragment>
               ))}
@@ -139,7 +159,7 @@ function BlockView({ block, ctx, scope, hidden, selectedId, onSelectBlock }: {
     case 'group':
       return wrap(
         <div>
-          <BlockList blocks={block.children} ctx={ctx} scope={scope}
+          <BlockList blocks={block.children} ctx={ctx} scope={scope} num={num}
             selectedId={selectedId} onSelectBlock={onSelectBlock} />
         </div>
       )

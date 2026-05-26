@@ -70,6 +70,9 @@ export interface HeadingBlock extends BlockBase {
   kind:    'heading'
   content: TemplateString
   level:   1 | 2 | 3
+  /** When true (and document numbering is on), this heading gets a multilevel
+   *  number prefix (e.g. "1.2.") based on its level and document order. */
+  numbered?: boolean
 }
 
 export interface KeyValueRow {
@@ -147,6 +150,9 @@ export interface PageOptions {
   footer?:      boolean
   /** Footer label; defaults to the tenant footer / tenant name when omitted. */
   footerLabel?: string
+  /** Master switch: when true, headings flagged `numbered` get a multilevel
+   *  decimal prefix (1., 1.1., 1.1.1.) in document order. */
+  numbering?:   boolean
 }
 
 /** Top-level template definition (the `definition` JSONB column). */
