@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import type { VisualizationAsset } from '../types/database'
+import { storagePathForAssetUrl } from '../lib/assets'
 
 // ── Pure resolution logic tests (no Supabase, no network) ───────────────────
 //
@@ -176,5 +177,39 @@ describe('render asset type', () => {
       makeAsset({ id: 'a1', url: 'render-default.jpg', is_default: true, asset_type: 'render' }),
     ]
     expect(resolveForDisplay(assets, new Set())).toBe('render-default.jpg')
+  })
+})
+
+// ── storagePathForAssetUrl ────────────────────────────────────────────────────
+
+describe('storagePathForAssetUrl', () => {
+  const PUBLIC = 'https://abc.supabase.co/storage/v1/object/public'
+
+  it('returns the bucket-relative path for a product-assets public URL', () => {
+    const url = `${PUBLIC}/product-assets/tenant-1/product-1/1700000000000.glb`
+    expect(storagePathForAssetUrl(url)).toBe('tenant-1/product-1/1700000000000.glb')
+  })
+
+  it('returns null for an external URL', () => {
+    expect(storagePathForAssetUrl('https://cdn.example.com/oak.jpg')).toBeNull()
+  })
+
+  it('returns null for a public URL in a different bucket', () => {
+    const url = `${PUBLIC}/quotation-attachments/tenant-1/file.pdf`
+    expect(storagePathForAssetUrl(url)).toBeNull()
+  })
+
+  it('returns null for empty / non-string input', () => {
+    expect(storagePathForAssetUrl('')).toBeNull()
+  })
+
+  it('strips a query string from the path', () => {
+    const url = `${PUBLIC}/product-assets/tenant-1/product-1/file.glb?t=1234`
+    expect(storagePathForAssetUrl(url)).toBe('tenant-1/product-1/file.glb')
+  })
+
+  it('returns null for a prefixed bucket name (product-assets-foo)', () => {
+    const url = `${PUBLIC}/product-assets-foo/tenant-1/file.glb`
+    expect(storagePathForAssetUrl(url)).toBeNull()
   })
 })

@@ -3,6 +3,7 @@
 // generic inference issue with hand-written Database types. The consuming
 // components remain fully typed via the return types.
 import { supabase } from './supabase'
+import { storagePathForAssetUrl, PRODUCT_ASSETS_BUCKET } from './assets'
 import type {
   Product,
   Characteristic,
@@ -144,6 +145,22 @@ export async function updateProduct(
 }
 
 export async function deleteProduct(id: string): Promise<void> {
+  // Collect storage paths for any files we host, so we can clean them up.
+  const { data: assetRows } = await supabase
+    .from('visualization_assets')
+    .select('url')
+    .eq('product_id', id)
+
+  const rows = (assetRows ?? []) as { url: string }[]
+  const paths = rows
+    .map(r => storagePathForAssetUrl(r.url))
+    .filter((p): p is string => p !== null)
+
+  if (paths.length > 0) {
+    // Best-effort — never block the delete on a storage failure.
+    await supabase.storage.from(PRODUCT_ASSETS_BUCKET).remove(paths).catch(() => {})
+  }
+
   const { error } = await supabase.from('products').delete().eq('id', id)
   if (error) throw new Error(error.message)
 }

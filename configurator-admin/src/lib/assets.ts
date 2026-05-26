@@ -8,6 +8,23 @@ async function getTenantId(): Promise<string> {
   return data as string
 }
 
+export const PRODUCT_ASSETS_BUCKET = 'product-assets'
+const PUBLIC_URL_MARKER = `/storage/v1/object/public/${PRODUCT_ASSETS_BUCKET}/`
+
+/**
+ * If `url` is a Supabase public URL into our own `product-assets` bucket,
+ * return the bucket-relative storage path (`{tenantId}/{productId}/{file}`).
+ * Returns null for external / pasted URLs and URLs for any other bucket —
+ * those files are not ours to delete.
+ */
+export function storagePathForAssetUrl(url: string): string | null {
+  if (!url) return null
+  const idx = url.indexOf(PUBLIC_URL_MARKER)
+  if (idx === -1) return null
+  const path = url.slice(idx + PUBLIC_URL_MARKER.length).split('?')[0]
+  return path.length > 0 ? path : null
+}
+
 export async function fetchAssetsForProduct(productId: string): Promise<VisualizationAsset[]> {
   const { data, error } = await supabase
     .from('visualization_assets')
@@ -68,11 +85,27 @@ export async function updateAsset(
 }
 
 export async function deleteAsset(id: string): Promise<void> {
+  // Look up the URL first so we know whether a hosted file needs cleanup.
+  // The select error is intentionally ignored — cleanup is best-effort; a failed
+  // lookup just skips storage removal and the DB delete still proceeds.
+  const { data: row } = await supabase
+    .from('visualization_assets')
+    .select('url')
+    .eq('id', id)
+    .single()
+
   const { error } = await supabase
     .from('visualization_assets')
     .delete()
     .eq('id', id)
   if (error) throw new Error(error.message)
+
+  // Best-effort storage cleanup — only for files we host; never block the delete.
+  const assetRow = row as { url: string } | null
+  const path = assetRow?.url ? storagePathForAssetUrl(assetRow.url) : null
+  if (path) {
+    await supabase.storage.from(PRODUCT_ASSETS_BUCKET).remove([path]).catch(() => {})
+  }
 }
 
 // Reorder: apply new sort_order values in a batch
@@ -100,11 +133,11 @@ export async function uploadAssetFile(
   const path = `${tenantId}/${productId}/${Date.now()}.${ext}`
 
   const { error: uploadError } = await supabase.storage
-    .from('product-assets')
+    .from(PRODUCT_ASSETS_BUCKET)
     .upload(path, file, { upsert: false })
 
   if (uploadError) throw new Error(uploadError.message)
 
-  const { data } = supabase.storage.from('product-assets').getPublicUrl(path)
+  const { data } = supabase.storage.from(PRODUCT_ASSETS_BUCKET).getPublicUrl(path)
   return data.publicUrl
 }
