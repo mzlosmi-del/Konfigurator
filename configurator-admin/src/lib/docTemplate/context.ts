@@ -15,6 +15,8 @@ export interface ContextConfigItem {
   characteristic_name: string
   value_label:         string
   description:         string
+  /** `specification` slot text — value-level, falling back to characteristic-level. */
+  specification:       string
   price_modifier:      number
   /** Resolved image URL (value-level) or null. */
   value_image:         string | null
@@ -28,6 +30,8 @@ export interface ContextLineItem {
   quantity:        number
   unit_price:      number
   line_total:      number
+  /** `specification` slot text at the product level. */
+  specification:   string
   product_image:   string | null
   configuration:   ContextConfigItem[]
 }
@@ -93,6 +97,7 @@ export function buildTemplateContext(
     quantity:        li.quantity,
     unit_price:      li.unit_price,
     line_total:      calcLineTotal(li),
+    specification:   resolveText(texts, 'product', li.product_id, 'specification', lang),
     product_image:   images?.productImage?.(li.product_id) ?? null,
     configuration:   (li.configuration ?? []).map((c: QuotationConfigItem) => ({
       characteristic_name: c.characteristic_name,
@@ -102,6 +107,10 @@ export function buildTemplateContext(
       description:
         resolveCharDescription(c.characteristic_description_i18n, lang) ||
         resolveText(texts, 'characteristic', c.characteristic_id, 'description', lang),
+      // Value-level specification slot, falling back to characteristic-level.
+      specification:
+        resolveText(texts, 'characteristic_value', c.value_id, 'specification', lang) ||
+        resolveText(texts, 'characteristic', c.characteristic_id, 'specification', lang),
       price_modifier:      c.price_modifier,
       value_image:         images?.valueImage?.(c.value_id) ?? null,
     })),

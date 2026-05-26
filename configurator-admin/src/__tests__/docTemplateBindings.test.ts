@@ -89,6 +89,19 @@ describe('collection + scoped resolution', () => {
     // description resolved from the i18n snapshot on the line item
     expect(resolveDisplay(ctx, oak, 'config_item.description')).toBe('Solid hardwood top.')
   })
+
+  it('specification bindings resolve from the specification slot', () => {
+    const items = resolveCollection(ctx, root, 'quotation.line_items')
+    const deskScope: ScopeStack = [items[0]] // Studio Desk
+    // product-level specification slot (fixture: PROD_DESK specification en)
+    expect(resolveDisplay(ctx, deskScope, 'line_item.specification'))
+      .toBe('Dimensions: 140 × 70 × 75 cm. Net weight 38 kg.')
+    // value-level specification slot (fixture: VAL_OAK specification en)
+    const cfg = resolveCollection(ctx, deskScope, 'line_item.configuration')
+    const oak: ScopeStack = [items[0], cfg[0]]
+    expect(resolveDisplay(ctx, oak, 'config_item.specification'))
+      .toBe('Oak: medium density, light golden grain.')
+  })
 })
 
 describe('interpolate', () => {

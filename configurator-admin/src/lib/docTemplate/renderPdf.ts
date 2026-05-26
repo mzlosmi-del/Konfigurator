@@ -40,9 +40,20 @@ export async function renderTemplateToPdf(args: RenderPdfArgs): Promise<Uint8Arr
   const pdfDoc = await PDFDocument.create()
   const { fontR, fontB } = await loadFonts(pdfDoc)
   const logoImg = await loadLogo(pdfDoc, ctx.tenant.logo_url)
-  // Binding-sourced images (product/value) — only the tenant logo is embedded
-  // for v1; binding images degrade to a thin placeholder line (their URLs may
-  // be remote/CORS-restricted and the PDF builder is synchronous past setup).
+
+  // Binding images (product / value) need async embedding, but the tree walk
+  // below is synchronous. Pre-pass: collect every distinct binding-image URL
+  // reachable in the tree (resolving image paths against every scope they can
+  // appear in) and embed each once into a lookup map. renderImage then resolves
+  // the binding to a URL and reads the embedded image from the map.
+  const bindingImages = new Map<string, EmbeddedImage>()
+  {
+    const urls = collectBindingImageUrls(args.definition.blocks ?? [], ctx)
+    await Promise.all([...urls].map(async (url) => {
+      const img = await loadLogo(pdfDoc, url)   // loadLogo handles png/jpg + failures → null
+      if (img) bindingImages.set(url, img)
+    }))
+  }
 
   let page: PDFPage = pdfDoc.addPage([W, H])
   let y = H - 48
@@ -205,20 +216,21 @@ export async function renderTemplateToPdf(args: RenderPdfArgs): Promise<Uint8Arr
 
   function renderImage(source: 'tenant_logo' | 'binding', binding: string | undefined, maxW = 160, maxH = 60, scope: ScopeStack) {
     let img: EmbeddedImage | null = null
-    if (source === 'tenant_logo') img = logoImg
-    // Binding images aren't pre-embedded in v1; if no image, draw nothing.
+    if (source === 'tenant_logo') {
+      img = logoImg
+    } else if (source === 'binding' && binding) {
+      const url = resolveRaw(ctx, scope, binding)
+      if (typeof url === 'string' && url) img = bindingImages.get(url) ?? null
+    }
     if (!img) {
-      // Degrade gracefully: if a logo was expected but missing, fall back to
-      // the tenant name as text so the document isn't blank where a brand mark
-      // would be.
+      // Degrade gracefully: a missing logo falls back to the tenant name so the
+      // document isn't blank where a brand mark would be. A missing binding
+      // image (no URL, or fetch failed) simply renders nothing.
       if (source === 'tenant_logo' && ctx.tenant.name) {
         ensureSpace(SIZE_PT.lg + LINE_GAP)
         y -= SIZE_PT.lg
         page.drawText(ctx.tenant.name, { x: MX, y, size: SIZE_PT.lg, font: fontB, color: C.ink })
         y -= LINE_GAP
-      } else if (source === 'binding' && binding) {
-        // resolve the URL only to decide whether to reserve any space; skip if empty
-        if (!resolveRaw(ctx, scope, binding)) return
       }
       return
     }
@@ -248,6 +260,29 @@ function truncateToWidth(str: string, font: PDFFont, size: number, maxWidth: num
     else hi = mid - 1
   }
   return clean.slice(0, lo) + '…'
+}
+
+/** Walk the block tree the same way the renderer does (entering repeaters and
+ *  pushing scope frames) and collect every distinct URL referenced by a
+ *  binding-sourced image block, so they can be embedded up front. */
+function collectBindingImageUrls(blocks: Block[], ctx: TemplateContext): Set<string> {
+  const urls = new Set<string>()
+  const walk = (bs: Block[], scope: ScopeStack) => {
+    for (const b of bs) {
+      // Note: we ignore `visible` here — over-collecting a few URLs is harmless
+      // and far cheaper than re-deriving visibility across all scope frames.
+      if (b.kind === 'image' && b.source === 'binding' && b.binding) {
+        const url = resolveRaw(ctx, scope, b.binding)
+        if (typeof url === 'string' && url) urls.add(url)
+      } else if (b.kind === 'repeater') {
+        for (const frame of resolveCollection(ctx, scope, b.over)) walk(b.children, [...scope, frame])
+      } else if (b.kind === 'group') {
+        walk(b.children, scope)
+      }
+    }
+  }
+  walk(blocks, [])
+  return urls
 }
 
 // Re-export so callers can build a context directly if needed.

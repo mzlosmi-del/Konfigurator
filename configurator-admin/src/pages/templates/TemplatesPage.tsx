@@ -10,9 +10,9 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { useToast } from '@/hooks/useToast'
 import { useAuthContext } from '@/components/auth/AuthContext'
 import { useCanEdit } from '@/hooks/usePermission'
-import { t } from '@/i18n'
+import { t, getLang } from '@/i18n'
 import { listTemplates, createTemplate, deleteTemplate, type DocumentTemplateRow } from '@/lib/docTemplate/templates'
-import { makeSampleTemplate } from '@/lib/docTemplate/sampleTemplate'
+import { TEMPLATE_PRESETS, presetById } from '@/lib/docTemplate/presets'
 import type { OutputKind } from '@/lib/docTemplate/types'
 
 const KIND_ICON: Record<OutputKind, typeof FileText> = {
@@ -31,7 +31,16 @@ export function TemplatesPage() {
   const [rows, setRows]         = useState<DocumentTemplateRow[]>([])
   const [newName, setNewName]   = useState('')
   const [newKind, setNewKind]   = useState<OutputKind>('pdf')
+  const [newPreset, setNewPreset] = useState<string>('blank')
   const [creating, setCreating] = useState(false)
+  const uiLang = getLang()
+
+  /** Selecting a preset suggests its default output kind (still editable). */
+  function handlePresetChange(presetId: string) {
+    setNewPreset(presetId)
+    const p = presetById(presetId)
+    if (p) setNewKind(p.output)
+  }
   const [deleteId, setDeleteId] = useState<string | null>(null)
 
   async function load() {
@@ -50,11 +59,12 @@ export function TemplatesPage() {
     if (!newName.trim() || !tenant) return
     setCreating(true)
     try {
+      const preset = presetById(newPreset) ?? TEMPLATE_PRESETS[0]
       const row = await createTemplate({
         tenant_id:   tenant.id,
         name:        newName.trim(),
         output_kind: newKind,
-        definition:  makeSampleTemplate(),
+        definition:  preset.make(),
       })
       setNewName('')
       navigate(`/templates/${row.id}`)
@@ -92,6 +102,14 @@ export function TemplatesPage() {
           <div className="flex-1 min-w-48">
             <label className="text-xs font-medium text-muted-foreground">{t('New template name')}</label>
             <Input value={newName} onChange={e => setNewName(e.target.value)} placeholder={t('e.g. Branded quotation')} />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-muted-foreground">{t('Start from')}</label>
+            <Select value={newPreset} onChange={e => handlePresetChange(e.target.value)} className="w-48">
+              {TEMPLATE_PRESETS.map(p => (
+                <option key={p.id} value={p.id}>{p.label[uiLang] ?? p.label.en}</option>
+              ))}
+            </Select>
           </div>
           <div>
             <label className="text-xs font-medium text-muted-foreground">{t('Output')}</label>

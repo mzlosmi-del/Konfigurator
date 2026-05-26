@@ -65,12 +65,14 @@ export const BINDINGS: BindingField[] = [
   { path: 'line_item.unit_price',      label: { en: 'Unit price',       sr: 'Jedinična cena' },   type: 'currency', scope: 'line_item' },
   { path: 'line_item.line_total',      label: { en: 'Line total',       sr: 'Ukupno za stavku' }, type: 'currency', scope: 'line_item' },
   { path: 'line_item.product_image',   label: { en: 'Product image',    sr: 'Slika proizvoda' },  type: 'image',  scope: 'line_item' },
+  { path: 'line_item.specification',   label: { en: 'Product specification', sr: 'Specifikacija proizvoda' }, type: 'string', scope: 'line_item' },
   { path: 'line_item.configuration',   label: { en: 'Configuration',    sr: 'Konfiguracija' },    type: 'string', scope: 'line_item', collection: true },
 
   // ── Config-item scope (inside a line_item.configuration repeater) ───────────
   { path: 'config_item.characteristic_name', label: { en: 'Characteristic name', sr: 'Naziv karakteristike' }, type: 'string', scope: 'config_item' },
   { path: 'config_item.value_label',         label: { en: 'Selected value',      sr: 'Izabrana vrednost' },    type: 'string', scope: 'config_item' },
   { path: 'config_item.description',         label: { en: 'Description',         sr: 'Opis' },                 type: 'string', scope: 'config_item' },
+  { path: 'config_item.specification',       label: { en: 'Specification',       sr: 'Specifikacija' },        type: 'string', scope: 'config_item' },
   { path: 'config_item.price_modifier',      label: { en: 'Price modifier',      sr: 'Doplata' },              type: 'currency', scope: 'config_item' },
   { path: 'config_item.value_image',         label: { en: 'Value image',         sr: 'Slika vrednosti' },      type: 'image',  scope: 'config_item' },
 ]
