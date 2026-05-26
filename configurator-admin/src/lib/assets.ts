@@ -85,11 +85,25 @@ export async function updateAsset(
 }
 
 export async function deleteAsset(id: string): Promise<void> {
+  // Look up the URL first so we know whether a hosted file needs cleanup.
+  const { data: row } = await supabase
+    .from('visualization_assets')
+    .select('url')
+    .eq('id', id)
+    .single()
+
   const { error } = await supabase
     .from('visualization_assets')
     .delete()
     .eq('id', id)
   if (error) throw new Error(error.message)
+
+  // Best-effort storage cleanup — only for files we host; never block the delete.
+  const assetRow = row as { url: string } | null
+  const path = assetRow?.url ? storagePathForAssetUrl(assetRow.url) : null
+  if (path) {
+    await supabase.storage.from(PRODUCT_ASSETS_BUCKET).remove([path]).catch(() => {})
+  }
 }
 
 // Reorder: apply new sort_order values in a batch
@@ -117,11 +131,11 @@ export async function uploadAssetFile(
   const path = `${tenantId}/${productId}/${Date.now()}.${ext}`
 
   const { error: uploadError } = await supabase.storage
-    .from('product-assets')
+    .from(PRODUCT_ASSETS_BUCKET)
     .upload(path, file, { upsert: false })
 
   if (uploadError) throw new Error(uploadError.message)
 
-  const { data } = supabase.storage.from('product-assets').getPublicUrl(path)
+  const { data } = supabase.storage.from(PRODUCT_ASSETS_BUCKET).getPublicUrl(path)
   return data.publicUrl
 }
