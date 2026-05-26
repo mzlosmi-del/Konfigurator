@@ -171,6 +171,9 @@ export async function renderTemplateToDocx(args: RenderDocxArgs): Promise<Uint8A
   const doc = new Document({
     sections: [{ properties: {}, children: body.length ? body : [new Paragraph({ children: [] })] }],
   })
-  const buf = await Packer.toBuffer(doc)
-  return new Uint8Array(buf)
+  // Packer.toBlob is browser-safe; toBuffer relies on a Node Buffer and throws
+  // "nodebuffer is not supported by this platform" in the browser. Mirrors the
+  // existing quotationDocx.ts / quotationTechSpecDocx.ts generators.
+  const blob = await Packer.toBlob(doc)
+  return new Uint8Array(await blob.arrayBuffer())
 }
