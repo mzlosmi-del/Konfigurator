@@ -52,7 +52,7 @@ describe('parseImportWorkbook — sheet presence', () => {
     ])
     const { errors } = await parseImportWorkbook(bytes)
     const missing = errors.filter(e => /Missing required sheet/.test(e.message))
-    expect(missing.length).toBe(4) // Characteristics, Values, Products, Texts
+    expect(missing.length).toBe(5) // Characteristics, Values, Products, Texts, Specifications
   })
 })
 
@@ -212,5 +212,85 @@ describe('parseImportWorkbook — texts sheet', () => {
     })
     const { errors } = await parseImportWorkbook(bytes)
     expect(errors.some(e => e.column === 'language')).toBe(true)
+  })
+})
+
+describe('parseImportWorkbook — specifications sheet', () => {
+  it('parses product / characteristic / value specifications with cross-refs', async () => {
+    const bytes = await buildCanonicalWorkbook({
+      Classes:         [['cls', 'Class', '', 1]],
+      Characteristics: [['ch', 'C', '', '', '', 'select', 'cls', 1]],
+      Values:          [['v', 'ch', 'Oak', '', 0, '', 1]],
+      Products:        [['p', 'P', '', '', '', 100, 'EUR', '', '', 'draft', 'cls']],
+      Specifications: [
+        ['product',              'p',  'specification', 'en', 0, 'U-value 1.1'],
+        ['product',              'p',  'specification', 'en', 1, 'Triple glazing'],
+        ['product',              'p',  'specification', 'sr', 0, 'U-vrednost 1.1'],
+        ['characteristic',       'ch', 'specification', 'en', 0, 'Colour spec'],
+        ['characteristic_value', 'v',  'specification', 'en', 0, 'Oak details'],
+      ],
+    })
+    const { payload, errors } = await parseImportWorkbook(bytes)
+    expect(errors).toEqual([])
+    expect(payload.specifications).toHaveLength(5)
+    expect(payload.specifications[0].sort_order).toBe(0)
+    expect(payload.specifications[1].sort_order).toBe(1)
+  })
+
+  it('flags unknown reference_key for each level', async () => {
+    const bytes = await buildCanonicalWorkbook({
+      Specifications: [
+        ['product', 'ghost', 'specification', 'en', 0, 'Body'],
+      ],
+    })
+    const { errors } = await parseImportWorkbook(bytes)
+    expect(errors.some(e => e.column === 'reference_key' && /Unknown product key/.test(e.message))).toBe(true)
+  })
+
+  it('rejects invalid slot for characteristic level', async () => {
+    const bytes = await buildCanonicalWorkbook({
+      Classes:         [['cls', 'Class', '', 1]],
+      Characteristics: [['ch', 'C', '', '', '', 'select', 'cls', 1]],
+      Specifications:  [['characteristic', 'ch', 'note', 'en', 0, 'Body']],
+    })
+    const { errors } = await parseImportWorkbook(bytes)
+    expect(errors.some(e => e.column === 'slot')).toBe(true)
+  })
+
+  it('rejects non-zero sort_order for characteristic & value specifications', async () => {
+    const bytes = await buildCanonicalWorkbook({
+      Classes:         [['cls', 'Class', '', 1]],
+      Characteristics: [['ch', 'C', '', '', '', 'select', 'cls', 1]],
+      Specifications:  [['characteristic', 'ch', 'specification', 'en', 1, 'Body']],
+    })
+    const { errors } = await parseImportWorkbook(bytes)
+    expect(errors.some(e => e.column === 'sort_order')).toBe(true)
+  })
+
+  it('flags duplicate (level, ref, slot, language, sort_order) rows', async () => {
+    const bytes = await buildCanonicalWorkbook({
+      Classes:         [['cls', 'Class', '', 1]],
+      Products:        [['p', 'P', '', '', '', 100, 'EUR', '', '', 'draft', 'cls']],
+      Specifications: [
+        ['product', 'p', 'specification', 'en', 0, 'A'],
+        ['product', 'p', 'specification', 'en', 0, 'B'],
+      ],
+    })
+    const { errors } = await parseImportWorkbook(bytes)
+    expect(errors.some(e => /Duplicate/.test(e.message))).toBe(true)
+  })
+
+  it('supports product-level multi-row slots (product, note, terms)', async () => {
+    const bytes = await buildCanonicalWorkbook({
+      Classes:  [['cls', 'Class', '', 1]],
+      Products: [['p', 'P', '', '', '', 100, 'EUR', '', '', 'draft', 'cls']],
+      Specifications: [
+        ['product', 'p', 'product', 'en', 0, 'Block 1'],
+        ['product', 'p', 'note',    'en', 0, 'A note'],
+        ['product', 'p', 'terms',   'en', 0, 'Terms 1'],
+      ],
+    })
+    const { errors } = await parseImportWorkbook(bytes)
+    expect(errors).toEqual([])
   })
 })

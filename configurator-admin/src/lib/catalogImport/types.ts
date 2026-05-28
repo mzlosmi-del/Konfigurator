@@ -6,6 +6,7 @@ export const SHEET_NAMES = {
   values:          'Values',
   products:        'Products',
   texts:           'Texts',
+  specifications:  'Specifications',
 } as const
 
 export const DISPLAY_TYPES: readonly DisplayType[] = [
@@ -67,12 +68,35 @@ export interface ParsedText {
   sort_order: number | null
 }
 
+/** Levels that the Specifications sheet can target. Tenant-level multi-row
+ *  slots (terms_line, etc.) still live in the Texts sheet. */
+export type SpecificationLevel = 'product' | 'characteristic' | 'characteristic_value'
+
+/** Allowed slot values per level on the Specifications sheet. Mirrors the
+ *  TEXT_SLOTS catalogue but restricted to multi-row / spec slots we're
+ *  exposing for bulk import. */
+export const SPECIFICATION_SLOTS: Record<SpecificationLevel, readonly string[]> = {
+  product:              ['specification', 'product', 'note', 'terms'],
+  characteristic:       ['specification'],
+  characteristic_value: ['specification'],
+}
+
+export interface ParsedSpecification {
+  level:         SpecificationLevel
+  reference_key: string
+  slot:          string
+  language:      TextLanguage
+  sort_order:    number | null
+  content:       string
+}
+
 export interface CatalogImportPayload {
   classes:         ParsedClass[]
   characteristics: ParsedCharacteristic[]
   values:          ParsedValue[]
   products:        ParsedProduct[]
   texts:           ParsedText[]
+  specifications:  ParsedSpecification[]
 }
 
 export interface ImportError {
@@ -98,4 +122,5 @@ export interface ImportResult {
   values_created:          number
   products_created:        number
   texts_created:           number
+  specifications_created:  number
 }

@@ -5,6 +5,7 @@ import {
   DISPLAY_TYPES,
   PRODUCT_STATUSES,
   TEXT_LANGUAGES,
+  SPECIFICATION_SLOTS,
   type CatalogImportPayload,
   type ImportError,
   type ParseResult,
@@ -13,6 +14,8 @@ import {
   type ParsedValue,
   type ParsedProduct,
   type ParsedText,
+  type ParsedSpecification,
+  type SpecificationLevel,
   type TextLanguage,
 } from './types'
 import { TEMPLATE_HEADERS, REQUIRED_COLUMNS } from './template'
@@ -58,6 +61,7 @@ export async function parseImportWorkbook(input: ArrayBuffer | Uint8Array): Prom
   const values         = parseValues(sheetRows[SHEET_NAMES.values], errors)
   const products       = parseProducts(sheetRows[SHEET_NAMES.products], errors)
   const texts          = parseTexts(sheetRows[SHEET_NAMES.texts], errors)
+  const specifications = parseSpecifications(sheetRows[SHEET_NAMES.specifications], errors)
 
   // 4. Within-sheet key uniqueness
   checkKeyUniqueness(SHEET_NAMES.classes,         classes,         errors)
@@ -68,6 +72,8 @@ export async function parseImportWorkbook(input: ArrayBuffer | Uint8Array): Prom
   // 5. Cross-sheet reference resolution
   const classKeys          = new Set(classes.map(c => c.key))
   const characteristicKeys = new Set(characteristics.map(c => c.key))
+  const valueKeys          = new Set(values.map(v => v.key))
+  const productKeys        = new Set(products.map(p => p.key))
 
   characteristics.forEach((c, idx) => {
     for (const ck of c.class_keys) {
@@ -100,8 +106,39 @@ export async function parseImportWorkbook(input: ArrayBuffer | Uint8Array): Prom
     }
   })
 
+  // Specifications: validate reference_key against the sheet matching `level`.
+  specifications.forEach((s, idx) => {
+    const ctx = { sheet: SHEET_NAMES.specifications, row: rowNumberOf(idx) }
+    const refOk =
+      (s.level === 'product'              && productKeys.has(s.reference_key)) ||
+      (s.level === 'characteristic'       && characteristicKeys.has(s.reference_key)) ||
+      (s.level === 'characteristic_value' && valueKeys.has(s.reference_key))
+    if (!refOk) {
+      errors.push({
+        sheet: ctx.sheet, row: ctx.row, column: 'reference_key',
+        message: `Unknown ${s.level} key "${s.reference_key}"`,
+      })
+    }
+  })
+
+  // Within-sheet uniqueness for (level, ref, slot, language, sort_order) on
+  // Specifications. Two rows with the same natural key would later collide
+  // with the tenant_texts unique index.
+  const specSeen = new Map<string, number>()
+  specifications.forEach((s, idx) => {
+    const k = `${s.level}::${s.reference_key}::${s.slot}::${s.language}::${s.sort_order ?? 0}`
+    if (specSeen.has(k)) {
+      errors.push({
+        sheet: SHEET_NAMES.specifications, row: rowNumberOf(idx), column: 'sort_order',
+        message: `Duplicate (level, reference_key, slot, language, sort_order) — first seen at row ${rowNumberOf(specSeen.get(k)!)}`,
+      })
+    } else {
+      specSeen.set(k, idx)
+    }
+  })
+
   return {
-    payload: { classes, characteristics, values, products, texts },
+    payload: { classes, characteristics, values, products, texts, specifications },
     errors,
   }
 }
@@ -115,7 +152,7 @@ type RawRow = {
 }
 
 function emptyPayload(): CatalogImportPayload {
-  return { classes: [], characteristics: [], values: [], products: [], texts: [] }
+  return { classes: [], characteristics: [], values: [], products: [], texts: [], specifications: [] }
 }
 
 /** Header row is row 2 in the template (row 1 is the instructions banner).
@@ -365,6 +402,54 @@ function parseTexts(rows: RawRow[], errors: ImportError[]): ParsedText[] {
       content,
       sort_order: parseOptionalInt(r.cells, 'sort_order', ctx),
     })
+  }
+  return out
+}
+
+function parseSpecifications(rows: RawRow[], errors: ImportError[]): ParsedSpecification[] {
+  const out: ParsedSpecification[] = []
+  const allowedLevels: SpecificationLevel[] = ['product', 'characteristic', 'characteristic_value']
+
+  for (const r of rows) {
+    const ctx = { sheet: SHEET_NAMES.specifications, row: r.excelRow, errors }
+    const level_raw    = required(r.cells, 'level', ctx)
+    const reference_key = required(r.cells, 'reference_key', ctx)
+    const slot         = required(r.cells, 'slot', ctx)
+    const language_raw = required(r.cells, 'language', ctx)
+    const content      = required(r.cells, 'content', ctx)
+    if (!level_raw || !reference_key || !slot || !language_raw || !content) continue
+
+    const level = level_raw.toLowerCase() as SpecificationLevel
+    if (!allowedLevels.includes(level)) {
+      errors.push({ sheet: ctx.sheet, row: r.excelRow, column: 'level',
+        message: `Invalid level "${level_raw}". Allowed: ${allowedLevels.join(', ')}` })
+      continue
+    }
+
+    const allowedSlots = SPECIFICATION_SLOTS[level]
+    if (!allowedSlots.includes(slot)) {
+      errors.push({ sheet: ctx.sheet, row: r.excelRow, column: 'slot',
+        message: `Invalid slot "${slot}" for level "${level}". Allowed: ${allowedSlots.join(', ')}` })
+      continue
+    }
+
+    const lang = language_raw.toLowerCase() as TextLanguage
+    if (!(TEXT_LANGUAGES as readonly string[]).includes(lang)) {
+      errors.push({ sheet: ctx.sheet, row: r.excelRow, column: 'language',
+        message: `Invalid language "${language_raw}". Allowed: ${TEXT_LANGUAGES.join(', ')}` })
+      continue
+    }
+
+    // Only product-level slots are multi-row. Characteristic & value
+    // specifications must stay at sort_order = 0.
+    const sort_order = parseOptionalInt(r.cells, 'sort_order', ctx)
+    if (level !== 'product' && sort_order != null && sort_order !== 0) {
+      errors.push({ sheet: ctx.sheet, row: r.excelRow, column: 'sort_order',
+        message: `sort_order must be 0 (or blank) for ${level} specifications — only product blocks are multi-line` })
+      continue
+    }
+
+    out.push({ level, reference_key, slot, language: lang, sort_order, content })
   }
   return out
 }

@@ -119,6 +119,7 @@ export function ImportPage() {
     values:          payload.values.length,
     products:        payload.products.length,
     texts:           payload.texts.length,
+    specifications:  payload.specifications.length,
   } : null
 
   const importable = payload != null && parseErrors.length === 0 && (counts ? Object.values(counts).some(c => c > 0) : false)
@@ -203,12 +204,13 @@ export function ImportPage() {
               <CardDescription>{t('The workbook parsed cleanly. Review the totals below before importing.')}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-6 gap-3">
                 <CountChip label={t('Classes')}         value={counts.classes} />
                 <CountChip label={t('Characteristics')} value={counts.characteristics} />
                 <CountChip label={t('Values')}          value={counts.values} />
                 <CountChip label={t('Products')}        value={counts.products} />
                 <CountChip label={t('Texts')}           value={counts.texts} />
+                <CountChip label={t('Specifications')}  value={counts.specifications} />
               </div>
               <Button onClick={handleImport} loading={importing} disabled={!importable}>
                 <FileSpreadsheet className="h-4 w-4 mr-2" />
@@ -225,12 +227,13 @@ export function ImportPage() {
               <div className="flex flex-col items-center gap-3 text-center py-4">
                 <CheckCircle2 className="h-10 w-10 text-emerald-500" />
                 <p className="text-base font-semibold">{t('Catalog imported successfully')}</p>
-                <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mt-2">
+                <div className="grid grid-cols-2 sm:grid-cols-6 gap-3 mt-2">
                   <CountChip label={t('Classes')}         value={result.classes_created} />
                   <CountChip label={t('Characteristics')} value={result.characteristics_created} />
                   <CountChip label={t('Values')}          value={result.values_created} />
                   <CountChip label={t('Products')}        value={result.products_created} />
                   <CountChip label={t('Texts')}           value={result.texts_created} />
+                  <CountChip label={t('Specifications')}  value={result.specifications_created} />
                 </div>
                 <div className="flex gap-2 mt-4">
                   <Button onClick={() => navigate('/products')}>{t('View products')}</Button>

@@ -58,6 +58,15 @@ const TEXTS_COLS: ColumnSpec[] = [
   { header: 'sort_order', width: 12, required: false, instructions: 'Used for multi-row slots (terms_line, etc.)' },
 ]
 
+const SPECIFICATIONS_COLS: ColumnSpec[] = [
+  { header: 'level',         width: 22, required: true,  instructions: 'product | characteristic | characteristic_value' },
+  { header: 'reference_key', width: 22, required: true,  instructions: 'Key from the matching sheet (Products, Characteristics, or Values)' },
+  { header: 'slot',          width: 16, required: true,  instructions: 'product level: specification | product | note | terms. characteristic & value: specification' },
+  { header: 'language',      width: 10, required: true,  instructions: 'en or sr' },
+  { header: 'sort_order',    width: 12, required: false, instructions: 'Order within the same (level, ref, slot, language). Use 0, 1, 2, … for multi-line product blocks' },
+  { header: 'content',       width: 60, required: true,  instructions: 'The text content for that language' },
+]
+
 interface SheetSpec {
   name:         string
   cols:         ColumnSpec[]
@@ -93,8 +102,14 @@ const SHEET_SPECS: SheetSpec[] = [
   {
     name:         SHEET_NAMES.texts,
     cols:         TEXTS_COLS,
-    instructions: 'Tenant-level text blocks (PDF footer, page title, terms lines, etc.). Per-product / per-characteristic translations belong inline on those sheets, not here.',
+    instructions: 'Tenant-level text blocks (PDF footer, page title, terms lines, etc.). Per-product / per-characteristic translations belong inline on those sheets, or on the Specifications sheet for multi-line blocks.',
     example:      { level: 'tenant', slot: 'pdf_footer', language: 'en', content: 'Configureout — Acme Co.', sort_order: 0 },
+  },
+  {
+    name:         SHEET_NAMES.specifications,
+    cols:         SPECIFICATIONS_COLS,
+    instructions: 'Specification text and other multi-line product blocks (product, note, terms). One row per (entity, slot, language, sort_order). For multi-line blocks, repeat the same key+slot+language with increasing sort_order. Characteristic and value specifications are single-row (sort_order = 0).',
+    example:      { level: 'product', reference_key: 'bay-window-120', slot: 'specification', language: 'en', sort_order: 0, content: 'Double-glazed, 24 mm pane, U-value 1.1 W/m²K' },
   },
 ]
 
@@ -154,6 +169,7 @@ export const TEMPLATE_HEADERS: Record<string, string[]> = {
   [SHEET_NAMES.values]:          VALUES_COLS.map(c => c.header),
   [SHEET_NAMES.products]:        PRODUCTS_COLS.map(c => c.header),
   [SHEET_NAMES.texts]:           TEXTS_COLS.map(c => c.header),
+  [SHEET_NAMES.specifications]:  SPECIFICATIONS_COLS.map(c => c.header),
 }
 
 export const REQUIRED_COLUMNS: Record<string, string[]> = {
@@ -162,4 +178,5 @@ export const REQUIRED_COLUMNS: Record<string, string[]> = {
   [SHEET_NAMES.values]:          VALUES_COLS.filter(c => c.required).map(c => c.header),
   [SHEET_NAMES.products]:        PRODUCTS_COLS.filter(c => c.required).map(c => c.header),
   [SHEET_NAMES.texts]:           TEXTS_COLS.filter(c => c.required).map(c => c.header),
+  [SHEET_NAMES.specifications]:  SPECIFICATIONS_COLS.filter(c => c.required).map(c => c.header),
 }
