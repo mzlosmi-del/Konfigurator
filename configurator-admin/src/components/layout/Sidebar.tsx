@@ -1,12 +1,12 @@
 import { useState } from 'react'
 import { NavLink } from 'react-router-dom'
-import { LayoutDashboard, Package, Inbox, Settings, LogOut, Layers, FileText, BarChart2, Code2, X, DollarSign, History, Shield, Table, HelpCircle, LayoutTemplate } from 'lucide-react'
+import { LayoutDashboard, Package, Inbox, Settings, LogOut, Layers, FileText, BarChart2, Code2, X, DollarSign, History, Shield, Table, HelpCircle, LayoutTemplate, Upload } from 'lucide-react'
 import { Logo } from '@/components/ui/Logo'
 import { cn } from '@/lib/utils'
 import { useAuthContext } from '@/components/auth/AuthContext'
 import { Separator } from '@/components/ui/separator'
 import { useInquiryCounts } from '@/hooks/useInquiryCounts'
-import { useCanView } from '@/hooks/usePermission'
+import { useCanView, useCanEdit } from '@/hooks/usePermission'
 import { isSuperAdminEmail } from '@/lib/superAdmin'
 import { t, getLang, setLang, LANGS, type Lang } from '@/i18n'
 
@@ -32,6 +32,7 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
   const canViewAnalytics  = useCanView('analytics')
   const canViewEmbed      = useCanView('embed')
   const canViewSettings   = useCanView('settings')
+  const canImportCatalog  = useCanEdit('library') && useCanEdit('products')
 
   function handleLang(l: Lang) {
     setLang(l)
@@ -43,6 +44,7 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
     { to: '/products',   icon: Package,         label: 'Products',    badge: 0,        visible: canViewProducts },
     { to: '/pricing',    icon: DollarSign,      label: 'Pricing',     badge: 0,        visible: canViewPricing },
     { to: '/library',    icon: Layers,          label: 'Library',     badge: 0,        visible: canViewLibrary },
+    { to: '/import',     icon: Upload,          label: 'Bulk import', badge: 0,        visible: canImportCatalog },
     { to: '/texts',         icon: Table,        label: 'Texts',         badge: 0,        visible: canViewTexts },
     { to: '/inquiries',  icon: Inbox,           label: 'Inquiries',   badge: newCount, visible: canViewInquiries },
     { to: '/quotations', icon: FileText,        label: 'Quotations',  badge: 0,        visible: canViewQuotations },

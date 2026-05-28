@@ -596,6 +596,16 @@ export interface Database {
         Args: { user_id: string; tenant_name: string; tenant_slug: string }
         Returns: void
       }
+      import_catalog: {
+        Args: { payload: Json }
+        Returns: {
+          classes_created:         number
+          characteristics_created: number
+          values_created:          number
+          products_created:        number
+          texts_created:           number
+        }
+      }
     }
   }
 }

@@ -14,6 +14,7 @@ import { ProductsPage } from '@/pages/products/ProductsPage'
 import { NewProductPage } from '@/pages/products/NewProductPage'
 import { EditProductPage } from '@/pages/products/EditProductPage'
 import { ProductsImportPage } from '@/pages/products/ProductsImportPage'
+import { ImportPage } from '@/pages/import/ImportPage'
 import { InquiriesPage } from '@/pages/inquiries/InquiriesPage'
 import { InquiryDetailPage } from '@/pages/inquiries/InquiryDetailPage'
 import { SettingsPage } from '@/pages/settings/SettingsPage'
@@ -79,6 +80,7 @@ export function App() {
 
               <Route element={<ProtectedRoute functionality="library" />}>
                 <Route path="/library" element={<LibraryPage />} />
+                <Route path="/import"  element={<ImportPage />} />
               </Route>
 
               <Route element={<ProtectedRoute functionality="inquiries" />}>
