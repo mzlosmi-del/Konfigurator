@@ -72,6 +72,15 @@ export function ImportPage() {
     }
   }
 
+  function handleCancel() {
+    setPayload(null)
+    setParseErrors([])
+    setServerErrors([])
+    setTopLevelError('')
+    setFileName(null)
+    if (fileRef.current) fileRef.current.value = ''
+  }
+
   async function handleImport() {
     if (!payload || parseErrors.length > 0) return
     setImporting(true)
@@ -214,10 +223,15 @@ export function ImportPage() {
                 <CountChip label={t('Texts')}           value={counts.texts} />
                 <CountChip label={t('Specifications')}  value={counts.specifications} />
               </div>
-              <Button onClick={handleImport} loading={importing} disabled={!importable}>
-                <FileSpreadsheet className="h-4 w-4 mr-2" />
-                {t('Import catalog')}
-              </Button>
+              <div className="flex gap-2">
+                <Button onClick={handleImport} loading={importing} disabled={!importable}>
+                  <FileSpreadsheet className="h-4 w-4 mr-2" />
+                  {t('Import catalog')}
+                </Button>
+                <Button variant="outline" onClick={handleCancel} disabled={importing}>
+                  {t('Cancel')}
+                </Button>
+              </div>
             </CardContent>
           </Card>
         )}
