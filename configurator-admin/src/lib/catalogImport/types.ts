@@ -5,8 +5,10 @@ export const SHEET_NAMES = {
   characteristics: 'Characteristics',
   values:          'Values',
   products:        'Products',
+  translations:    'Translations',
   texts:           'Texts',
   specifications:  'Specifications',
+  slots:           'Slots',
 } as const
 
 export const DISPLAY_TYPES: readonly DisplayType[] = [
@@ -18,29 +20,23 @@ export const PRODUCT_STATUSES: readonly ProductStatus[] = ['draft', 'published',
 export const TEXT_LANGUAGES = ['en', 'sr'] as const
 export type TextLanguage = typeof TEXT_LANGUAGES[number]
 
+// ── Entity sheets (structural columns only — translations live in Translations) ──
+
 export interface ParsedClass {
   key:        string
-  name_en:    string
-  name_sr:    string | null
   sort_order: number | null
 }
 
 export interface ParsedCharacteristic {
-  key:             string
-  name_en:         string
-  name_sr:         string | null
-  description_en:  string | null
-  description_sr:  string | null
-  display_type:    DisplayType
-  class_keys:      string[]
-  sort_order:      number | null
+  key:          string
+  display_type: DisplayType
+  class_keys:   string[]
+  sort_order:   number | null
 }
 
 export interface ParsedValue {
   key:                string
   characteristic_key: string
-  label_en:           string
-  label_sr:           string | null
   price_modifier:     number
   hex_color:          string | null
   sort_order:         number | null
@@ -48,10 +44,6 @@ export interface ParsedValue {
 
 export interface ParsedProduct {
   key:             string
-  name_en:         string
-  name_sr:         string | null
-  description_en:  string | null
-  description_sr: string | null
   base_price:      number
   currency:        string | null
   sku:             string | null
@@ -59,6 +51,41 @@ export interface ParsedProduct {
   status:          ProductStatus
   class_keys:      string[]
 }
+
+// ── Translations sheet (name / description / label) ──────────────────────────
+
+/** Levels you can target from the Translations sheet. tenant goes through the
+ *  separate Texts sheet (it has no entity reference). */
+export type TranslationLevel = 'class' | 'characteristic' | 'characteristic_value' | 'product'
+
+export interface ParsedTranslation {
+  level:         TranslationLevel
+  reference_key: string
+  slot:          string
+  language:      TextLanguage
+  content:       string
+}
+
+/** Single-row slots accepted on the Translations sheet, per level. */
+export const TRANSLATION_SLOTS: Record<TranslationLevel, readonly string[]> = {
+  class:                ['name'],
+  characteristic:       ['name', 'description'],
+  characteristic_value: ['label', 'description'],
+  product:              ['name', 'description'],
+}
+
+/** The canonical-EN slot for each level. Every entity must have a row in the
+ *  Translations sheet with language='en' and slot equal to this — that text
+ *  is what populates the `.name` (or `.label`) column on the underlying
+ *  table, used as the universal fallback. */
+export const CANONICAL_NAME_SLOT: Record<TranslationLevel, string> = {
+  class:                'name',
+  characteristic:       'name',
+  characteristic_value: 'label',
+  product:              'name',
+}
+
+// ── Tenant-level texts sheet (unchanged) ─────────────────────────────────────
 
 export interface ParsedText {
   level:      'tenant'
@@ -68,13 +95,23 @@ export interface ParsedText {
   sort_order: number | null
 }
 
-/** Levels that the Specifications sheet can target. Tenant-level multi-row
- *  slots (terms_line, etc.) still live in the Texts sheet. */
+/** Tenant-level slots accepted on the Texts sheet. Some are single-row
+ *  (pdf_footer, public_page_title), others are multi-row (terms_line, etc.). */
+export const TENANT_TEXT_SLOTS: readonly string[] = [
+  'pdf_footer',
+  'public_page_title',
+  'post_inquiry_message',
+  'quotation_email_intro',
+  'quotation_accept_message',
+  'quotation_reject_message',
+  'terms_line',
+  'product', 'specification', 'note', 'terms',
+]
+
+// ── Specifications sheet (multi-row text blocks + spec slots) ────────────────
+
 export type SpecificationLevel = 'product' | 'characteristic' | 'characteristic_value'
 
-/** Allowed slot values per level on the Specifications sheet. Mirrors the
- *  TEXT_SLOTS catalogue but restricted to multi-row / spec slots we're
- *  exposing for bulk import. */
 export const SPECIFICATION_SLOTS: Record<SpecificationLevel, readonly string[]> = {
   product:              ['specification', 'product', 'note', 'terms'],
   characteristic:       ['specification'],
@@ -90,11 +127,14 @@ export interface ParsedSpecification {
   content:       string
 }
 
+// ── Payload ──────────────────────────────────────────────────────────────────
+
 export interface CatalogImportPayload {
   classes:         ParsedClass[]
   characteristics: ParsedCharacteristic[]
   values:          ParsedValue[]
   products:        ParsedProduct[]
+  translations:    ParsedTranslation[]
   texts:           ParsedText[]
   specifications:  ParsedSpecification[]
 }
@@ -121,6 +161,7 @@ export interface ImportResult {
   characteristics_created: number
   values_created:          number
   products_created:        number
+  translations_created:    number
   texts_created:           number
   specifications_created:  number
 }

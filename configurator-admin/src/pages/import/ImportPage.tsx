@@ -118,6 +118,7 @@ export function ImportPage() {
     characteristics: payload.characteristics.length,
     values:          payload.values.length,
     products:        payload.products.length,
+    translations:    payload.translations.length,
     texts:           payload.texts.length,
     specifications:  payload.specifications.length,
   } : null
@@ -204,11 +205,12 @@ export function ImportPage() {
               <CardDescription>{t('The workbook parsed cleanly. Review the totals below before importing.')}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 sm:grid-cols-6 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
                 <CountChip label={t('Classes')}         value={counts.classes} />
                 <CountChip label={t('Characteristics')} value={counts.characteristics} />
                 <CountChip label={t('Values')}          value={counts.values} />
                 <CountChip label={t('Products')}        value={counts.products} />
+                <CountChip label={t('Translations')}    value={counts.translations} />
                 <CountChip label={t('Texts')}           value={counts.texts} />
                 <CountChip label={t('Specifications')}  value={counts.specifications} />
               </div>
@@ -227,11 +229,12 @@ export function ImportPage() {
               <div className="flex flex-col items-center gap-3 text-center py-4">
                 <CheckCircle2 className="h-10 w-10 text-emerald-500" />
                 <p className="text-base font-semibold">{t('Catalog imported successfully')}</p>
-                <div className="grid grid-cols-2 sm:grid-cols-6 gap-3 mt-2">
+                <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3 mt-2">
                   <CountChip label={t('Classes')}         value={result.classes_created} />
                   <CountChip label={t('Characteristics')} value={result.characteristics_created} />
                   <CountChip label={t('Values')}          value={result.values_created} />
                   <CountChip label={t('Products')}        value={result.products_created} />
+                  <CountChip label={t('Translations')}    value={result.translations_created} />
                   <CountChip label={t('Texts')}           value={result.texts_created} />
                   <CountChip label={t('Specifications')}  value={result.specifications_created} />
                 </div>

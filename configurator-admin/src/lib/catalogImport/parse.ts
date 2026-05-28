@@ -5,6 +5,8 @@ import {
   DISPLAY_TYPES,
   PRODUCT_STATUSES,
   TEXT_LANGUAGES,
+  TRANSLATION_SLOTS,
+  CANONICAL_NAME_SLOT,
   SPECIFICATION_SLOTS,
   type CatalogImportPayload,
   type ImportError,
@@ -14,11 +16,13 @@ import {
   type ParsedValue,
   type ParsedProduct,
   type ParsedText,
+  type ParsedTranslation,
   type ParsedSpecification,
+  type TranslationLevel,
   type SpecificationLevel,
   type TextLanguage,
 } from './types'
-import { TEMPLATE_HEADERS, REQUIRED_COLUMNS } from './template'
+import { TEMPLATE_HEADERS, REQUIRED_COLUMNS, PARSED_SHEET_NAMES } from './template'
 
 /** Read a File / Blob / ArrayBuffer into an ExcelJS workbook, then walk every
  *  sheet collecting parsed rows and validation errors. The function is pure
@@ -30,8 +34,9 @@ export async function parseImportWorkbook(input: ArrayBuffer | Uint8Array): Prom
 
   const errors: ImportError[] = []
 
-  // 1. Sheet presence check
-  for (const required of Object.values(SHEET_NAMES)) {
+  // 1. Sheet presence check (the Slots reference sheet is optional — parser
+  //    ignores it whether present or not).
+  for (const required of PARSED_SHEET_NAMES) {
     if (!wb.getWorksheet(required)) {
       errors.push({ sheet: null, row: null, column: null, message: `Missing required sheet "${required}"` })
     }
@@ -42,7 +47,7 @@ export async function parseImportWorkbook(input: ArrayBuffer | Uint8Array): Prom
 
   // 2. Per-sheet header validation
   const sheetRows: Record<string, RawRow[]> = {}
-  for (const sheetName of Object.values(SHEET_NAMES)) {
+  for (const sheetName of PARSED_SHEET_NAMES) {
     const ws = wb.getWorksheet(sheetName)!
     const headerResult = readHeader(ws, sheetName, errors)
     if (!headerResult) {
@@ -60,6 +65,7 @@ export async function parseImportWorkbook(input: ArrayBuffer | Uint8Array): Prom
   const characteristics = parseCharacteristics(sheetRows[SHEET_NAMES.characteristics], errors)
   const values         = parseValues(sheetRows[SHEET_NAMES.values], errors)
   const products       = parseProducts(sheetRows[SHEET_NAMES.products], errors)
+  const translations   = parseTranslations(sheetRows[SHEET_NAMES.translations], errors)
   const texts          = parseTexts(sheetRows[SHEET_NAMES.texts], errors)
   const specifications = parseSpecifications(sheetRows[SHEET_NAMES.specifications], errors)
 
@@ -106,7 +112,60 @@ export async function parseImportWorkbook(input: ArrayBuffer | Uint8Array): Prom
     }
   })
 
-  // Specifications: validate reference_key against the sheet matching `level`.
+  // 6. Translations cross-reference + uniqueness + canonical-EN enforcement
+  const keySetsByLevel: Record<TranslationLevel, Set<string>> = {
+    class:                classKeys,
+    characteristic:       characteristicKeys,
+    characteristic_value: valueKeys,
+    product:              productKeys,
+  }
+
+  translations.forEach((tr, idx) => {
+    const ctx = { sheet: SHEET_NAMES.translations, row: rowNumberOf(idx) }
+    if (!keySetsByLevel[tr.level].has(tr.reference_key)) {
+      errors.push({
+        sheet: ctx.sheet, row: ctx.row, column: 'reference_key',
+        message: `Unknown ${tr.level} key "${tr.reference_key}"`,
+      })
+    }
+  })
+
+  const translationSeen = new Map<string, number>()
+  translations.forEach((tr, idx) => {
+    const k = `${tr.level}::${tr.reference_key}::${tr.slot}::${tr.language}`
+    if (translationSeen.has(k)) {
+      errors.push({
+        sheet: SHEET_NAMES.translations, row: rowNumberOf(idx), column: 'language',
+        message: `Duplicate (level, reference_key, slot, language) — first seen at row ${rowNumberOf(translationSeen.get(k)!)}`,
+      })
+    } else {
+      translationSeen.set(k, idx)
+    }
+  })
+
+  // Every entity must have one EN row with the canonical name/label slot
+  // (it populates the .name or .label DB column). Without it the entity has
+  // no fallback string in the EN-canonical column and would import broken.
+  const enforceCanonicalEn = (level: TranslationLevel, keys: Set<string>, sheetForRef: string) => {
+    const canon = CANONICAL_NAME_SLOT[level]
+    for (const key of keys) {
+      const has = translations.some(tr =>
+        tr.level === level && tr.reference_key === key && tr.language === 'en' && tr.slot === canon
+      )
+      if (!has) {
+        errors.push({
+          sheet: sheetForRef, row: null, column: 'key',
+          message: `${level} "${key}" is missing a Translations row with language="en" and slot="${canon}"`,
+        })
+      }
+    }
+  }
+  enforceCanonicalEn('class',                classKeys,          SHEET_NAMES.classes)
+  enforceCanonicalEn('characteristic',       characteristicKeys, SHEET_NAMES.characteristics)
+  enforceCanonicalEn('characteristic_value', valueKeys,          SHEET_NAMES.values)
+  enforceCanonicalEn('product',              productKeys,        SHEET_NAMES.products)
+
+  // 7. Specifications cross-references + (level, ref, slot, lang, sort_order) uniqueness
   specifications.forEach((s, idx) => {
     const ctx = { sheet: SHEET_NAMES.specifications, row: rowNumberOf(idx) }
     const refOk =
@@ -121,9 +180,6 @@ export async function parseImportWorkbook(input: ArrayBuffer | Uint8Array): Prom
     }
   })
 
-  // Within-sheet uniqueness for (level, ref, slot, language, sort_order) on
-  // Specifications. Two rows with the same natural key would later collide
-  // with the tenant_texts unique index.
   const specSeen = new Map<string, number>()
   specifications.forEach((s, idx) => {
     const k = `${s.level}::${s.reference_key}::${s.slot}::${s.language}::${s.sort_order ?? 0}`
@@ -138,7 +194,7 @@ export async function parseImportWorkbook(input: ArrayBuffer | Uint8Array): Prom
   })
 
   return {
-    payload: { classes, characteristics, values, products, texts, specifications },
+    payload: { classes, characteristics, values, products, translations, texts, specifications },
     errors,
   }
 }
@@ -152,13 +208,9 @@ type RawRow = {
 }
 
 function emptyPayload(): CatalogImportPayload {
-  return { classes: [], characteristics: [], values: [], products: [], texts: [], specifications: [] }
+  return { classes: [], characteristics: [], values: [], products: [], translations: [], texts: [], specifications: [] }
 }
 
-/** Header row is row 2 in the template (row 1 is the instructions banner).
- *  We accept either layout though: if row 1 already looks like headers, use
- *  it; otherwise use row 2. This way users can re-save the template from
- *  programs that strip merged-cell instruction rows. */
 function readHeader(ws: ExcelJS.Worksheet, sheetName: string, errors: ImportError[]): { colMap: Map<string, number>; headerRow: number } | null {
   const required = REQUIRED_COLUMNS[sheetName] ?? []
   const canonical = TEMPLATE_HEADERS[sheetName] ?? []
@@ -170,9 +222,7 @@ function readHeader(ws: ExcelJS.Worksheet, sheetName: string, errors: ImportErro
       const v = cellToString(cell)
       if (v) colMap.set(v.toLowerCase(), colNumber)
     })
-    // Header row must contain every required column.
     if (required.every(h => colMap.has(h))) {
-      // Flag any unknown columns (warning-level — still fail strict mode)
       const unknown: string[] = []
       colMap.forEach((_, name) => { if (!canonical.includes(name)) unknown.push(name) })
       if (unknown.length > 0) {
@@ -186,7 +236,6 @@ function readHeader(ws: ExcelJS.Worksheet, sheetName: string, errors: ImportErro
   }
 
   const missing = required.filter(h => {
-    // crude check across rows 1 + 2
     for (const r of [1, 2]) {
       let found = false
       ws.getRow(r).eachCell({ includeEmpty: false }, cell => {
@@ -226,7 +275,6 @@ function cellToString(cell: ExcelJS.Cell): string {
   if (typeof v === 'number') return String(v)
   if (typeof v === 'boolean') return v ? 'true' : 'false'
   if (v instanceof Date) return v.toISOString()
-  // Rich text or formula result
   if (typeof v === 'object') {
     if ('richText' in v && Array.isArray(v.richText)) {
       return v.richText.map(r => r.text).join('').trim()
@@ -244,14 +292,8 @@ function parseClasses(rows: RawRow[], errors: ImportError[]): ParsedClass[] {
   for (const r of rows) {
     const ctx = { sheet: SHEET_NAMES.classes, row: r.excelRow, errors }
     const key = required(r.cells, 'key', ctx)
-    const name_en = required(r.cells, 'name_en', ctx)
-    if (!key || !name_en) continue
-    out.push({
-      key,
-      name_en,
-      name_sr:    optional(r.cells, 'name_sr'),
-      sort_order: parseOptionalInt(r.cells, 'sort_order', ctx),
-    })
+    if (!key) continue
+    out.push({ key, sort_order: parseOptionalInt(r.cells, 'sort_order', ctx) })
   }
   return out
 }
@@ -261,9 +303,8 @@ function parseCharacteristics(rows: RawRow[], errors: ImportError[]): ParsedChar
   for (const r of rows) {
     const ctx = { sheet: SHEET_NAMES.characteristics, row: r.excelRow, errors }
     const key = required(r.cells, 'key', ctx)
-    const name_en = required(r.cells, 'name_en', ctx)
     const display_type_raw = required(r.cells, 'display_type', ctx)
-    if (!key || !name_en || !display_type_raw) continue
+    if (!key || !display_type_raw) continue
 
     const dt = display_type_raw.toLowerCase() as DisplayType
     if (!DISPLAY_TYPES.includes(dt)) {
@@ -274,13 +315,9 @@ function parseCharacteristics(rows: RawRow[], errors: ImportError[]): ParsedChar
 
     out.push({
       key,
-      name_en,
-      name_sr:        optional(r.cells, 'name_sr'),
-      description_en: optional(r.cells, 'description_en'),
-      description_sr: optional(r.cells, 'description_sr'),
-      display_type:   dt,
-      class_keys:     splitCsv(r.cells['class_keys']),
-      sort_order:     parseOptionalInt(r.cells, 'sort_order', ctx),
+      display_type: dt,
+      class_keys:   splitCsv(r.cells['class_keys']),
+      sort_order:   parseOptionalInt(r.cells, 'sort_order', ctx),
     })
   }
   return out
@@ -292,8 +329,7 @@ function parseValues(rows: RawRow[], errors: ImportError[]): ParsedValue[] {
     const ctx = { sheet: SHEET_NAMES.values, row: r.excelRow, errors }
     const key = required(r.cells, 'key', ctx)
     const characteristic_key = required(r.cells, 'characteristic_key', ctx)
-    const label_en = required(r.cells, 'label_en', ctx)
-    if (!key || !characteristic_key || !label_en) continue
+    if (!key || !characteristic_key) continue
 
     const price_modifier_raw = r.cells['price_modifier']
     let price_modifier = 0
@@ -317,8 +353,6 @@ function parseValues(rows: RawRow[], errors: ImportError[]): ParsedValue[] {
     out.push({
       key,
       characteristic_key,
-      label_en,
-      label_sr:      optional(r.cells, 'label_sr'),
       price_modifier,
       hex_color:     hex_color_raw ? (hex_color_raw.startsWith('#') ? hex_color_raw : `#${hex_color_raw}`) : null,
       sort_order:    parseOptionalInt(r.cells, 'sort_order', ctx),
@@ -332,9 +366,8 @@ function parseProducts(rows: RawRow[], errors: ImportError[]): ParsedProduct[] {
   for (const r of rows) {
     const ctx = { sheet: SHEET_NAMES.products, row: r.excelRow, errors }
     const key = required(r.cells, 'key', ctx)
-    const name_en = required(r.cells, 'name_en', ctx)
     const base_price_raw = required(r.cells, 'base_price', ctx)
-    if (!key || !name_en || !base_price_raw) continue
+    if (!key || !base_price_raw) continue
 
     const base_price = Number(base_price_raw)
     if (Number.isNaN(base_price) || base_price < 0) {
@@ -357,10 +390,6 @@ function parseProducts(rows: RawRow[], errors: ImportError[]): ParsedProduct[] {
 
     out.push({
       key,
-      name_en,
-      name_sr:         optional(r.cells, 'name_sr'),
-      description_en:  optional(r.cells, 'description_en'),
-      description_sr:  optional(r.cells, 'description_sr'),
       base_price,
       currency:        optional(r.cells, 'currency')?.toUpperCase().slice(0, 3) ?? null,
       sku:             optional(r.cells, 'sku'),
@@ -368,6 +397,45 @@ function parseProducts(rows: RawRow[], errors: ImportError[]): ParsedProduct[] {
       status,
       class_keys:      splitCsv(r.cells['class_keys']),
     })
+  }
+  return out
+}
+
+function parseTranslations(rows: RawRow[], errors: ImportError[]): ParsedTranslation[] {
+  const out: ParsedTranslation[] = []
+  const allowedLevels: TranslationLevel[] = ['class', 'characteristic', 'characteristic_value', 'product']
+
+  for (const r of rows) {
+    const ctx = { sheet: SHEET_NAMES.translations, row: r.excelRow, errors }
+    const level_raw    = required(r.cells, 'level', ctx)
+    const reference_key = required(r.cells, 'reference_key', ctx)
+    const slot         = required(r.cells, 'slot', ctx)
+    const language_raw = required(r.cells, 'language', ctx)
+    const content      = required(r.cells, 'content', ctx)
+    if (!level_raw || !reference_key || !slot || !language_raw || !content) continue
+
+    const level = level_raw.toLowerCase() as TranslationLevel
+    if (!allowedLevels.includes(level)) {
+      errors.push({ sheet: ctx.sheet, row: r.excelRow, column: 'level',
+        message: `Invalid level "${level_raw}". Allowed: ${allowedLevels.join(', ')}` })
+      continue
+    }
+
+    const allowedSlots = TRANSLATION_SLOTS[level]
+    if (!allowedSlots.includes(slot)) {
+      errors.push({ sheet: ctx.sheet, row: r.excelRow, column: 'slot',
+        message: `Invalid slot "${slot}" for level "${level}". Allowed: ${allowedSlots.join(', ')}` })
+      continue
+    }
+
+    const lang = language_raw.toLowerCase() as TextLanguage
+    if (!(TEXT_LANGUAGES as readonly string[]).includes(lang)) {
+      errors.push({ sheet: ctx.sheet, row: r.excelRow, column: 'language',
+        message: `Invalid language "${language_raw}". Allowed: ${TEXT_LANGUAGES.join(', ')}` })
+      continue
+    }
+
+    out.push({ level, reference_key, slot, language: lang, content })
   }
   return out
 }
@@ -384,7 +452,7 @@ function parseTexts(rows: RawRow[], errors: ImportError[]): ParsedText[] {
 
     if (level !== 'tenant') {
       errors.push({ sheet: ctx.sheet, row: r.excelRow, column: 'level',
-        message: `Only "tenant" is supported in this template. Set per-product/characteristic/value translations using the inline _en / _sr columns on those sheets.` })
+        message: `Only "tenant" is supported here. Per-entity translations go on the Translations sheet, multi-line product blocks on Specifications.` })
       continue
     }
 
@@ -440,8 +508,6 @@ function parseSpecifications(rows: RawRow[], errors: ImportError[]): ParsedSpeci
       continue
     }
 
-    // Only product-level slots are multi-row. Characteristic & value
-    // specifications must stay at sort_order = 0.
     const sort_order = parseOptionalInt(r.cells, 'sort_order', ctx)
     if (level !== 'product' && sort_order != null && sort_order !== 0) {
       errors.push({ sheet: ctx.sheet, row: r.excelRow, column: 'sort_order',
@@ -499,9 +565,6 @@ function checkKeyUniqueness<T extends { key: string }>(sheet: string, rows: T[],
   })
 }
 
-/** Excel row number for a 0-based index into parsed rows. The template
- *  reserves row 1 for instructions and row 2 for headers, so the first
- *  data row is row 3. This is the number we surface in error messages. */
 function rowNumberOf(idx: number): number {
   return idx + 3
 }
