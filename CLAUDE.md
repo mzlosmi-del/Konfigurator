@@ -104,7 +104,7 @@ React Router v6. Top-level routes: `/login`, `/register`, and a layout wrapper f
 - New tenants get seeded defaults: `member` → `edit` everywhere, `viewer` → `view` everywhere (done inside `handle_new_user()`).
 
 ### Audit log system (migration 060)
-`audit_log` table: one row per save/delete, stores a JSONB diff of only changed fields with human-readable keys. 90-day retention via pg_cron (falls back gracefully if pg_cron unavailable).
+`audit_log` table: one row per save/delete, stores a JSONB diff of only changed fields with human-readable keys. 90-day retention via a pg_cron job (`purge-audit-log`, daily at 03:00 UTC).
 
 - `configurator-admin/src/lib/auditLog.ts`: `logChange(opts)` — inserts a row, swallows errors so audit never breaks a save. `computeDiff(before, after, labelMap)` — compares two snapshots, returns only changed fields keyed by label. `fetchAuditLog(filter)` — paginated fetch with filters.
 - `configurator-admin/src/lib/auditLabels.ts`: entity-specific label maps that control which fields appear in diffs.
@@ -112,7 +112,7 @@ React Router v6. Top-level routes: `/login`, `/register`, and a layout wrapper f
 - `AuditLogPage` at `/admin/audit-log` — global log visible to admins only, with entity-type and date filters.
 - Currently wired up on: products, quotations, quotation line items, characteristics, characteristic values, settings, texts, pricing formulas.
 
-**IMPORTANT: Migration 060 (`migrations/060_audit_log.sql`) has NOT yet been run in Supabase. Run it in the SQL editor before the audit log feature will work in production.**
+**Status: Migration 060 is applied in production (Configurator MVP).** The 90-day retention job was initially skipped because `pg_cron` was not installed; `pg_cron` has since been enabled (in the `pg_catalog` schema) and the `purge-audit-log` cron job is scheduled and active.
 
 ### Widget theme per product (migration 059)
 `products.widget_theme` column (text, default `'cloud'`). Persisted from the Embed panel (`EmbedPanel.tsx`) and read by the widget embed snippet to apply the correct theme automatically. Available themes are defined in the widget as `ThemeId`.
@@ -132,7 +132,7 @@ Server-side feature gates and downgrade safety. All gated dimensions raise `RAIS
 - Edge Functions use `_shared/planGate.ts` (`assertFeature`, `assertMonthlyLimit` — both return `Response | null`) and `_shared/monthlyUsage.ts` (`getMonthlyUsage`, `incrementMonthlyUsage`, `currentPeriodMonth`).
 - The widget's `submitInquiry` parses the DETAIL JSON into a `PlanLimitError` so `InquiryForm` can render a friendly localised message instead of leaking the raw DB exception text to the customer.
 
-**IMPORTANT: Migration 062 (`migrations/062_feature_gate_triggers.sql`) has NOT yet been run in Supabase. Apply it before deploying these enforcement changes.**
+**Status: Migration 062 is applied in production (Configurator MVP).** All six functions, the three `enforce_*` triggers, and the `visualization_assets.read_only` column exist and are active.
 
 ### White-label features (migrations 063, 064, 065)
 Honour `plan_limits.white_label` (scale plan only) by letting tenants override Configureout-branded surfaces:
