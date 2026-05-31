@@ -83,8 +83,23 @@ interface EmailArgs {
   currency:        string
   validUntil:      string | null
   publicUrl:       string
-  lang:            'en' | 'sr'
+  lang:            OutputLang
   customIntro:     string | null
+}
+
+// Built-in output languages — keep in sync with OUTPUT_LANGS in
+// configurator-admin/src/lib/languages.ts and the COPY / DATE_LOCALE maps below.
+type OutputLang = 'en' | 'sr' | 'de' | 'fr' | 'es' | 'ru'
+
+const DATE_LOCALE: Record<OutputLang, string> = {
+  en: 'en-GB', sr: 'sr-Latn-RS', de: 'de-DE', fr: 'fr-FR', es: 'es-ES', ru: 'ru-RU',
+}
+
+const OUTPUT_LANGS: OutputLang[] = ['en', 'sr', 'de', 'fr', 'es', 'ru']
+
+/** Narrow an unknown lang string to a built-in OutputLang, defaulting to 'en'. */
+function asOutputLang(c: string | null | undefined): OutputLang {
+  return c && (OUTPUT_LANGS as string[]).includes(c) ? c as OutputLang : 'en'
 }
 
 const COPY = {
@@ -112,12 +127,65 @@ const COPY = {
     accept:        'Prihvati',
     reject:        'Odbij',
   },
+  de: {
+    subject:       (ref: string, name: string) => `${ref} — Ihr Angebot von ${name}`,
+    yourQuoteIs:   'Ihr Angebot ist fertig',
+    hi:            (n: string) => `Hallo ${n},`,
+    reference:     'Referenz',
+    total:         'Gesamt',
+    validUntil:    (d: string) => `Dieses Angebot ist gültig bis ${d}.`,
+    actionsHint:   'Klicken Sie unten, um zu bestätigen oder abzulehnen. Eine PDF-Kopie ist beigefügt.',
+    viewOnline:    'Online ansehen',
+    accept:        'Annehmen',
+    reject:        'Ablehnen',
+  },
+  fr: {
+    subject:       (ref: string, name: string) => `${ref} — votre devis de ${name}`,
+    yourQuoteIs:   'Votre devis est prêt',
+    hi:            (n: string) => `Bonjour ${n},`,
+    reference:     'Référence',
+    total:         'Total',
+    validUntil:    (d: string) => `Ce devis est valable jusqu’au ${d}.`,
+    actionsHint:   'Cliquez ci-dessous pour confirmer ou refuser. Une copie PDF est jointe.',
+    viewOnline:    'Voir en ligne',
+    accept:        'Accepter',
+    reject:        'Refuser',
+  },
+  es: {
+    subject:       (ref: string, name: string) => `${ref} — su presupuesto de ${name}`,
+    yourQuoteIs:   'Su presupuesto está listo',
+    hi:            (n: string) => `Hola ${n},`,
+    reference:     'Referencia',
+    total:         'Total',
+    validUntil:    (d: string) => `Este presupuesto es válido hasta ${d}.`,
+    actionsHint:   'Haga clic abajo para confirmar o rechazar. Se adjunta una copia en PDF.',
+    viewOnline:    'Ver en línea',
+    accept:        'Aceptar',
+    reject:        'Rechazar',
+  },
+  ru: {
+    subject:       (ref: string, name: string) => `${ref} — ваше предложение от ${name}`,
+    yourQuoteIs:   'Ваше предложение готово',
+    hi:            (n: string) => `Здравствуйте, ${n},`,
+    reference:     'Номер',
+    total:         'Итого',
+    validUntil:    (d: string) => `Это предложение действительно до ${d}.`,
+    actionsHint:   'Нажмите ниже, чтобы принять или отклонить. Копия в формате PDF прилагается.',
+    viewOnline:    'Открыть онлайн',
+    accept:        'Принять',
+    reject:        'Отклонить',
+  },
+}
+
+/** Safe accessor — falls back to English if a language is missing. */
+function copyFor(lang: OutputLang): typeof COPY['en'] {
+  return COPY[lang] ?? COPY.en
 }
 
 function buildEmailHtml(args: EmailArgs): string {
-  const c           = COPY[args.lang]
+  const c           = copyFor(args.lang)
   const validityRow = args.validUntil
-    ? `<p style="margin:8px 0 0;font-size:13px;color:#6b7280;">${escHtml(c.validUntil(new Date(args.validUntil).toLocaleDateString(args.lang === 'sr' ? 'sr-Latn-RS' : 'en-GB', { dateStyle: 'long' })))}</p>`
+    ? `<p style="margin:8px 0 0;font-size:13px;color:#6b7280;">${escHtml(c.validUntil(new Date(args.validUntil).toLocaleDateString(DATE_LOCALE[args.lang] ?? 'en-GB', { dateStyle: 'long' })))}</p>`
     : ''
   const introRow    = args.customIntro && args.customIntro.trim().length > 0
     ? `<p style="margin:12px 0 0;font-size:14px;color:#374151;line-height:1.55;white-space:pre-line;">${escHtml(args.customIntro.trim())}</p>`
@@ -224,8 +292,9 @@ Deno.serve(async (req: Request) => {
     if (qErr || !quotation) return json({ error: 'Quotation not found' }, 404)
 
     // Lang lives on the quotation (set during Confirm & Generate PDF). Body
-    // override is accepted for backwards compat with old callers.
-    const lang: 'en' | 'sr' = body?.lang === 'sr' || quotation.lang === 'sr' ? 'sr' : 'en'
+    // override is accepted for backwards compat with old callers; both are
+    // narrowed to a built-in output language (defaults to 'en').
+    const lang: OutputLang = asOutputLang(body?.lang ?? quotation.lang)
 
     if (!quotation.customer_email) {
       return json({ error: 'Quotation has no customer email' }, 400)
@@ -263,7 +332,10 @@ Deno.serve(async (req: Request) => {
       .eq('slot', 'quotation_email_intro')
     const introList = (introRows ?? []) as { language: string; content: string }[]
     const introByLang = (l: string) => introList.find(r => r.language === l && r.content.trim())?.content ?? null
-    const tenantIntro = introByLang(lang) ?? introByLang(lang === 'en' ? 'sr' : 'en')
+    // chosen → EN → SR
+    const introChain = lang === 'en' ? ['en', 'sr'] : lang === 'sr' ? ['sr', 'en'] : [lang, 'en', 'sr']
+    let tenantIntro: string | null = null
+    for (const l of introChain) { tenantIntro = introByLang(l); if (tenantIntro) break }
     // Per-send override (from the preview dialog) wins over the tenant default.
     const customIntro = introOverride !== null ? introOverride : tenantIntro
 
@@ -336,7 +408,7 @@ Deno.serve(async (req: Request) => {
     })
     const subject = subjectOverride && subjectOverride.length > 0
       ? subjectOverride
-      : COPY[lang].subject(quotation.reference_number, tenantName)
+      : copyFor(lang).subject(quotation.reference_number, tenantName)
     const toEmail = toOverride ?? quotation.customer_email
 
     const emailRes = await fetch('https://api.resend.com/emails', {

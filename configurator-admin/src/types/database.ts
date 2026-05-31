@@ -2,6 +2,8 @@
 // When you add columns, update these too.
 // Alternative: use `npx supabase gen types typescript` for auto-generated types.
 
+import type { OutputLang } from '@/lib/languages'
+
 export type Json = string | number | boolean | null | { [key: string]: Json } | Json[]
 
 export type ProductStatus = 'draft' | 'published' | 'archived'
@@ -505,7 +507,7 @@ export interface Database {
           responded_at:        string | null
           responded_ip:        string | null
           responded_user_agent: string | null
-          lang:                'en' | 'sr'
+          lang:                OutputLang
           created_at: string
           updated_at: string
         }
@@ -518,7 +520,7 @@ export interface Database {
           responded_at?:         string | null
           responded_ip?:         string | null
           responded_user_agent?: string | null
-          lang?:                 'en' | 'sr'
+          lang?:                 OutputLang
         }
         Update: Partial<Database['public']['Tables']['quotations']['Insert']>
       }

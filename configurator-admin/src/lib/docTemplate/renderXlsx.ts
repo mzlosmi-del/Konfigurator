@@ -5,8 +5,8 @@
 
 import ExcelJS from 'exceljs'
 import type { Quotation, TenantText } from '@/types/database'
-import type { TenantProfile } from '@/lib/pdf/shared'
-import type { Lang } from '@/i18n'
+import { type TenantProfile, labelsFor } from '@/lib/pdf/shared'
+import type { OutputLang as Lang } from '@/lib/languages'
 import type { Block, TableColumn, BlockStyle, StyleAlign } from './types'
 import { buildTemplateContext, type ImageResolver } from './context'
 import type { DocumentTemplateDefinition } from './types'
@@ -177,13 +177,9 @@ export async function renderTemplateToXlsx(args: RenderXlsxArgs): Promise<Uint8A
         vc.alignment = { horizontal: 'right' }
         row += 1
       }
-      summary(label('Subtotal', 'Međuzbir'), `${ctx.quotation.subtotal.toFixed(2)} ${cur}`, false)
-      summary(label('Total', 'Ukupno'), `${ctx.quotation.total.toFixed(2)} ${cur}`, true)
+      summary(labelsFor(args.lang).subtotal, `${ctx.quotation.subtotal.toFixed(2)} ${cur}`, false)
+      summary(labelsFor(args.lang).total, `${ctx.quotation.total.toFixed(2)} ${cur}`, true)
     }
-  }
-
-  function label(en: string, sr: string): string {
-    return args.lang === 'en' ? en : sr
   }
 
   emit(args.definition.blocks ?? [], [])

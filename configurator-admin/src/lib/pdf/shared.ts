@@ -2,6 +2,25 @@ import { PDFDocument, PDFFont, rgb } from 'pdf-lib'
 import fontkit from '@pdf-lib/fontkit'
 import type { Quotation, TenantText } from '@/types/database'
 import type { PdfSection } from '@/pages/quotations/PdfLayoutDialog'
+import type { OutputLang } from '@/lib/languages'
+
+/** Language fallback order for resolving per-tenant output text.
+ *  chosen → EN → SR (deduped). Callers append the canonical name/value last. */
+export function outputLangFallback(lang: OutputLang): OutputLang[] {
+  if (lang === 'en') return ['en', 'sr']
+  if (lang === 'sr') return ['sr', 'en']
+  return [lang, 'en', 'sr']
+}
+
+/** Pick a value from a per-language map, following the output fallback chain,
+ *  finally returning `map.en` (or undefined) when nothing matches. */
+export function pickByLang<T>(lang: OutputLang, map: Partial<Record<OutputLang, T>>): T | undefined {
+  for (const l of outputLangFallback(lang)) {
+    const v = map[l]
+    if (v !== undefined && v !== null && !(typeof v === 'string' && v.trim() === '')) return v
+  }
+  return map.en
+}
 
 export interface TenantProfile {
   name:                string
@@ -27,12 +46,17 @@ export function getFooterLabel(
   tenant: TenantProfile,
   defaultLabel: string,
   texts: TenantText[] | undefined,
-  lang: 'en' | 'sr',
+  lang: OutputLang,
 ): string {
   if (texts && texts.length > 0) {
-    const row = texts.find(r => r.level === 'tenant' && r.reference_id === null && r.slot === 'pdf_footer' && r.language === lang)
-      ?? texts.find(r => r.level === 'tenant' && r.reference_id === null && r.slot === 'pdf_footer')
-    if (row && row.content.trim()) return row.content.trim()
+    const footerRows = texts.filter(r => r.level === 'tenant' && r.reference_id === null && r.slot === 'pdf_footer')
+    // Resolve chosen → EN → SR; fall back to any authored footer row otherwise.
+    for (const l of outputLangFallback(lang)) {
+      const row = footerRows.find(r => r.language === l && r.content.trim())
+      if (row) return row.content.trim()
+    }
+    const any = footerRows.find(r => r.content.trim())
+    if (any) return any.content.trim()
   }
   const legacy = (tenant.pdf_footer ?? '').trim()
   return legacy.length > 0 ? legacy : defaultLabel
@@ -44,15 +68,20 @@ export function getFooterLabel(
 export function getTermsLines(
   texts: TenantText[] | undefined,
   fallback: readonly string[],
-  lang: 'en' | 'sr',
+  lang: OutputLang,
 ): readonly string[] {
   if (!texts || texts.length === 0) return fallback
-  const rows = texts
-    .filter(r => r.level === 'tenant' && r.reference_id === null && r.slot === 'terms_line' && r.language === lang)
+  const linesFor = (l: OutputLang) => texts
+    .filter(r => r.level === 'tenant' && r.reference_id === null && r.slot === 'terms_line' && r.language === l)
     .sort((a, b) => a.sort_order - b.sort_order)
     .map(r => r.content)
     .filter(s => s.trim().length > 0)
-  return rows.length > 0 ? rows : fallback
+  // Use the first language in the fallback chain that has any authored lines.
+  for (const l of outputLangFallback(lang)) {
+    const rows = linesFor(l)
+    if (rows.length > 0) return rows
+  }
+  return fallback
 }
 
 export type PdfTemplate = 'modern' | 'classic' | 'compact' | 'bold'
@@ -66,7 +95,7 @@ export interface PdfBuildArgs {
    *  whose tenant never had any texts simply render no blocks. */
   texts?:           TenantText[]
   layoutSections?:  PdfSection[]
-  lang:             'en' | 'sr'
+  lang:             OutputLang
   watermark?:       boolean
   template:         PdfTemplate
 }
@@ -107,51 +136,62 @@ export function wrapText(rawText: string, font: PDFFont, size: number, maxWidth:
 }
 
 // ── PDF label translations ────────────────────────────────────────────────────
+// `en` is the canonical shape; every other language must define the same keys.
+// Adding a new output language: add its code to OUTPUT_LANGS (lib/languages.ts)
+// and a full entry here — the `Record<OutputLang, LabelSet>` typing makes the
+// compiler reject any missing key.
 
-export const PDF_LABELS = {
-  en: {
-    quotation:    'QUOTATION',
-    billTo:       'BILL TO',
-    shipTo:       'SHIP TO',
-    quoteDetails: 'QUOTE DETAILS',
-    reference:    'Reference',
-    issued:       'Issue Date',
-    validUntil:   'Valid Until',
-    currency:     'Currency',
-    preparedBy:   'Prepared By',
-    paymentTerms: 'Payment Terms',
-    vatNumber:    'VAT No.',
-    regNumber:    'Reg. No.',
-    customerVat:  'VAT / Tax ID',
-    lineItems:    'LINE ITEMS',
-    product:      'PRODUCT',
-    qty:          'QTY',
-    uom:          'UOM',
-    unitPrice:    'UNIT PRICE',
-    total:        'TOTAL',
-    basePrice:    'Base price',
-    subtotal:     'Subtotal',
-    totalDue:     'TOTAL DUE',
-    notes:        'NOTES',
-    termsHeader:  'TERMS & CONDITIONS',
-    termsLines: [
-      '• Payment: 50% deposit on order confirmation, remaining balance due prior to delivery.',
-      '• Prices are exclusive of VAT and all applicable taxes unless otherwise stated.',
-      '• This quotation is valid for 30 days from the date of issue unless a specific expiry date is noted above.',
-      '• Goods remain the property of the seller until full payment has been received.',
-      '• Delivery timelines are indicative and will be confirmed in writing upon order placement.',
-      '• Any modifications to the agreed order must be requested and confirmed in writing.',
-      '• The seller shall not be liable for delays caused by circumstances beyond its reasonable control.',
-      '• Thank you for your business. We look forward to working with you.',
-    ],
-    validityText: (date: string) => `Valid until ${date}`,
-    contactText:  'Contact us to confirm your order.',
-    footer:       'Configureout',
-    page:         'Page',
-    of:           'of',
-    dateLocale:   'en-GB' as const,
-    previewWatermark: 'PREVIEW — Not an official quotation',
-  },
+const EN_LABELS = {
+  quotation:    'QUOTATION',
+  billTo:       'BILL TO',
+  shipTo:       'SHIP TO',
+  quoteDetails: 'QUOTE DETAILS',
+  reference:    'Reference',
+  issued:       'Issue Date',
+  validUntil:   'Valid Until',
+  currency:     'Currency',
+  preparedBy:   'Prepared By',
+  paymentTerms: 'Payment Terms',
+  vatNumber:    'VAT No.',
+  regNumber:    'Reg. No.',
+  customerVat:  'VAT / Tax ID',
+  lineItems:    'LINE ITEMS',
+  product:      'PRODUCT',
+  qty:          'QTY',
+  uom:          'UOM',
+  unitPrice:    'UNIT PRICE',
+  total:        'TOTAL',
+  basePrice:    'Base price',
+  subtotal:     'Subtotal',
+  totalDue:     'TOTAL DUE',
+  notes:        'NOTES',
+  termsHeader:  'TERMS & CONDITIONS',
+  from:         'FROM',
+  to:           'TO',
+  termsLines: [
+    '• Payment: 50% deposit on order confirmation, remaining balance due prior to delivery.',
+    '• Prices are exclusive of VAT and all applicable taxes unless otherwise stated.',
+    '• This quotation is valid for 30 days from the date of issue unless a specific expiry date is noted above.',
+    '• Goods remain the property of the seller until full payment has been received.',
+    '• Delivery timelines are indicative and will be confirmed in writing upon order placement.',
+    '• Any modifications to the agreed order must be requested and confirmed in writing.',
+    '• The seller shall not be liable for delays caused by circumstances beyond its reasonable control.',
+    '• Thank you for your business. We look forward to working with you.',
+  ],
+  validityText: (date: string) => `Valid until ${date}`,
+  contactText:  'Contact us to confirm your order.',
+  footer:       'Configureout',
+  page:         'Page',
+  of:           'of',
+  dateLocale:   'en-GB',
+  previewWatermark: 'PREVIEW — Not an official quotation',
+  previewSectionsHint: 'Configurable sections — drag in left panel to reorder',
+}
+
+export type LabelSet = typeof EN_LABELS
+
+export const PDF_LABELS: Record<OutputLang, LabelSet> = {
+  en: EN_LABELS,
   sr: {
     quotation:    'PONUDA',
     billTo:       'NARUČILAC',
@@ -177,6 +217,8 @@ export const PDF_LABELS = {
     totalDue:     'UKUPAN IZNOS',
     notes:        'NAPOMENE',
     termsHeader:  'USLOVI I PLAĆANJE',
+    from:         'OD',
+    to:           'ZA',
     termsLines: [
       '• Plaćanje: 50% avansa pri potvrdi porudžbine, preostali iznos dospeva pre isporuke.',
       '• Cene ne uključuju PDV i sve primenjive poreze, osim ako nije drugačije naznačeno.',
@@ -192,12 +234,200 @@ export const PDF_LABELS = {
     footer:       'Configureout',
     page:         'Strana',
     of:           'od',
-    dateLocale:   'sr-Latn-RS' as const,
+    dateLocale:   'sr-Latn-RS',
     previewWatermark: 'PREGLED — Nije zvanična ponuda',
+    previewSectionsHint: 'Sekcije — prevucite u levom panelu za izmenu redosleda',
+  },
+  de: {
+    quotation:    'ANGEBOT',
+    billTo:       'RECHNUNGSEMPFÄNGER',
+    shipTo:       'LIEFERADRESSE',
+    quoteDetails: 'ANGEBOTSDETAILS',
+    reference:    'Referenz',
+    issued:       'Ausstellungsdatum',
+    validUntil:   'Gültig bis',
+    currency:     'Währung',
+    preparedBy:   'Erstellt von',
+    paymentTerms: 'Zahlungsbedingungen',
+    vatNumber:    'USt-IdNr.',
+    regNumber:    'Reg.-Nr.',
+    customerVat:  'USt-IdNr. / Steuernr.',
+    lineItems:    'POSITIONEN',
+    product:      'PRODUKT',
+    qty:          'MENGE',
+    uom:          'EINHEIT',
+    unitPrice:    'EINZELPREIS',
+    total:        'GESAMT',
+    basePrice:    'Grundpreis',
+    subtotal:     'Zwischensumme',
+    totalDue:     'GESAMTBETRAG',
+    notes:        'ANMERKUNGEN',
+    termsHeader:  'ALLGEMEINE GESCHÄFTSBEDINGUNGEN',
+    from:         'VON',
+    to:           'AN',
+    termsLines: [
+      '• Zahlung: 50 % Anzahlung bei Auftragsbestätigung, Restbetrag vor Lieferung fällig.',
+      '• Preise verstehen sich ohne Mehrwertsteuer und sonstige anfallende Steuern, sofern nicht anders angegeben.',
+      '• Dieses Angebot ist 30 Tage ab Ausstellungsdatum gültig, sofern oben kein abweichendes Ablaufdatum angegeben ist.',
+      '• Die Ware bleibt bis zur vollständigen Bezahlung Eigentum des Verkäufers.',
+      '• Lieferzeiten sind Richtwerte und werden bei Auftragserteilung schriftlich bestätigt.',
+      '• Änderungen am vereinbarten Auftrag müssen schriftlich beantragt und bestätigt werden.',
+      '• Der Verkäufer haftet nicht für Verzögerungen aufgrund von Umständen außerhalb seiner zumutbaren Kontrolle.',
+      '• Vielen Dank für Ihr Vertrauen. Wir freuen uns auf die Zusammenarbeit.',
+    ],
+    validityText: (date: string) => `Gültig bis ${date}`,
+    contactText:  'Kontaktieren Sie uns, um Ihre Bestellung zu bestätigen.',
+    footer:       'Configureout',
+    page:         'Seite',
+    of:           'von',
+    dateLocale:   'de-DE',
+    previewWatermark: 'VORSCHAU — Kein offizielles Angebot',
+    previewSectionsHint: 'Konfigurierbare Abschnitte — im linken Bereich zum Umsortieren ziehen',
+  },
+  fr: {
+    quotation:    'DEVIS',
+    billTo:       'FACTURÉ À',
+    shipTo:       'LIVRÉ À',
+    quoteDetails: 'DÉTAILS DU DEVIS',
+    reference:    'Référence',
+    issued:       'Date d’émission',
+    validUntil:   'Valable jusqu’au',
+    currency:     'Devise',
+    preparedBy:   'Préparé par',
+    paymentTerms: 'Conditions de paiement',
+    vatNumber:    'N° TVA',
+    regNumber:    'N° d’enreg.',
+    customerVat:  'N° TVA / fiscal',
+    lineItems:    'LIGNES',
+    product:      'PRODUIT',
+    qty:          'QTÉ',
+    uom:          'UNITÉ',
+    unitPrice:    'PRIX UNITAIRE',
+    total:        'TOTAL',
+    basePrice:    'Prix de base',
+    subtotal:     'Sous-total',
+    totalDue:     'TOTAL À PAYER',
+    notes:        'NOTES',
+    termsHeader:  'CONDITIONS GÉNÉRALES',
+    from:         'DE',
+    to:           'À',
+    termsLines: [
+      '• Paiement : acompte de 50 % à la confirmation de commande, solde dû avant la livraison.',
+      '• Les prix s’entendent hors TVA et toutes taxes applicables, sauf indication contraire.',
+      '• Ce devis est valable 30 jours à compter de la date d’émission, sauf date d’expiration précisée ci-dessus.',
+      '• Les marchandises restent la propriété du vendeur jusqu’au paiement intégral.',
+      '• Les délais de livraison sont indicatifs et seront confirmés par écrit à la passation de la commande.',
+      '• Toute modification de la commande convenue doit être demandée et confirmée par écrit.',
+      '• Le vendeur ne saurait être tenu responsable des retards dus à des circonstances échappant à son contrôle raisonnable.',
+      '• Merci de votre confiance. Nous nous réjouissons de collaborer avec vous.',
+    ],
+    validityText: (date: string) => `Valable jusqu’au ${date}`,
+    contactText:  'Contactez-nous pour confirmer votre commande.',
+    footer:       'Configureout',
+    page:         'Page',
+    of:           'sur',
+    dateLocale:   'fr-FR',
+    previewWatermark: 'APERÇU — Devis non officiel',
+    previewSectionsHint: 'Sections configurables — glissez dans le panneau de gauche pour réordonner',
+  },
+  es: {
+    quotation:    'PRESUPUESTO',
+    billTo:       'FACTURAR A',
+    shipTo:       'ENVIAR A',
+    quoteDetails: 'DETALLES DEL PRESUPUESTO',
+    reference:    'Referencia',
+    issued:       'Fecha de emisión',
+    validUntil:   'Válido hasta',
+    currency:     'Moneda',
+    preparedBy:   'Preparado por',
+    paymentTerms: 'Condiciones de pago',
+    vatNumber:    'N.º de IVA',
+    regNumber:    'N.º de reg.',
+    customerVat:  'N.º de IVA / fiscal',
+    lineItems:    'LÍNEAS',
+    product:      'PRODUCTO',
+    qty:          'CANT.',
+    uom:          'UD.',
+    unitPrice:    'PRECIO UNITARIO',
+    total:        'TOTAL',
+    basePrice:    'Precio base',
+    subtotal:     'Subtotal',
+    totalDue:     'TOTAL A PAGAR',
+    notes:        'NOTAS',
+    termsHeader:  'TÉRMINOS Y CONDICIONES',
+    from:         'DE',
+    to:           'PARA',
+    termsLines: [
+      '• Pago: 50 % de anticipo a la confirmación del pedido, saldo restante antes de la entrega.',
+      '• Los precios no incluyen el IVA ni otros impuestos aplicables, salvo que se indique lo contrario.',
+      '• Este presupuesto es válido durante 30 días desde la fecha de emisión, salvo que se indique arriba una fecha de vencimiento concreta.',
+      '• La mercancía sigue siendo propiedad del vendedor hasta el pago íntegro.',
+      '• Los plazos de entrega son orientativos y se confirmarán por escrito al realizar el pedido.',
+      '• Cualquier modificación del pedido acordado debe solicitarse y confirmarse por escrito.',
+      '• El vendedor no será responsable de retrasos causados por circunstancias ajenas a su control razonable.',
+      '• Gracias por su confianza. Esperamos poder trabajar con usted.',
+    ],
+    validityText: (date: string) => `Válido hasta ${date}`,
+    contactText:  'Contáctenos para confirmar su pedido.',
+    footer:       'Configureout',
+    page:         'Página',
+    of:           'de',
+    dateLocale:   'es-ES',
+    previewWatermark: 'VISTA PREVIA — No es un presupuesto oficial',
+    previewSectionsHint: 'Secciones configurables — arrastre en el panel izquierdo para reordenar',
+  },
+  ru: {
+    quotation:    'КОММЕРЧЕСКОЕ ПРЕДЛОЖЕНИЕ',
+    billTo:       'ПЛАТЕЛЬЩИК',
+    shipTo:       'АДРЕС ДОСТАВКИ',
+    quoteDetails: 'ДЕТАЛИ ПРЕДЛОЖЕНИЯ',
+    reference:    'Номер',
+    issued:       'Дата выставления',
+    validUntil:   'Действительно до',
+    currency:     'Валюта',
+    preparedBy:   'Подготовил',
+    paymentTerms: 'Условия оплаты',
+    vatNumber:    'ИНН / НДС',
+    regNumber:    'Рег. №',
+    customerVat:  'ИНН / НДС',
+    lineItems:    'ПОЗИЦИИ',
+    product:      'ТОВАР',
+    qty:          'КОЛ-ВО',
+    uom:          'ЕД.',
+    unitPrice:    'ЦЕНА ЗА ЕД.',
+    total:        'ИТОГО',
+    basePrice:    'Базовая цена',
+    subtotal:     'Промежуточный итог',
+    totalDue:     'ИТОГО К ОПЛАТЕ',
+    notes:        'ПРИМЕЧАНИЯ',
+    termsHeader:  'УСЛОВИЯ',
+    from:         'ОТ',
+    to:           'КОМУ',
+    termsLines: [
+      '• Оплата: 50 % предоплаты при подтверждении заказа, остаток — до поставки.',
+      '• Цены указаны без НДС и иных применимых налогов, если не указано иное.',
+      '• Настоящее предложение действительно в течение 30 дней с даты выставления, если выше не указан конкретный срок.',
+      '• Товар остаётся собственностью продавца до полной оплаты.',
+      '• Сроки поставки являются ориентировочными и подтверждаются письменно при размещении заказа.',
+      '• Любые изменения согласованного заказа должны запрашиваться и подтверждаться в письменной форме.',
+      '• Продавец не несёт ответственности за задержки, вызванные обстоятельствами вне его разумного контроля.',
+      '• Благодарим за сотрудничество. Будем рады работать с вами.',
+    ],
+    validityText: (date: string) => `Действительно до ${date}`,
+    contactText:  'Свяжитесь с нами для подтверждения заказа.',
+    footer:       'Configureout',
+    page:         'Стр.',
+    of:           'из',
+    dateLocale:   'ru-RU',
+    previewWatermark: 'ПРЕДПРОСМОТР — не является официальным предложением',
+    previewSectionsHint: 'Настраиваемые разделы — перетащите на левой панели для изменения порядка',
   },
 }
 
-export type LabelSet = typeof PDF_LABELS['en']
+/** Safe accessor — returns the label set for `lang`, falling back to English. */
+export function labelsFor(lang: OutputLang): LabelSet {
+  return PDF_LABELS[lang] ?? PDF_LABELS.en
+}
 
 // ── Font / image / watermark helpers ──────────────────────────────────────────
 
@@ -303,13 +533,13 @@ export function isSectionVisibleOptIn(layoutSections: PdfSection[] | undefined, 
  *  description_i18n map. Returns an empty string when nothing useful is available. */
 export function resolveCharDescription(
   i18n: Record<string, string> | null | undefined,
-  lang: 'en' | 'sr',
+  lang: OutputLang,
 ): string {
   if (!i18n) return ''
-  const direct = i18n[lang]
-  if (typeof direct === 'string' && direct.trim()) return direct.trim()
-  const fallback = lang === 'en' ? i18n.sr : i18n.en
-  if (typeof fallback === 'string' && fallback.trim()) return fallback.trim()
+  for (const l of outputLangFallback(lang)) {
+    const v = i18n[l]
+    if (typeof v === 'string' && v.trim()) return v.trim()
+  }
   return ''
 }
 
@@ -317,7 +547,7 @@ export function buildOrderedSections(
   layoutSections: PdfSection[] | undefined,
   /** Tenant-level text rows in the chosen language; produces one section per row. */
   globalTextRows: { id: string; label: string | null }[] | undefined,
-  _lang: 'en' | 'sr',
+  _lang: OutputLang,
 ): PdfSection[] {
   const defaultOrder: PdfSection[] = [
     { id: 'notes', label: 'Notes', visible: true },

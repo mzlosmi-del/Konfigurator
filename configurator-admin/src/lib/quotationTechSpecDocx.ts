@@ -9,10 +9,11 @@ import type {
   Quotation, TenantText, QuotationLineItem, QuotationConfigItem,
   VisualizationAsset,
 } from '@/types/database'
-import { type TenantProfile, loadLogoBytes, PDF_LABELS } from './pdf/shared'
+import { type TenantProfile, labelsFor, loadLogoBytes } from './pdf/shared'
 import { resolveText } from './texts'
+import type { OutputLang } from '@/lib/languages'
 
-type Lang = 'en' | 'sr'
+type Lang = OutputLang
 
 export interface BuildTechSpecArgs {
   tenant:    TenantProfile
@@ -52,7 +53,7 @@ const SZ = {
 
 const FONT = 'Noto Sans'
 
-const TS_LABELS: Record<Lang, {
+interface TechSpecLabels {
   title: string
   toc: string
   refNumber: string
@@ -61,7 +62,9 @@ const TS_LABELS: Record<Lang, {
   preparedBy: string
   createdOn: string
   pageOf: { page: string; of: string }
-}> = {
+}
+
+const TS_LABELS: Record<Lang, TechSpecLabels> = {
   en: {
     title: 'Technical Specification',
     toc: 'Table of Contents',
@@ -82,6 +85,51 @@ const TS_LABELS: Record<Lang, {
     createdOn: 'Datum izrade',
     pageOf: { page: 'Strana', of: 'od' },
   },
+  de: {
+    title: 'Technische Spezifikation',
+    toc: 'Inhaltsverzeichnis',
+    refNumber: 'Referenz',
+    customer: 'Kunde',
+    preparedFor: 'Erstellt für',
+    preparedBy: 'Erstellt von',
+    createdOn: 'Erstellt am',
+    pageOf: { page: 'Seite', of: 'von' },
+  },
+  fr: {
+    title: 'Spécification technique',
+    toc: 'Table des matières',
+    refNumber: 'Référence',
+    customer: 'Client',
+    preparedFor: 'Préparé pour',
+    preparedBy: 'Préparé par',
+    createdOn: 'Créé le',
+    pageOf: { page: 'Page', of: 'sur' },
+  },
+  es: {
+    title: 'Especificación técnica',
+    toc: 'Índice',
+    refNumber: 'Referencia',
+    customer: 'Cliente',
+    preparedFor: 'Preparado para',
+    preparedBy: 'Preparado por',
+    createdOn: 'Creado el',
+    pageOf: { page: 'Página', of: 'de' },
+  },
+  ru: {
+    title: 'Техническая спецификация',
+    toc: 'Содержание',
+    refNumber: 'Номер',
+    customer: 'Заказчик',
+    preparedFor: 'Подготовлено для',
+    preparedBy: 'Подготовил',
+    createdOn: 'Дата создания',
+    pageOf: { page: 'Стр.', of: 'из' },
+  },
+}
+
+/** Safe accessor — tech-spec labels for `lang`, falling back to English. */
+function tsLabels(lang: Lang): TechSpecLabels {
+  return TS_LABELS[lang] ?? TS_LABELS.en
 }
 
 // ── Tiny paragraph helpers ──────────────────────────────────────────────────
@@ -126,7 +174,7 @@ function blank(before = 120): Paragraph {
 }
 
 function fmtDate(date: Date, lang: Lang): string {
-  return date.toLocaleDateString(PDF_LABELS[lang].dateLocale, { dateStyle: 'long' })
+  return date.toLocaleDateString(labelsFor(lang).dateLocale, { dateStyle: 'long' })
 }
 
 // ── Spec resolver (single slot lookup with EN/SR fallback) ─────────────────
@@ -243,7 +291,7 @@ async function imagesRowElements(assets: VisualizationAsset[]): Promise<(Paragra
 
 export async function buildQuotationTechSpecDocxBytes(args: BuildTechSpecArgs): Promise<Uint8Array> {
   const { tenant, quotation, texts, assets, lang } = args
-  const L = TS_LABELS[lang]
+  const L = tsLabels(lang)
   const items = (Array.isArray(quotation.line_items) ? quotation.line_items : []) as unknown as QuotationLineItem[]
 
   // Partition images for fast O(1) lookup per product / value.

@@ -9,7 +9,8 @@
 // `formatValue` turns a raw resolved value into display text (currency, dates),
 // and `interpolate` substitutes `{{path}}` tokens inside template strings.
 
-import type { Lang } from '@/i18n'
+import type { OutputLang as Lang } from '@/lib/languages'
+import { labelsFor } from '@/lib/pdf/shared'
 import { bindingField, type BindingType } from './bindings'
 import type { TemplateContext, ContextLineItem, ContextConfigItem } from './context'
 
@@ -104,7 +105,7 @@ export function formatValue(
 function formatDate(iso: string, lang: Lang): string {
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return iso
-  return d.toLocaleDateString(lang === 'en' ? 'en-GB' : 'sr-Latn-RS')
+  return d.toLocaleDateString(labelsFor(lang).dateLocale)
 }
 
 /** Resolve a binding path to its display string (raw → formatValue using the

@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { createClient } from '@supabase/supabase-js'
+import { type OutputLang, asOutputLang } from '@/lib/languages'
+import { labelsFor } from '@/lib/pdf/shared'
 
 const SUPABASE_URL      = import.meta.env.VITE_SUPABASE_URL      ?? ''
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY ?? ''
@@ -59,9 +61,9 @@ const ACCEPT_STATUSES = new Set(['accepted_no_changes', 'accepted_with_changes']
 
 // ── i18n ──────────────────────────────────────────────────────────────────
 
-type Lang = 'en' | 'sr'
+type Lang = OutputLang
 
-const PAGE_COPY: Record<Lang, {
+interface PageCopy {
   notFoundTitle:       string
   notFoundMsg:         string
   expiredBanner:       string
@@ -84,7 +86,9 @@ const PAGE_COPY: Record<Lang, {
   confirmRejectBody:   string
   cancel:              string
   submitting:          string
-}> = {
+}
+
+const PAGE_COPY: Record<Lang, PageCopy> = {
   en: {
     notFoundTitle:       'Quote not found',
     notFoundMsg:         'This link may have expired or has already been replaced.',
@@ -133,12 +137,112 @@ const PAGE_COPY: Record<Lang, {
     cancel:              'Otkaži',
     submitting:          'Slanje…',
   },
+  de: {
+    notFoundTitle:       'Angebot nicht gefunden',
+    notFoundMsg:         'Dieser Link ist möglicherweise abgelaufen oder wurde bereits ersetzt.',
+    expiredBanner:       'Angebot abgelaufen',
+    expiredMsg:          (date, tenant) => `Dieses Angebot war bis ${date} gültig und kann nicht mehr online bestätigt werden. Wenden Sie sich an ${tenant} für ein aktualisiertes Angebot.`,
+    activeMsg:           (name, validUntil) => `Hallo ${name}, bitte prüfen Sie Ihr Angebot unten${validUntil ? ` — gültig bis ${validUntil}` : ''}.`,
+    customer:            'Kunde',
+    subtotal:            'Zwischensumme',
+    total:               'Gesamt',
+    validUntil:          'Gültig bis',
+    downloadPdf:         'PDF herunterladen',
+    accept:              'Annehmen',
+    reject:              'Ablehnen',
+    acceptedBanner:      'Angenommen',
+    rejectedBanner:      'Abgelehnt',
+    acceptedThanks:      (date) => `Vielen Dank — Ihre Annahme wurde am ${date} erfasst.`,
+    rejectedThanks:      (date) => `Ihre Ablehnung wurde am ${date} erfasst.`,
+    confirmAcceptTitle:  (ref) => `${ref} annehmen?`,
+    confirmRejectTitle:  (ref) => `${ref} ablehnen?`,
+    confirmAcceptBody:   'Wir erfassen Ihre Annahme und benachrichtigen den Anbieter. Über den Link lässt sich dies nicht rückgängig machen.',
+    confirmRejectBody:   'Wir erfassen Ihre Ablehnung und benachrichtigen den Anbieter. Über den Link lässt sich dies nicht rückgängig machen.',
+    cancel:              'Abbrechen',
+    submitting:          'Wird gesendet…',
+  },
+  fr: {
+    notFoundTitle:       'Devis introuvable',
+    notFoundMsg:         'Ce lien a peut-être expiré ou a déjà été remplacé.',
+    expiredBanner:       'Devis expiré',
+    expiredMsg:          (date, tenant) => `Ce devis était valable jusqu’au ${date} et ne peut plus être confirmé en ligne. Contactez ${tenant} pour une offre mise à jour.`,
+    activeMsg:           (name, validUntil) => `Bonjour ${name}, veuillez consulter votre devis ci-dessous${validUntil ? ` — valable jusqu’au ${validUntil}` : ''}.`,
+    customer:            'Client',
+    subtotal:            'Sous-total',
+    total:               'Total',
+    validUntil:          'Valable jusqu’au',
+    downloadPdf:         'Télécharger le PDF',
+    accept:              'Accepter',
+    reject:              'Refuser',
+    acceptedBanner:      'Accepté',
+    rejectedBanner:      'Refusé',
+    acceptedThanks:      (date) => `Merci — votre acceptation a été enregistrée le ${date}.`,
+    rejectedThanks:      (date) => `Votre refus a été enregistré le ${date}.`,
+    confirmAcceptTitle:  (ref) => `Accepter ${ref} ?`,
+    confirmRejectTitle:  (ref) => `Refuser ${ref} ?`,
+    confirmAcceptBody:   'Nous enregistrerons votre acceptation et en informerons le fournisseur. Vous ne pourrez pas annuler depuis ce lien.',
+    confirmRejectBody:   'Nous enregistrerons votre refus et en informerons le fournisseur. Vous ne pourrez pas annuler depuis ce lien.',
+    cancel:              'Annuler',
+    submitting:          'Envoi…',
+  },
+  es: {
+    notFoundTitle:       'Presupuesto no encontrado',
+    notFoundMsg:         'Este enlace puede haber caducado o ya ha sido reemplazado.',
+    expiredBanner:       'Presupuesto caducado',
+    expiredMsg:          (date, tenant) => `Este presupuesto era válido hasta el ${date} y ya no puede confirmarse en línea. Póngase en contacto con ${tenant} para una oferta actualizada.`,
+    activeMsg:           (name, validUntil) => `Hola ${name}, revise su presupuesto a continuación${validUntil ? ` — válido hasta el ${validUntil}` : ''}.`,
+    customer:            'Cliente',
+    subtotal:            'Subtotal',
+    total:               'Total',
+    validUntil:          'Válido hasta',
+    downloadPdf:         'Descargar PDF',
+    accept:              'Aceptar',
+    reject:              'Rechazar',
+    acceptedBanner:      'Aceptado',
+    rejectedBanner:      'Rechazado',
+    acceptedThanks:      (date) => `Gracias — su aceptación se registró el ${date}.`,
+    rejectedThanks:      (date) => `Su rechazo se registró el ${date}.`,
+    confirmAcceptTitle:  (ref) => `¿Aceptar ${ref}?`,
+    confirmRejectTitle:  (ref) => `¿Rechazar ${ref}?`,
+    confirmAcceptBody:   'Registraremos su aceptación y avisaremos al proveedor. No podrá deshacerlo desde el enlace.',
+    confirmRejectBody:   'Registraremos su rechazo y avisaremos al proveedor. No podrá deshacerlo desde el enlace.',
+    cancel:              'Cancelar',
+    submitting:          'Enviando…',
+  },
+  ru: {
+    notFoundTitle:       'Предложение не найдено',
+    notFoundMsg:         'Срок действия этой ссылки мог истечь, или она уже заменена.',
+    expiredBanner:       'Срок предложения истёк',
+    expiredMsg:          (date, tenant) => `Это предложение было действительно до ${date} и больше не может быть подтверждено онлайн. Свяжитесь с ${tenant} для получения обновлённого предложения.`,
+    activeMsg:           (name, validUntil) => `Здравствуйте, ${name}! Ознакомьтесь с вашим предложением ниже${validUntil ? ` — действительно до ${validUntil}` : ''}.`,
+    customer:            'Заказчик',
+    subtotal:            'Промежуточный итог',
+    total:               'Итого',
+    validUntil:          'Действительно до',
+    downloadPdf:         'Скачать PDF',
+    accept:              'Принять',
+    reject:              'Отклонить',
+    acceptedBanner:      'Принято',
+    rejectedBanner:      'Отклонено',
+    acceptedThanks:      (date) => `Спасибо — ваше согласие зарегистрировано ${date}.`,
+    rejectedThanks:      (date) => `Ваш отказ зарегистрирован ${date}.`,
+    confirmAcceptTitle:  (ref) => `Принять ${ref}?`,
+    confirmRejectTitle:  (ref) => `Отклонить ${ref}?`,
+    confirmAcceptBody:   'Мы зарегистрируем ваше согласие и уведомим поставщика. Отменить это по ссылке нельзя.',
+    confirmRejectBody:   'Мы зарегистрируем ваш отказ и уведомим поставщика. Отменить это по ссылке нельзя.',
+    cancel:              'Отмена',
+    submitting:          'Отправка…',
+  },
+}
+
+/** Safe accessor — page copy for `lang`, falling back to English. */
+function pageCopy(lang: Lang): PageCopy {
+  return PAGE_COPY[lang] ?? PAGE_COPY.en
 }
 
 function fmtDate(iso: string | null | undefined, lang: Lang): string {
   if (!iso) return ''
-  const locale = lang === 'sr' ? 'sr-Latn-RS' : 'en-GB'
-  return new Date(iso).toLocaleDateString(locale, { dateStyle: 'long' })
+  return new Date(iso).toLocaleDateString(labelsFor(lang).dateLocale, { dateStyle: 'long' })
 }
 
 function readTenantMessage(map: Record<string, unknown> | null | undefined, lang: Lang): string | null {
@@ -306,8 +410,8 @@ export function PublicQuotationPage() {
 
   const q    = view.quotation
   const ten  = view.tenant
-  const lang: Lang = q.lang === 'sr' ? 'sr' : 'en'
-  const c    = PAGE_COPY[lang]
+  const lang: Lang = asOutputLang(q.lang)
+  const c    = pageCopy(lang)
   const cur  = q.currency || ''
 
   const headerEl = (

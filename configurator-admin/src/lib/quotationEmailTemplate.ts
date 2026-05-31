@@ -6,7 +6,10 @@
 // function. The reference/totals/buttons block is generated — only the
 // subject, recipient and intro paragraph are operator-editable.
 
-export type EmailLang = 'en' | 'sr'
+import type { OutputLang } from '@/lib/languages'
+import { labelsFor } from '@/lib/pdf/shared'
+
+export type EmailLang = OutputLang
 
 export interface EmailPreviewArgs {
   tenantName:      string
@@ -58,6 +61,59 @@ export const EMAIL_COPY: Record<EmailLang, Copy> = {
     accept:      'Prihvati',
     reject:      'Odbij',
   },
+  de: {
+    subject:     (ref, name) => `${ref} — Ihr Angebot von ${name}`,
+    yourQuoteIs: 'Ihr Angebot ist fertig',
+    hi:          n => `Hallo ${n},`,
+    reference:   'Referenz',
+    total:       'Gesamt',
+    validUntil:  d => `Dieses Angebot ist gültig bis ${d}.`,
+    actionsHint: 'Klicken Sie unten, um zu bestätigen oder abzulehnen. Eine PDF-Kopie ist beigefügt.',
+    viewOnline:  'Online ansehen',
+    accept:      'Annehmen',
+    reject:      'Ablehnen',
+  },
+  fr: {
+    subject:     (ref, name) => `${ref} — votre devis de ${name}`,
+    yourQuoteIs: 'Votre devis est prêt',
+    hi:          n => `Bonjour ${n},`,
+    reference:   'Référence',
+    total:       'Total',
+    validUntil:  d => `Ce devis est valable jusqu’au ${d}.`,
+    actionsHint: 'Cliquez ci-dessous pour confirmer ou refuser. Une copie PDF est jointe.',
+    viewOnline:  'Voir en ligne',
+    accept:      'Accepter',
+    reject:      'Refuser',
+  },
+  es: {
+    subject:     (ref, name) => `${ref} — su presupuesto de ${name}`,
+    yourQuoteIs: 'Su presupuesto está listo',
+    hi:          n => `Hola ${n},`,
+    reference:   'Referencia',
+    total:       'Total',
+    validUntil:  d => `Este presupuesto es válido hasta ${d}.`,
+    actionsHint: 'Haga clic abajo para confirmar o rechazar. Se adjunta una copia en PDF.',
+    viewOnline:  'Ver en línea',
+    accept:      'Aceptar',
+    reject:      'Rechazar',
+  },
+  ru: {
+    subject:     (ref, name) => `${ref} — ваше предложение от ${name}`,
+    yourQuoteIs: 'Ваше предложение готово',
+    hi:          n => `Здравствуйте, ${n},`,
+    reference:   'Номер',
+    total:       'Итого',
+    validUntil:  d => `Это предложение действительно до ${d}.`,
+    actionsHint: 'Нажмите ниже, чтобы принять или отклонить. Копия в формате PDF прилагается.',
+    viewOnline:  'Открыть онлайн',
+    accept:      'Принять',
+    reject:      'Отклонить',
+  },
+}
+
+/** Safe accessor — email copy for `lang`, falling back to English. */
+function emailCopy(lang: EmailLang): Copy {
+  return EMAIL_COPY[lang] ?? EMAIL_COPY.en
 }
 
 function escHtml(s: string): string {
@@ -69,9 +125,9 @@ function escHtml(s: string): string {
 }
 
 export function buildEmailHtml(args: EmailPreviewArgs): string {
-  const c           = EMAIL_COPY[args.lang]
+  const c           = emailCopy(args.lang)
   const validityRow = args.validUntil
-    ? `<p style="margin:8px 0 0;font-size:13px;color:#6b7280;">${escHtml(c.validUntil(new Date(args.validUntil).toLocaleDateString(args.lang === 'sr' ? 'sr-Latn-RS' : 'en-GB', { dateStyle: 'long' })))}</p>`
+    ? `<p style="margin:8px 0 0;font-size:13px;color:#6b7280;">${escHtml(c.validUntil(new Date(args.validUntil).toLocaleDateString(labelsFor(args.lang).dateLocale, { dateStyle: 'long' })))}</p>`
     : ''
   const introRow    = args.customIntro && args.customIntro.trim().length > 0
     ? `<p style="margin:12px 0 0;font-size:14px;color:#374151;line-height:1.55;white-space:pre-line;">${escHtml(args.customIntro.trim())}</p>`
@@ -126,5 +182,5 @@ export function defaultEmailSubject(
   referenceNumber: string,
   tenantName: string,
 ): string {
-  return EMAIL_COPY[lang].subject(referenceNumber, tenantName)
+  return emailCopy(lang).subject(referenceNumber, tenantName)
 }

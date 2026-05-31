@@ -5,7 +5,7 @@
 
 import type { Quotation, QuotationLineItem, QuotationConfigItem, QuotationAdjustment, TenantText } from '@/types/database'
 import type { TenantProfile } from '@/lib/pdf/shared'
-import type { Lang } from '@/i18n'
+import type { OutputLang as Lang } from '@/lib/languages'
 import { calcLineTotal, calcSubtotal, calcTotal } from '@/lib/quotations'
 import { resolveText } from '@/lib/texts'
 import { resolveCharDescription } from '@/lib/pdf/shared'

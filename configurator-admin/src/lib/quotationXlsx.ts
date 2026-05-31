@@ -3,13 +3,12 @@ import type {
   Quotation, TenantText, QuotationLineItem, QuotationAdjustment, QuotationConfigItem,
 } from '@/types/database'
 import type { PdfSection } from '@/pages/quotations/PdfLayoutDialog'
+import type { OutputLang } from '@/lib/languages'
 import {
-  PDF_LABELS, type TenantProfile, getFooterLabel, getTermsLines, loadLogoBytes,
+  labelsFor, type TenantProfile, type LabelSet as Labels, getFooterLabel, getTermsLines, loadLogoBytes,
   isSectionVisible, isSectionVisibleOptIn, resolveCharDescription, buildOrderedSections,
 } from './pdf/shared'
 import { resolveProductTextBlocks, resolveTenantTextBlocks } from './texts'
-
-type Labels = (typeof PDF_LABELS)[keyof typeof PDF_LABELS]
 
 export interface BuildXlsxArgs {
   tenant:          TenantProfile
@@ -18,7 +17,7 @@ export interface BuildXlsxArgs {
    *  referenced by the quotation. */
   texts?:          TenantText[]
   layoutSections?: PdfSection[]
-  lang:            'en' | 'sr'
+  lang:            OutputLang
 }
 
 const HEX = {
@@ -34,7 +33,7 @@ const HEX = {
   white:    'FFFFFFFF',
 }
 
-function fmtLongDate(iso: string | null | undefined, locale: 'en-GB' | 'sr-Latn-RS'): string {
+function fmtLongDate(iso: string | null | undefined, locale: string): string {
   if (!iso) return '—'
   return new Date(iso).toLocaleDateString(locale, { dateStyle: 'long' })
 }
@@ -48,7 +47,7 @@ const FONT = 'Noto Sans'
 export async function buildQuotationXlsxBytes(args: BuildXlsxArgs): Promise<Uint8Array> {
   const { tenant, quotation, texts = [], layoutSections, lang } = args
   const tenantBlocks = resolveTenantTextBlocks(texts, lang)
-  const L: Labels = PDF_LABELS[lang]
+  const L: Labels = labelsFor(lang)
   const items = (Array.isArray(quotation.line_items)  ? quotation.line_items  : []) as unknown as QuotationLineItem[]
   const adjs  = (Array.isArray(quotation.adjustments) ? quotation.adjustments : []) as unknown as QuotationAdjustment[]
   const currency = quotation.currency ?? ''

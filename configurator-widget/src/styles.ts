@@ -753,6 +753,21 @@ export const WIDGET_STYLES = `
     color: var(--cw-lang-active-text);
     border-color: var(--cw-lang-active-bg);
   }
+  .cw-lang-btn--disabled {
+    opacity: 0.45;
+    cursor: default;
+    border-style: dashed;
+  }
+  .cw-lang-btn--disabled:hover {
+    color: var(--cw-text-placeholder);
+    border-color: var(--cw-border);
+  }
+  .cw-lang-divider {
+    width: 1px;
+    align-self: stretch;
+    margin: 0 2px;
+    background: var(--cw-border);
+  }
 
   /* Dimension lines overlay for 3D model viewer */
   .cw-dim-overlay {

@@ -2,7 +2,7 @@ import { PDFDocument, PDFPage, PDFFont, rgb, degrees } from 'pdf-lib'
 import type { QuotationLineItem, QuotationAdjustment } from '@/types/database'
 import { calcLineTotal } from '@/lib/quotations'
 import {
-  C, wrapText, PDF_LABELS, loadFonts, loadLogo, getFooterLabel, getTermsLines,
+  C, wrapText, labelsFor, loadFonts, loadLogo, getFooterLabel, getTermsLines,
   isSectionVisible, isSectionVisibleOptIn, resolveCharDescription, buildOrderedSections,
   type PdfBuildArgs,
 } from './shared'
@@ -17,7 +17,7 @@ import { resolveProductTextBlocks, resolveTenantTextBlocks, type ResolvedTextBlo
 export async function renderCompact(args: PdfBuildArgs): Promise<Uint8Array> {
   const { tenant, quotation, texts = [], layoutSections, lang, watermark } = args
   const tenantBlocks = resolveTenantTextBlocks(texts, lang)
-  const L = PDF_LABELS[lang]
+  const L = labelsFor(lang)
   const pdfDoc = await PDFDocument.create()
   const { fontR, fontB } = await loadFonts(pdfDoc)
 

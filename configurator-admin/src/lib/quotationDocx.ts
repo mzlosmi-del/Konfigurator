@@ -8,13 +8,12 @@ import type {
   Quotation, TenantText, QuotationLineItem, QuotationAdjustment, QuotationConfigItem,
 } from '@/types/database'
 import type { PdfSection } from '@/pages/quotations/PdfLayoutDialog'
+import type { OutputLang } from '@/lib/languages'
 import {
-  PDF_LABELS, type TenantProfile, getFooterLabel, getTermsLines, loadLogoBytes,
+  labelsFor, type TenantProfile, type LabelSet as Labels, getFooterLabel, getTermsLines, loadLogoBytes,
   isSectionVisible, isSectionVisibleOptIn, resolveCharDescription, buildOrderedSections,
 } from './pdf/shared'
 import { resolveProductTextBlocks, resolveTenantTextBlocks, type ResolvedTextBlock } from './texts'
-
-type Labels = (typeof PDF_LABELS)[keyof typeof PDF_LABELS]
 
 export interface BuildDocxArgs {
   tenant:          TenantProfile
@@ -23,7 +22,7 @@ export interface BuildDocxArgs {
    *  referenced by the quotation. */
   texts?:          TenantText[]
   layoutSections?: PdfSection[]
-  lang:            'en' | 'sr'
+  lang:            OutputLang
 }
 
 // ── Palette (matches PDF modern template) ──────────────────────────────────
@@ -47,7 +46,7 @@ const RULE_BORDER = {
   style: BorderStyle.SINGLE, size: 4, color: HEX.rule,
 }
 
-function fmtLongDate(iso: string | null | undefined, locale: 'en-GB' | 'sr-Latn-RS'): string {
+function fmtLongDate(iso: string | null | undefined, locale: string): string {
   if (!iso) return '—'
   return new Date(iso).toLocaleDateString(locale, { dateStyle: 'long' })
 }
@@ -260,7 +259,7 @@ function buildLineItemsTable(
   items: QuotationLineItem[],
   texts: TenantText[],
   layoutSections: PdfSection[] | undefined,
-  lang: 'en' | 'sr',
+  lang: OutputLang,
   L: Labels,
 ): Table {
   const showBreakdownGlobal = isSectionVisible(layoutSections, 'price-breakdown')
@@ -487,7 +486,7 @@ function buildNotesSection(quotation: Quotation, L: Labels): Paragraph[] {
   return out
 }
 
-function buildTermsSection(L: Labels, texts: TenantText[], lang: 'en' | 'sr'): Paragraph[] {
+function buildTermsSection(L: Labels, texts: TenantText[], lang: OutputLang): Paragraph[] {
   const out: Paragraph[] = [ruleParagraph(), ...sectionLabel(L.termsHeader)]
   for (const line of getTermsLines(texts, L.termsLines, lang)) {
     out.push(new Paragraph({
@@ -511,7 +510,7 @@ function buildGlobalTextSection(textBlock: ResolvedTextBlock): Paragraph[] {
 
 export async function buildQuotationDocxBytes(args: BuildDocxArgs): Promise<Uint8Array> {
   const { tenant, quotation, texts = [], layoutSections, lang } = args
-  const L = PDF_LABELS[lang]
+  const L = labelsFor(lang)
   const items = (Array.isArray(quotation.line_items)  ? quotation.line_items  : []) as unknown as QuotationLineItem[]
   const adjs  = (Array.isArray(quotation.adjustments) ? quotation.adjustments : []) as unknown as QuotationAdjustment[]
   const tenantBlocks = resolveTenantTextBlocks(texts, lang)

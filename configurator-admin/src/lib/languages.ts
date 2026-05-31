@@ -54,3 +54,21 @@ export const CONTENT_LANGUAGES = [
 export function getLanguageName(code: string): string {
   return CONTENT_LANGUAGES.find(l => l.code === code)?.name ?? code.toUpperCase()
 }
+
+// ── Output (document/email) languages ─────────────────────────────────────────
+// The fixed set of languages the generated quotation output (PDF/DOCX/XLSX/email)
+// can be produced in. Each of these has a full set of fixed labels in PDF_LABELS
+// (configurator-admin/src/lib/pdf/shared.ts) and COPY in the email Edge Function.
+// This is distinct from the widget *user* language (EN+SR only) and from the
+// per-tenant `tenant_texts` content (authored in EN/SR, resolved with fallback).
+export const OUTPUT_LANGS = ['en', 'sr', 'de', 'fr', 'es', 'ru'] as const
+export type OutputLang = typeof OUTPUT_LANGS[number]
+
+export function isOutputLang(c: string): c is OutputLang {
+  return (OUTPUT_LANGS as readonly string[]).includes(c)
+}
+
+/** Narrow any persisted/unknown lang string to a safe OutputLang, defaulting to 'en'. */
+export function asOutputLang(c: string | null | undefined): OutputLang {
+  return c && isOutputLang(c) ? c : 'en'
+}

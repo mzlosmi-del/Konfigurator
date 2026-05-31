@@ -1,5 +1,7 @@
 import { supabase } from './supabase'
 import type { TenantText, TenantTextInsert, TextLevel } from '@/types/database'
+import type { OutputLang } from '@/lib/languages'
+import { outputLangFallback } from '@/lib/pdf/shared'
 
 /** All text rows visible to the current tenant. Use sparingly — for renderer
  *  paths prefer the lookup helpers below. */
@@ -171,16 +173,20 @@ export function resolveText(
   level: TextLevel,
   reference_id: string | null,
   slot: string,
-  language: 'en' | 'sr',
+  language: OutputLang,
 ): string {
   const candidates = rows.filter(r =>
     r.level === level && r.reference_id === reference_id && r.slot === slot
   )
   if (candidates.length === 0) return ''
-  const exact = candidates.find(r => r.language === language)
-  if (exact && exact.content.trim()) return exact.content
-  const other = candidates.find(r => r.language !== language)
-  return other?.content ?? ''
+  // chosen → EN → SR
+  for (const l of outputLangFallback(language)) {
+    const hit = candidates.find(r => r.language === l && r.content.trim())
+    if (hit) return hit.content
+  }
+  // Last resort: any authored content in another language.
+  const any = candidates.find(r => r.content.trim())
+  return any?.content ?? ''
 }
 
 /** Resolve a (scope, slot) → `{ en, sr }` translation map, suitable for the
@@ -208,13 +214,19 @@ export function resolveTextLines(
   level: TextLevel,
   reference_id: string | null,
   slot: string,
-  language: 'en' | 'sr',
+  language: OutputLang,
 ): string[] {
-  return rows
-    .filter(r => r.level === level && r.reference_id === reference_id && r.slot === slot && r.language === language)
+  const linesFor = (l: OutputLang) => rows
+    .filter(r => r.level === level && r.reference_id === reference_id && r.slot === slot && r.language === l)
     .sort((a, b) => a.sort_order - b.sort_order)
     .map(r => r.content)
     .filter(s => s.trim().length > 0)
+  // Return the first language in the fallback chain that has any authored lines.
+  for (const l of outputLangFallback(language)) {
+    const lines = linesFor(l)
+    if (lines.length > 0) return lines
+  }
+  return []
 }
 
 // ── Quotation renderer helpers ──────────────────────────────────────────────
@@ -238,36 +250,47 @@ const BLOCK_SLOTS = ['product', 'specification', 'note', 'terms'] as const
 export function resolveProductTextBlocks(
   rows: TenantText[],
   productId: string,
-  language: 'en' | 'sr',
+  language: OutputLang,
 ): ResolvedTextBlock[] {
-  return rows
+  const blocksFor = (l: OutputLang) => rows
     .filter(r =>
       r.level === 'product' &&
       r.reference_id === productId &&
-      r.language === language &&
+      r.language === l &&
       (BLOCK_SLOTS as readonly string[]).includes(r.slot) &&
       r.content.trim().length > 0
     )
     .sort((a, b) => a.sort_order - b.sort_order)
     .map(r => ({ id: r.id, slot: r.slot, label: r.label, content: r.content, sort_order: r.sort_order }))
+  // First language in the fallback chain that has any blocks (no cross-language mixing).
+  for (const l of outputLangFallback(language)) {
+    const blocks = blocksFor(l)
+    if (blocks.length > 0) return blocks
+  }
+  return []
 }
 
 /** All tenant-wide ("global") text blocks in the chosen language. Replaces
  *  the legacy `globalTexts` array. */
 export function resolveTenantTextBlocks(
   rows: TenantText[],
-  language: 'en' | 'sr',
+  language: OutputLang,
 ): ResolvedTextBlock[] {
-  return rows
+  const blocksFor = (l: OutputLang) => rows
     .filter(r =>
       r.level === 'tenant' &&
       r.reference_id === null &&
-      r.language === language &&
+      r.language === l &&
       (BLOCK_SLOTS as readonly string[]).includes(r.slot) &&
       r.content.trim().length > 0
     )
     .sort((a, b) => a.sort_order - b.sort_order)
     .map(r => ({ id: r.id, slot: r.slot, label: r.label, content: r.content, sort_order: r.sort_order }))
+  for (const l of outputLangFallback(language)) {
+    const blocks = blocksFor(l)
+    if (blocks.length > 0) return blocks
+  }
+  return []
 }
 
 /** Bulk fetch every text row a quotation builder needs:

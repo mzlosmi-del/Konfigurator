@@ -21,6 +21,7 @@ import { buildQuotationXlsxBytes }         from '@/lib/quotationXlsx'
 import { buildQuotationDocxBytes }         from '@/lib/quotationDocx'
 import { buildQuotationTechSpecDocxBytes } from '@/lib/quotationTechSpecDocx'
 import { buildQuotationPdfBytes, type PdfTemplate } from '@/lib/quotationPdf'
+import type { OutputLang } from '@/lib/languages'
 import * as pdfjsLib from 'pdfjs-dist'
 // `?url` asks Vite to resolve to the served URL of the worker bundle.
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
@@ -29,16 +30,16 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl
 
 export interface GeneratePdfOpts {
   template: PdfTemplate
-  lang:     'en' | 'sr'
+  lang:     OutputLang
 }
 
 declare global {
   interface Window {
     __testHarness: {
       ready:                       Promise<void>
-      generateXlsxB64:             (lang?: 'en' | 'sr') => Promise<string>
-      generateQuotationDocxB64:    (lang?: 'en' | 'sr') => Promise<string>
-      generateTechSpecDocxB64:     (lang?: 'en' | 'sr') => Promise<string>
+      generateXlsxB64:             (lang?: OutputLang) => Promise<string>
+      generateQuotationDocxB64:    (lang?: OutputLang) => Promise<string>
+      generateTechSpecDocxB64:     (lang?: OutputLang) => Promise<string>
       generatePdfB64:              (opts: GeneratePdfOpts) => Promise<string>
       renderPdfToCanvases:         (b64: string) => Promise<{ pageCount: number }>
     }
@@ -68,21 +69,21 @@ const ready: Promise<void> = (async () => {
   setStatus('Harness ready')
 })()
 
-async function generateXlsxB64(lang: 'en' | 'sr' = 'en'): Promise<string> {
+async function generateXlsxB64(lang: OutputLang = 'en'): Promise<string> {
   const bytes = await buildQuotationXlsxBytes({
     tenant, quotation, texts, lang,
   })
   return bytesToBase64(bytes)
 }
 
-async function generateQuotationDocxB64(lang: 'en' | 'sr' = 'en'): Promise<string> {
+async function generateQuotationDocxB64(lang: OutputLang = 'en'): Promise<string> {
   const bytes = await buildQuotationDocxBytes({
     tenant, quotation, texts, lang,
   })
   return bytesToBase64(bytes)
 }
 
-async function generateTechSpecDocxB64(lang: 'en' | 'sr' = 'en'): Promise<string> {
+async function generateTechSpecDocxB64(lang: OutputLang = 'en'): Promise<string> {
   const bytes = await buildQuotationTechSpecDocxBytes({
     tenant, quotation, texts, assets, lang,
   })

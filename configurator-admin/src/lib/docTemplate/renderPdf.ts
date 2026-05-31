@@ -7,9 +7,9 @@
 // all walk the SAME tree against the SAME TemplateContext built by context.ts.
 
 import { PDFDocument, PDFPage, PDFFont } from 'pdf-lib'
-import { C, wrapText, loadFonts, loadLogo, getFooterLabel, type TenantProfile, type EmbeddedImage } from '@/lib/pdf/shared'
+import { C, wrapText, loadFonts, loadLogo, getFooterLabel, labelsFor, type TenantProfile, type EmbeddedImage } from '@/lib/pdf/shared'
 import type { Quotation, TenantText } from '@/types/database'
-import type { Lang } from '@/i18n'
+import type { OutputLang as Lang } from '@/lib/languages'
 import type {
   Block, DocumentTemplateDefinition, TableColumn, BlockStyle,
 } from './types'
@@ -259,8 +259,8 @@ export async function renderTemplateToPdf(args: RenderPdfArgs): Promise<Uint8Arr
         drawAligned(amount, size, bold ? fontB : fontR, bold ? C.accent : C.ink, 'right', MX + COL * 0.78, W - MX)
         y -= 4
       }
-      sumRow(label('Subtotal', 'Međuzbir'), `${ctx.quotation.subtotal.toFixed(2)} ${cur}`)
-      sumRow(label('Total', 'Ukupno'), `${ctx.quotation.total.toFixed(2)} ${cur}`, true)
+      sumRow(labelsFor(args.lang).subtotal, `${ctx.quotation.subtotal.toFixed(2)} ${cur}`)
+      sumRow(labelsFor(args.lang).total, `${ctx.quotation.total.toFixed(2)} ${cur}`, true)
     }
   }
 
@@ -297,15 +297,11 @@ export async function renderTemplateToPdf(args: RenderPdfArgs): Promise<Uint8Arr
     y -= 10
   }
 
-  function label(en: string, sr: string): string {
-    return args.lang === 'en' ? en : sr
-  }
-
   renderBlocks(args.definition.blocks ?? [], [])
 
   // ── Optional footer with page numbers (post-pass: total count is known now) ─
   if (args.definition.page?.footer) {
-    const L = { page: args.lang === 'en' ? 'Page' : 'Strana', of: args.lang === 'en' ? 'of' : 'od' }
+    const L = labelsFor(args.lang)
     const footerLabel = (args.definition.page.footerLabel ?? '').trim()
       || getFooterLabel(args.tenant, args.tenant.name, args.texts, args.lang)
     const pages = pdfDoc.getPages()

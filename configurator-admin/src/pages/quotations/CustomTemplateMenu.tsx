@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
 import { t } from '@/i18n'
 import type { Quotation, QuotationLineItem, VisualizationAsset } from '@/types/database'
+import type { OutputLang } from '@/lib/languages'
 import type { TenantProfile } from '@/lib/pdf/shared'
 import { fetchQuotationTexts } from '@/lib/texts'
 import { fetchImageAssetsForProducts } from '@/lib/assets'
@@ -25,7 +26,7 @@ import type { ImageResolver } from '@/lib/docTemplate/context'
 interface Props {
   quotation:           Quotation
   buildTenantProfile:  () => Promise<TenantProfile>
-  lang:                'en' | 'sr'
+  lang:                OutputLang
   onError:             (message: string) => void
 }
 

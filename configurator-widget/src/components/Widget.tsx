@@ -4,7 +4,7 @@ import type { FullProductConfig, Selection, NumericInputs, WidgetConfig, ConfigL
 import { loadProductConfig } from '../api'
 import { evaluateRules, calculatePrice, buildOptionBreakdown, sanitizeSelection, applyDefaultValues, applyNumericDefaults } from '../rules'
 import { calculateFormulaTotal, calculateFormulaBreakdown } from '../formulaEngine'
-import { t, getLang, setLang, LANGS, pickTranslation, type Lang } from '../i18n'
+import { t, getLang, setLang, ENABLED_LANGS, OTHER_LANGS, pickTranslation, type Lang } from '../i18n'
 import { Visualization } from './Visualization'
 import { CharacteristicInput } from './CharacteristicInput'
 import { InquiryForm } from './InquiryForm'
@@ -181,7 +181,8 @@ export function Widget({ config, track, onThemeLoad }: Props) {
   function LangSwitcher() {
     return (
       <div class="cw-lang-switcher">
-        {LANGS.map(l => (
+        {/* Available (translated) widget languages — selectable, highlighted. */}
+        {ENABLED_LANGS.map(l => (
           <button
             key={l}
             type="button"
@@ -189,6 +190,20 @@ export function Widget({ config, track, onThemeLoad }: Props) {
             onClick={() => { setLang(l); setLangState(l) }}
           >
             {l.toUpperCase()}
+          </button>
+        ))}
+        {/* Other supported languages — de-emphasized and disabled until a
+            translation exists. Marked off from the enabled set by a divider. */}
+        {OTHER_LANGS.length > 0 && <span class="cw-lang-divider" aria-hidden="true" />}
+        {OTHER_LANGS.map(o => (
+          <button
+            key={o.code}
+            type="button"
+            class="cw-lang-btn cw-lang-btn--disabled"
+            disabled
+            title={`${o.name} — ${t('coming soon')}`}
+          >
+            {o.code.toUpperCase()}
           </button>
         ))}
       </div>

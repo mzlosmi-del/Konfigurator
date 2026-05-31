@@ -28,6 +28,9 @@ const sr: Record<string, string> = {
   'Quote requests are temporarily paused. Please contact us directly.':
     'Slanje upita je privremeno pauzirano. Kontaktirajte nas direktno.',
 
+  // Language switcher
+  'coming soon':                           'uskoro',
+
   // CharacteristicInput
   'Auto-set':                              'Automatski postavljeno',
   'Included':                              'Uključeno',
@@ -35,8 +38,28 @@ const sr: Record<string, string> = {
   'Product visualization':                 'Vizualizacija proizvoda',
 }
 
+// Widget *user* languages that are actually translated and selectable today.
 export const LANGS = ['en', 'sr'] as const
 export type Lang = typeof LANGS[number]
+
+// The enabled user languages, shown on top of the picker and highlighted.
+// For now this is the full translated set (EN + SR). When more widget
+// translations are added (or a per-tenant enabled-languages setting lands),
+// extend LANGS and this follows automatically.
+export const ENABLED_LANGS: readonly Lang[] = LANGS
+
+// Forward-looking: languages advertised below the enabled ones, de-emphasized
+// and disabled (no widget UI translations exist for them yet). Selecting one is
+// a no-op. Kept local so the widget bundle stays self-contained (the admin's
+// CONTENT_LANGUAGES list is in a separate package).
+export const OTHER_LANGS: readonly { code: string; name: string }[] = [
+  { code: 'de', name: 'Deutsch' },
+  { code: 'fr', name: 'Français' },
+  { code: 'es', name: 'Español' },
+  { code: 'ru', name: 'Русский' },
+  { code: 'it', name: 'Italiano' },
+  { code: 'pt', name: 'Português' },
+]
 
 let _lang: Lang = (typeof localStorage !== 'undefined'
   ? (localStorage.getItem('lang') as Lang | null) ?? 'sr'

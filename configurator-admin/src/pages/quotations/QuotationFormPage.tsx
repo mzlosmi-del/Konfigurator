@@ -49,6 +49,8 @@ import { Spinner } from '@/components/ui/spinner'
 import { useToast } from '@/hooks/useToast'
 import { Toaster } from '@/components/ui/toast'
 import { t, getLang } from '@/i18n'
+import { type OutputLang, asOutputLang } from '@/lib/languages'
+import { outputLangFallback } from '@/lib/pdf/shared'
 
 // ── Internal draft types ──────────────────────────────────────────────────────
 
@@ -328,7 +330,7 @@ export function QuotationFormPage() {
     // editing an existing quote, otherwise the operator's current UI language.
     // Falls back to 'en' if neither resolves to a supported language.
     const rawLang = (loadedQuotation?.lang as string | undefined) ?? getLang()
-    const snapshotLang: 'en' | 'sr' = rawLang === 'sr' ? 'sr' : 'en'
+    const snapshotLang: OutputLang = asOutputLang(rawLang)
     return lineItems
       .filter(li => li.product_id)
       .map(li => {
@@ -385,7 +387,11 @@ export function QuotationFormPage() {
         // back to the other language and finally the canonical plain name.
         const formulaNameFor = (id: string, fallback: string): string => {
           const i18n = formulas.find(f => f.id === id)?.name_i18n
-          return i18n?.[snapshotLang]?.trim() || i18n?.[snapshotLang === 'en' ? 'sr' : 'en']?.trim() || fallback
+          for (const l of outputLangFallback(snapshotLang)) {
+            const v = i18n?.[l]?.trim()
+            if (v) return v
+          }
+          return fallback
         }
         return {
           product_id:      li.product_id,

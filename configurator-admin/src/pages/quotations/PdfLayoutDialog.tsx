@@ -38,6 +38,8 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { t } from '@/i18n'
+import { OUTPUT_LANGS, type OutputLang, getLanguageName, asOutputLang } from '@/lib/languages'
+import { labelsFor } from '@/lib/pdf/shared'
 
 export interface PdfSection {
   id:            string
@@ -62,10 +64,13 @@ interface Props {
   globalTexts:       PdfTextBlock[]
   productTexts?:     ProductTextGroup[]
   quotationHasNotes: boolean
-  onConfirm:         (sections: PdfSection[], lang: 'en' | 'sr', template: PdfTemplate, format: ExportFormat) => void
+  onConfirm:         (sections: PdfSection[], lang: OutputLang, template: PdfTemplate, format: ExportFormat) => void
   loading:           boolean
   quotation:         Quotation
   tenant:            TenantProfile
+  /** Output language to preselect when the dialog opens (defaults to 'en').
+   *  Pass the quotation's saved `lang` so re-opening preserves the choice. */
+  defaultLang?:      OutputLang
   /** When true, only PDF can be generated (used by the confirm-quotation flow,
    *  which uploads the file as the official record). */
   pdfOnly?:          boolean
@@ -194,29 +199,13 @@ function SortableItem({ section, onToggle }: SortableItemProps) {
 
 // ── A4 preview ────────────────────────────────────────────────────────────────
 
-const TERMS_LINES = [
-  '• Payment: 50% deposit on order confirmation, balance prior to delivery.',
-  '• Prices are exclusive of VAT and applicable taxes unless otherwise stated.',
-  '• This quotation is valid for 30 days unless a specific validity date is noted above.',
-  '• Delivery timelines will be confirmed upon order placement.',
-  '• Thank you for your business.',
-]
-
-const TERMS_LINES_SR = [
-  '• Plaćanje: 50% avans pri potvrdi porudžbine, ostatak pre isporuke.',
-  '• Cene ne uključuju PDV i poreze, osim ako nije drugačije naznačeno.',
-  '• Ova ponuda važi 30 dana, osim ako je naznačen konkretan datum.',
-  '• Rokovi isporuke biće potvrđeni pri porudžbini.',
-  '• Hvala na interesovanju.',
-]
-
 interface PreviewA4Props {
   sections:     PdfSection[]
   quotation:    Quotation
   tenant:       TenantProfile
   globalTexts:  PdfTextBlock[]
   productTexts: ProductTextGroup[]
-  lang:         'en' | 'sr'
+  lang:         OutputLang
   template:     PdfTemplate
   onToggle:     (id: string) => void
 }
@@ -228,11 +217,13 @@ function PreviewA4({ sections, quotation, tenant, globalTexts, productTexts, lan
   const subtotal = calcSubtotal(items)
   const total    = calcTotal(subtotal, adjs)
   const cur      = quotation.currency ?? ''
-  const isEn     = lang === 'en'
+  // Route every fixed label through the shared PDF label set so the live
+  // preview matches the generated document for all output languages.
+  const L        = labelsFor(lang)
 
   const fmtDate = (iso: string | null | undefined) => {
     if (!iso) return '—'
-    return new Date(iso).toLocaleDateString(isEn ? 'en-GB' : 'sr-Latn-RS')
+    return new Date(iso).toLocaleDateString(L.dateLocale)
   }
 
   // map textId → content for global text blocks
@@ -279,7 +270,7 @@ function PreviewA4({ sections, quotation, tenant, globalTexts, productTexts, lan
               color: accent,
             }}
           >
-            {isEn ? 'QUOTATION' : 'PONUDA'}
+            {L.quotation}
           </div>
           {quotation.reference_number && (
             <div className="text-xs mt-0.5 text-[#6C7179]">{quotation.reference_number}</div>
@@ -288,11 +279,11 @@ function PreviewA4({ sections, quotation, tenant, globalTexts, productTexts, lan
             <div className="text-xs font-medium mt-0.5 text-[#151928]">{quotation.title}</div>
           )}
           <div className="text-xs mt-0.5 text-[#6C7179]">
-            {isEn ? 'Issue Date' : 'Datum'}: {fmtDate(quotation.created_at)}
+            {L.issued}: {fmtDate(quotation.created_at)}
           </div>
           {quotation.valid_until && (
             <div className="text-xs text-[#6C7179]">
-              {isEn ? 'Valid Until' : 'Važi do'}: {fmtDate(quotation.valid_until)}
+              {L.validUntil}: {fmtDate(quotation.valid_until)}
             </div>
           )}
         </div>
@@ -313,8 +304,8 @@ function PreviewA4({ sections, quotation, tenant, globalTexts, productTexts, lan
         {tenant.company_address && <span>{tenant.company_address}</span>}
         {tenant.company_phone   && <span>{tenant.company_phone}</span>}
         {tenant.company_email   && <span>{tenant.company_email}</span>}
-        {tenant.vat_number      && <span>{isEn ? 'VAT No.' : 'PDV br.'} {tenant.vat_number}</span>}
-        {tenant.company_reg_number && <span>{isEn ? 'Reg. No.' : 'Mat. br.'} {tenant.company_reg_number}</span>}
+        {tenant.vat_number      && <span>{L.vatNumber} {tenant.vat_number}</span>}
+        {tenant.company_reg_number && <span>{L.regNumber} {tenant.company_reg_number}</span>}
       </div>
       <div className="mx-8 mt-2 border-t border-[#D2D4D8]" />
 
@@ -322,7 +313,7 @@ function PreviewA4({ sections, quotation, tenant, globalTexts, productTexts, lan
       <div className="mx-8 mt-3 mb-1 grid grid-cols-2 gap-4 text-xs">
         <div>
           <div className="font-bold text-[10px] text-[#6C7179] tracking-widest mb-1">
-            {isEn ? 'BILL TO' : 'NARUČILAC'}
+            {L.billTo}
           </div>
           {quotation.customer_name    && <div className="font-semibold text-[#151928]">{quotation.customer_name}</div>}
           {quotation.customer_company && <div className="text-[#6C7179]">{quotation.customer_company}</div>}
@@ -332,21 +323,21 @@ function PreviewA4({ sections, quotation, tenant, globalTexts, productTexts, lan
         </div>
         <div>
           <div className="font-bold text-[10px] text-[#6C7179] tracking-widest mb-1">
-            {isEn ? 'QUOTE DETAILS' : 'DETALJI PONUDE'}
+            {L.quoteDetails}
           </div>
           <div className="space-y-0.5 text-[#6C7179]">
             {quotation.reference_number && (
-              <div><span className="font-medium text-[#151928]">{isEn ? 'Reference' : 'Referenca'}:</span> {quotation.reference_number}</div>
+              <div><span className="font-medium text-[#151928]">{L.reference}:</span> {quotation.reference_number}</div>
             )}
-            <div><span className="font-medium text-[#151928]">{isEn ? 'Issue Date' : 'Datum'}:</span> {fmtDate(quotation.created_at)}</div>
+            <div><span className="font-medium text-[#151928]">{L.issued}:</span> {fmtDate(quotation.created_at)}</div>
             {quotation.valid_until && (
-              <div><span className="font-medium text-[#151928]">{isEn ? 'Valid Until' : 'Važi do'}:</span> {fmtDate(quotation.valid_until)}</div>
+              <div><span className="font-medium text-[#151928]">{L.validUntil}:</span> {fmtDate(quotation.valid_until)}</div>
             )}
             {cur && (
-              <div><span className="font-medium text-[#151928]">{isEn ? 'Currency' : 'Valuta'}:</span> {cur}</div>
+              <div><span className="font-medium text-[#151928]">{L.currency}:</span> {cur}</div>
             )}
             {(quotation as { payment_terms?: string | null }).payment_terms && (
-              <div><span className="font-medium text-[#151928]">{isEn ? 'Payment Terms' : 'Uslovi plaćanja'}:</span> {(quotation as { payment_terms?: string | null }).payment_terms}</div>
+              <div><span className="font-medium text-[#151928]">{L.paymentTerms}:</span> {(quotation as { payment_terms?: string | null }).payment_terms}</div>
             )}
           </div>
         </div>
@@ -356,16 +347,16 @@ function PreviewA4({ sections, quotation, tenant, globalTexts, productTexts, lan
       {/* Line Items */}
       <div className="mx-8 mt-3">
         <div className="font-bold text-[10px] text-[#6C7179] tracking-widest mb-1.5">
-          {isEn ? 'LINE ITEMS' : 'STAVKE'}
+          {L.lineItems}
         </div>
         <table className="w-full text-xs border-collapse">
           <thead>
             <tr className="border-b border-[#D2D4D8]">
               <th className="text-left py-1 text-[#6C7179] font-semibold w-5">#</th>
-              <th className="text-left py-1 text-[#6C7179] font-semibold">{isEn ? 'PRODUCT' : 'PROIZVOD'}</th>
-              <th className="text-right py-1 text-[#6C7179] font-semibold w-8">{isEn ? 'QTY' : 'KOL.'}</th>
-              <th className="text-right py-1 text-[#6C7179] font-semibold w-20">{isEn ? 'UNIT PRICE' : 'JED. CENA'}</th>
-              <th className="text-right py-1 text-[#6C7179] font-semibold w-20">{isEn ? 'TOTAL' : 'UKUPNO'}</th>
+              <th className="text-left py-1 text-[#6C7179] font-semibold">{L.product}</th>
+              <th className="text-right py-1 text-[#6C7179] font-semibold w-8">{L.qty}</th>
+              <th className="text-right py-1 text-[#6C7179] font-semibold w-20">{L.unitPrice}</th>
+              <th className="text-right py-1 text-[#6C7179] font-semibold w-20">{L.total}</th>
             </tr>
           </thead>
           <tbody>
@@ -395,7 +386,7 @@ function PreviewA4({ sections, quotation, tenant, globalTexts, productTexts, lan
         {/* Price summary */}
         <div className="mt-2 border-t border-[#D2D4D8] pt-2 flex flex-col items-end gap-0.5">
           <div className="flex gap-6 text-xs text-[#6C7179]">
-            <span>{isEn ? 'Subtotal' : 'Međuzbir'}</span>
+            <span>{L.subtotal}</span>
             <span className="tabular-nums w-24 text-right">{subtotal.toFixed(2)} {cur}</span>
           </div>
           {adjs.map((adj, i) => {
@@ -419,7 +410,7 @@ function PreviewA4({ sections, quotation, tenant, globalTexts, productTexts, lan
               borderLeft: template === 'bold' ? `3px solid ${accent}` : undefined,
             }}
           >
-            <span style={{ color: accent }}>{isEn ? 'TOTAL DUE' : 'UKUPAN IZNOS'}</span>
+            <span style={{ color: accent }}>{L.totalDue}</span>
             <span className="tabular-nums w-24 text-right" style={{ color: accent }}>{total.toFixed(2)} {cur}</span>
           </div>
         </div>
@@ -430,7 +421,7 @@ function PreviewA4({ sections, quotation, tenant, globalTexts, productTexts, lan
         <div className="mx-8 mt-3 space-y-2 pb-6">
           <div className="border-t border-dashed border-[#D2D4D8] pt-2 mb-1">
             <span className="text-[9px] text-[#ADB1B7] uppercase tracking-widest">
-              {isEn ? 'Configurable sections — drag in left panel to reorder' : 'Sekcije — prevucite u levom panelu za izmenu redosleda'}
+              {L.previewSectionsHint}
             </span>
           </div>
           {configurablesections.map(section => {
@@ -438,7 +429,7 @@ function PreviewA4({ sections, quotation, tenant, globalTexts, productTexts, lan
             if (section.id === 'notes') {
               preview = String(quotation.notes ?? '').slice(0, 150)
             } else if (section.id === 'terms') {
-              preview = (isEn ? TERMS_LINES : TERMS_LINES_SR).slice(0, 3).join('  ')
+              preview = L.termsLines.slice(0, 3).join('  ')
             } else if (section.textId) {
               const txt = globalTextMap[section.textId]
               preview = txt ? String(txt.content ?? '').slice(0, 150) : ''
@@ -497,12 +488,12 @@ function PreviewA4({ sections, quotation, tenant, globalTexts, productTexts, lan
 
 export function PdfLayoutDialog({
   open, onOpenChange, globalTexts, productTexts, quotationHasNotes,
-  onConfirm, loading, quotation, tenant, pdfOnly,
+  onConfirm, loading, quotation, tenant, pdfOnly, defaultLang = 'en',
 }: Props) {
   const [sections, setSections] = useState<PdfSection[]>(() =>
     buildDefaultSections(globalTexts, quotationHasNotes, productTexts)
   )
-  const [lang, setLang] = useState<'en' | 'sr'>('en')
+  const [lang, setLang] = useState<OutputLang>(defaultLang)
   const [template, setTemplate] = useState<PdfTemplate>('modern')
   const [format, setFormat] = useState<ExportFormat>('pdf')
 
@@ -510,7 +501,7 @@ export function PdfLayoutDialog({
   const [lastOpen, setLastOpen] = useState(false)
   if (open && !lastOpen) {
     setSections(buildDefaultSections(globalTexts, quotationHasNotes, productTexts))
-    setLang('en')
+    setLang(defaultLang)
     setTemplate('modern')
     setFormat('pdf')
     setLastOpen(true)
@@ -548,25 +539,19 @@ export function PdfLayoutDialog({
           <DialogDescription className="sr-only">
             {t('Reorder, show or hide sections of the quotation PDF and choose the language before generating it.')}
           </DialogDescription>
-          {/* Language toggle */}
+          {/* Output language picker */}
           <div className="flex items-center gap-2 mr-6">
             <span className="text-xs text-muted-foreground">{t('Language')}:</span>
-            <div className="flex rounded-md border overflow-hidden text-xs font-medium">
-              <button
-                type="button"
-                onClick={() => setLang('en')}
-                className={`px-3 py-1 transition-colors ${lang === 'en' ? 'bg-primary text-primary-foreground' : 'bg-background hover:bg-muted text-foreground'}`}
-              >
-                {t('English')}
-              </button>
-              <button
-                type="button"
-                onClick={() => setLang('sr')}
-                className={`px-3 py-1 transition-colors border-l ${lang === 'sr' ? 'bg-primary text-primary-foreground' : 'bg-background hover:bg-muted text-foreground'}`}
-              >
-                {t('Serbian')}
-              </button>
-            </div>
+            <select
+              value={lang}
+              onChange={e => setLang(asOutputLang(e.target.value))}
+              className="rounded-md border bg-background px-2 py-1 text-xs font-medium text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+              aria-label={t('Output language')}
+            >
+              {OUTPUT_LANGS.map(code => (
+                <option key={code} value={code}>{t(getLanguageName(code))}</option>
+              ))}
+            </select>
           </div>
         </DialogHeader>
 

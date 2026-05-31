@@ -39,6 +39,7 @@ import { useToast } from '@/hooks/useToast'
 import { Toaster } from '@/components/ui/toast'
 import { useCanEdit } from '@/hooks/usePermission'
 import { t } from '@/i18n'
+import { type OutputLang, asOutputLang } from '@/lib/languages'
 import { logChange } from '@/lib/auditLog'
 import { AuditHistory } from '@/components/audit-log/AuditHistory'
 
@@ -189,7 +190,7 @@ export function QuotationDetailPage() {
       // Reduce to the dialog's PdfTextBlock shape for the selected language.
       // The dialog uses the row id as section id and the label/content for
       // its preview; the builder will re-resolve from the full rows array.
-      const dialogLang: 'en' | 'sr' = (quotation.lang as 'en' | 'sr') ?? 'en'
+      const dialogLang: OutputLang = asOutputLang(quotation.lang)
       const globals = resolveTenantTextBlocks(textRows, dialogLang).map(b => ({
         id:      b.id,
         label:   b.label ?? b.slot,
@@ -220,7 +221,7 @@ export function QuotationDetailPage() {
     }
   }
 
-  async function handleLayoutConfirm(sections: PdfSection[], lang: 'en' | 'sr', template: PdfTemplate, format: ExportFormat) {
+  async function handleLayoutConfirm(sections: PdfSection[], lang: OutputLang, template: PdfTemplate, format: ExportFormat) {
     if (!id || !quotation) return
     setGeneratingPdf(true)
     try {
@@ -324,7 +325,7 @@ export function QuotationDetailPage() {
         buildTenantProfile(),
       ])
 
-      const lang: 'en' | 'sr' = (quotation.lang as 'en' | 'sr') ?? 'en'
+      const lang: OutputLang = asOutputLang(quotation.lang)
       const bytes = await buildQuotationTechSpecDocxBytes({
         tenant:    prof,
         quotation,
@@ -432,7 +433,7 @@ export function QuotationDetailPage() {
             <CustomTemplateMenu
               quotation={quotation}
               buildTenantProfile={buildTenantProfile}
-              lang={(quotation.lang as 'en' | 'sr') ?? 'en'}
+              lang={asOutputLang(quotation.lang)}
               onError={msg => toast({ title: t('Failed to generate document'), description: msg, variant: 'destructive' })}
             />
             {canEdit && (quotation.status === 'confirmed' || quotation.status === 'sent') && quotation.pdf_url && (
@@ -752,6 +753,7 @@ export function QuotationDetailPage() {
         quotation={quotation}
         tenant={tenantProfile ?? { name: tenant?.name ?? 'Your store' }}
         pdfOnly={pdfMode === 'confirm'}
+        defaultLang={asOutputLang(quotation.lang)}
       />
 
       {/* ── Delete confirm ─────────────────────────────────────────────────── */}
@@ -786,11 +788,11 @@ export function QuotationDetailPage() {
           validUntil={quotation.valid_until}
           publicUrl={`${window.location.origin}/q/${quotation.public_token}`}
           tenantName={tenant?.name ?? 'Your store'}
-          lang={quotation.lang === 'sr' ? 'sr' : 'en'}
+          lang={asOutputLang(quotation.lang)}
           defaultIntro={(() => {
             // Fetched once in `handleOpenPdfDialog`; falls back to '' when
             // the user hasn't opened the PDF preview yet.
-            const lang = quotation.lang === 'sr' ? 'sr' : 'en'
+            const lang = asOutputLang(quotation.lang)
             const exact = pdfTexts.find(r =>
               r.level === 'tenant' && r.reference_id === null
               && r.slot === 'quotation_email_intro' && r.language === lang

@@ -1,5 +1,6 @@
 import type { Quotation, TenantText } from '@/types/database'
 import type { PdfSection } from '@/pages/quotations/PdfLayoutDialog'
+import type { OutputLang } from '@/lib/languages'
 import { renderModern }  from './pdf/templateModern'
 import { renderClassic } from './pdf/templateClassic'
 import { renderCompact } from './pdf/templateCompact'
@@ -22,7 +23,7 @@ export async function buildQuotationPdfBytes(
    *  referenced by this quotation. Use `fetchQuotationTexts` in `lib/texts.ts`. */
   texts: TenantText[] = [],
   layoutSections?: PdfSection[],
-  lang: 'en' | 'sr' = 'en',
+  lang: OutputLang = 'en',
   watermark?: boolean,
   template: PdfTemplate = 'modern',
 ): Promise<Uint8Array> {

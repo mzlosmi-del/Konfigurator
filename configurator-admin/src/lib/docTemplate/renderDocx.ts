@@ -10,8 +10,8 @@ import {
   Table, TableRow, TableCell, WidthType, AlignmentType, BorderStyle,
 } from 'docx'
 import type { Quotation, TenantText } from '@/types/database'
-import { type TenantProfile, loadLogoBytes, getFooterLabel, PDF_LABELS } from '@/lib/pdf/shared'
-import type { Lang } from '@/i18n'
+import { type TenantProfile, loadLogoBytes, getFooterLabel, labelsFor } from '@/lib/pdf/shared'
+import type { OutputLang as Lang } from '@/lib/languages'
 import type { Block, TableColumn, BlockStyle, StyleAlign } from './types'
 import { buildTemplateContext, type ImageResolver } from './context'
 import type { DocumentTemplateDefinition } from './types'
@@ -57,7 +57,7 @@ function fitImage(natW: number, natH: number, maxW: number, maxH: number) {
 
 export async function renderTemplateToDocx(args: RenderDocxArgs): Promise<Uint8Array> {
   const ctx = buildTemplateContext(args.quotation, args.tenant, args.texts, args.lang, args.images)
-  const L = PDF_LABELS[args.lang]
+  const L = labelsFor(args.lang)
   const numberer = new HeadingNumberer()
   const docNumbering = args.definition.page?.numbering
 
@@ -230,13 +230,9 @@ export async function renderTemplateToDocx(args: RenderDocxArgs): Promise<Uint8A
       ],
     })
     return [
-      line(label('Subtotal', 'Međuzbir'), `${ctx.quotation.subtotal.toFixed(2)} ${cur}`),
-      line(label('Total', 'Ukupno'), `${ctx.quotation.total.toFixed(2)} ${cur}`, true),
+      line(L.subtotal, `${ctx.quotation.subtotal.toFixed(2)} ${cur}`),
+      line(L.total, `${ctx.quotation.total.toFixed(2)} ${cur}`, true),
     ]
-  }
-
-  function label(en: string, sr: string): string {
-    return args.lang === 'en' ? en : sr
   }
 
   emit(args.definition.blocks ?? [], [])
