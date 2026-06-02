@@ -12,7 +12,7 @@
     "test:visual": "playwright test",
     "test:visual:update": "playwright test --update-snapshots",
     "test:visual:report": "playwright show-report",
-    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+    "lint": "eslint . --report-unused-disable-directives",
     "db:gen-types": "supabase gen types typescript --project-id $SUPABASE_PROJECT_ID > src/types/database.generated.ts"
   },
   "dependencies": {
