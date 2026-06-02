@@ -19,7 +19,8 @@ export type BindingType  = 'string' | 'number' | 'date' | 'currency' | 'image'
 
 export interface BindingField {
   path:        string
-  label:       { en: string; sr: string }
+  // EN is required and acts as the fallback; other languages are optional.
+  label:       { en: string } & Partial<Record<Lang, string>>
   type:        BindingType
   scope:       BindingScope
   /** True when this path is a loopable collection (used by repeaters). */

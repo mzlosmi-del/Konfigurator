@@ -54,7 +54,7 @@ export function DashboardPage() {
   return (
     <div className="animate-fade-in">
       <PageHeader
-        title={`Welcome${tenant?.name ? `, ${tenant.name}` : ''}`}
+        title={`${t('Welcome')}${tenant?.name ? `, ${tenant.name}` : ''}`}
         description={t('Overview of your configurator activity.')}
       />
 

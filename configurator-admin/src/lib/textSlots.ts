@@ -2,10 +2,12 @@ import type { TextLevel } from '@/types/database'
 import type { Lang } from '@/i18n'
 
 /** One entry of the slot catalogue: a friendly label and a description of
- *  where the text actually appears, both in EN and SR. */
+ *  where the text actually appears. EN is required and acts as the fallback;
+ *  other languages (sr, de, …) are optional. Lookups by an untranslated
+ *  language fall back to `.en` in the accessor functions below. */
 interface SlotMeta {
-  label:       { en: string; sr: string }
-  description: { en: string; sr: string }
+  label:       { en: string } & Partial<Record<Lang, string>>
+  description: { en: string } & Partial<Record<Lang, string>>
 }
 
 /** Catalogue keyed by `(level, slot)`. The same `slot` string can mean

@@ -32,7 +32,11 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
   const canViewAnalytics  = useCanView('analytics')
   const canViewEmbed      = useCanView('embed')
   const canViewSettings   = useCanView('settings')
-  const canImportCatalog  = useCanEdit('library') && useCanEdit('products')
+  // Call both hooks unconditionally (rules-of-hooks), then combine — `&&`
+  // would short-circuit the second hook when the first is falsy.
+  const canEditLibrary    = useCanEdit('library')
+  const canEditProducts   = useCanEdit('products')
+  const canImportCatalog  = canEditLibrary && canEditProducts
 
   function handleLang(l: Lang) {
     setLang(l)

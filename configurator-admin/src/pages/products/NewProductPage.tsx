@@ -320,6 +320,8 @@ export function NewProductPage() {
                 </p>
               </CardContent>
             </Card>
+            {/* AI product setup is intentionally disabled via the `false` flag. */}
+            {/* eslint-disable-next-line no-constant-condition, no-constant-binary-expression */}
             {false && !aiAllowed ? (
               <Card>
                 <CardContent className="pt-6 text-center space-y-3">

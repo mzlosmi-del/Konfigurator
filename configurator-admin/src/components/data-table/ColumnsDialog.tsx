@@ -22,6 +22,7 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
+import { t } from '@/i18n'
 import type { ColumnPref } from '@/lib/uiPreferences'
 
 export interface ColumnDescriptor {
@@ -62,9 +63,9 @@ export function ColumnsDialog({ open, onClose, columns, descriptors, onChange, o
     <Dialog open={open} onOpenChange={o => { if (!o) onClose() }}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Columns</DialogTitle>
+          <DialogTitle>{t('Columns')}</DialogTitle>
           <DialogDescription>
-            Drag to reorder. Click the eye to show or hide a column.
+            {t('Drag to reorder. Click the eye to show or hide a column.')}
           </DialogDescription>
         </DialogHeader>
 
@@ -92,9 +93,9 @@ export function ColumnsDialog({ open, onClose, columns, descriptors, onChange, o
         <div className="flex justify-between mt-4">
           <Button variant="ghost" size="sm" onClick={onReset}>
             <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
-            Reset to defaults
+            {t('Reset to defaults')}
           </Button>
-          <Button onClick={onClose}>Done</Button>
+          <Button onClick={onClose}>{t('Done')}</Button>
         </div>
       </DialogContent>
     </Dialog>
@@ -137,7 +138,7 @@ function SortableRow({ id, label, visible, fixed, onToggle }: RowProps) {
           {...listeners}
           type="button"
           className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground shrink-0"
-          aria-label="Drag to reorder"
+          aria-label={t('Drag to reorder')}
         >
           <GripVertical className="h-4 w-4" />
         </button>
@@ -147,7 +148,7 @@ function SortableRow({ id, label, visible, fixed, onToggle }: RowProps) {
         type="button"
         onClick={onToggle}
         disabled={fixed}
-        title={fixed ? 'This column is required and cannot be hidden' : visible ? 'Hide column' : 'Show column'}
+        title={fixed ? t('This column is required and cannot be hidden') : visible ? t('Hide column') : t('Show column')}
         className="text-muted-foreground hover:text-foreground disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
       >
         {visible ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}

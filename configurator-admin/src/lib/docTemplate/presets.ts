@@ -13,6 +13,7 @@
 // valid binding paths from bindings.ts.
 
 import type { DocumentTemplateDefinition, OutputKind } from './types'
+import type { Lang } from '@/i18n'
 import { makeSampleTemplate } from './sampleTemplate'
 
 let _seq = 0
@@ -128,7 +129,8 @@ export function makeTechSpecTemplate(): DocumentTemplateDefinition {
 
 export interface TemplatePreset {
   id:     string
-  label:  { en: string; sr: string }
+  // EN is required and acts as the fallback; other languages are optional.
+  label:  { en: string } & Partial<Record<Lang, string>>
   /** Default output kind suggested when this preset is chosen. */
   output: OutputKind
   make:   () => DocumentTemplateDefinition

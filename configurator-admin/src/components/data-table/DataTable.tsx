@@ -4,6 +4,7 @@ import type { LucideIcon } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
+import { t } from '@/i18n'
 import { useTableLayout } from '@/hooks/useTableLayout'
 import type { TableLayout } from '@/lib/uiPreferences'
 import { SortTh } from './SortTh'
@@ -122,7 +123,7 @@ export function DataTable<T>(props: Props<T>) {
           {toolbarEnd}
           <Button variant="outline" size="sm" onClick={() => setColumnsOpen(true)}>
             <ColumnsIcon className="h-3.5 w-3.5 mr-1.5" />
-            Columns
+            {t('Columns')}
           </Button>
         </div>
       </div>
@@ -165,7 +166,7 @@ export function DataTable<T>(props: Props<T>) {
                     key={rowKey(row)}
                     className={`border-t hover:bg-muted/20 transition-colors ${rowClassName?.(row) ?? ''}`}
                     onDoubleClick={() => onRowOpen(row)}
-                    title="Double-click to open"
+                    title={t('Double-click to open')}
                   >
                     {visibleColumns.map(c => (
                       <td
@@ -192,11 +193,18 @@ export function DataTable<T>(props: Props<T>) {
           <div className="border-t bg-muted/10 px-3 py-2 flex items-center justify-between text-xs text-muted-foreground">
             <span>
               {sortedRows.length === 0
-                ? 'No rows'
-                : `Showing ${startIdx}–${endIdx} of ${sortedRows.length}`}
+                ? t('No rows')
+                : t('Showing {start}–{end} of {total}')
+                    .replace('{start}', String(startIdx))
+                    .replace('{end}', String(endIdx))
+                    .replace('{total}', String(sortedRows.length))}
             </span>
             <div className="flex items-center gap-2">
-              <span>Page {safePage + 1} of {totalPages}</span>
+              <span>
+                {t('Page {n} of {total}')
+                  .replace('{n}', String(safePage + 1))
+                  .replace('{total}', String(totalPages))}
+              </span>
               <Button
                 variant="outline"
                 size="sm"

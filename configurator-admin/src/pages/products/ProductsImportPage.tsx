@@ -21,7 +21,7 @@ interface ValidationError { row: number; message: string }
 // Client-side CSV preview parser (mirrors server logic, no insertion)
 function parseCsvPreview(text: string): { rows: PreviewRow[]; error?: string } {
   const lines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n')
-  if (lines.length < 2) return { rows: [], error: 'CSV must have a header row and at least one data row.' }
+  if (lines.length < 2) return { rows: [], error: t('CSV must have a header row and at least one data row.') }
 
   function splitLine(line: string): string[] {
     const fields: string[] = []
@@ -41,7 +41,7 @@ function parseCsvPreview(text: string): { rows: PreviewRow[]; error?: string } {
 
   const headers = splitLine(lines[0]).map(h => h.trim().toLowerCase())
   if (!headers.includes('name') && !headers.includes('product name') && !headers.includes('product')) {
-    return { rows: [], error: 'CSV must have a "name" column.' }
+    return { rows: [], error: t('CSV must have a "name" column.') }
   }
 
   const rows: PreviewRow[] = []
@@ -107,13 +107,13 @@ export function ProductsImportPage() {
       if (res.error || (res.data as { error?: string })?.error) {
         const d = res.data as { error?: string; errors?: ValidationError[]; message?: string } | null
         if (d?.errors) { setServerErrors(d.errors); return }
-        throw new Error(d?.message ?? d?.error ?? res.error?.message ?? 'Import failed')
+        throw new Error(d?.message ?? d?.error ?? res.error?.message ?? t('Import failed'))
       }
       setResult(res.data as { created: number; products: { id: string; name: string }[] })
       setCsvText('')
       setPreview([])
     } catch (e) {
-      setParseError(e instanceof Error ? e.message : 'Import failed')
+      setParseError(e instanceof Error ? e.message : t('Import failed'))
     } finally {
       setImporting(false)
     }
@@ -220,7 +220,7 @@ export function ProductsImportPage() {
               <div className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive space-y-1">
                 <p className="font-medium">{t('Validation errors:')}</p>
                 {serverErrors.map((e, i) => (
-                  <p key={i}>Row {e.row}: {e.message}</p>
+                  <p key={i}>{t('Row')} {e.row}: {e.message}</p>
                 ))}
               </div>
             )}
@@ -242,14 +242,14 @@ export function ProductsImportPage() {
                   <thead className="bg-muted/50 border-b">
                     <tr>
                       {['Name', 'Price', 'Currency', 'SKU', 'Description'].map(h => (
-                        <th key={h} className="text-left px-3 py-2 font-medium">{h}</th>
+                        <th key={h} className="text-left px-3 py-2 font-medium">{t(h)}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody className="divide-y">
                     {preview.slice(0, 10).map((row, i) => (
                       <tr key={i} className={!row.name ? 'bg-destructive/5' : ''}>
-                        <td className="px-3 py-2">{row.name || <span className="text-destructive">missing</span>}</td>
+                        <td className="px-3 py-2">{row.name || <span className="text-destructive">{t('missing')}</span>}</td>
                         <td className="px-3 py-2">{row.base_price}</td>
                         <td className="px-3 py-2">{row.currency}</td>
                         <td className="px-3 py-2 text-muted-foreground">{row.sku || '—'}</td>
