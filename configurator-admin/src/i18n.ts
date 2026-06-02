@@ -1631,6 +1631,28 @@ const sr: Record<string, string> = {
   'Import failed':                         'Uvoz nije uspeo',
   'Row':                                   'Red',
   'missing':                               'nedostaje',
+
+  // ── Quotations / Inquiries list: search + quick filters ─────────────────
+  'Search customer, company or reference…': 'Pretraži po kupcu, firmi ili referenci…',
+  'Search customer, email or product…':    'Pretraži po kupcu, e-mailu ili proizvodu…',
+  'No inquiries match the current filters.': 'Nema upita koji odgovaraju filterima.',
+  // Quotation quick filters ('Draft' is already defined above as 'Skica')
+  'Awaiting customer':                     'Čeka kupca',
+  'Won':                                   'Dobijeno',
+  'Expiring in 7 days':                    'Ističe za 7 dana',
+  'This month':                            'Ovog meseca',
+  // Inquiry quick filters
+  'Unread':                                'Nepročitano',
+  'Today':                                 'Danas',
+  'Last 7 days':                           'Poslednjih 7 dana',
+  'Has price':                             'Sa cenom',
+  // Quotation/inquiry table columns
+  'Items':                                 'Stavke',
+  'Options':                               'Opcije',
+  'Date':                                  'Datum',
+  'From inquiry':                          'Iz upita',
+  'Open source inquiry':                   'Otvori izvorni upit',
+  'Responded':                             'Odgovoreno',
 }
 
 // German (Deutsch) translations for the admin. Mirrors the `sr` keys for the
@@ -2781,6 +2803,29 @@ const de: Record<string, string> = {
   'Import failed':                         'Import fehlgeschlagen',
   'Row':                                   'Zeile',
   'missing':                               'fehlt',
+
+  // ── Quotations / Inquiries list: search + quick filters ─────────────────
+  'Search customer, company or reference…': 'Nach Kunde, Firma oder Referenz suchen…',
+  'Search customer, email or product…':    'Nach Kunde, E-Mail oder Produkt suchen…',
+  'No inquiries match the current filters.': 'Keine Anfragen entsprechen den aktuellen Filtern.',
+  // Quotation quick filters
+  'Draft':                                 'Entwurf',
+  'Awaiting customer':                     'Wartet auf Kunde',
+  'Won':                                   'Gewonnen',
+  'Expiring in 7 days':                    'Läuft in 7 Tagen ab',
+  'This month':                            'Diesen Monat',
+  // Inquiry quick filters
+  'Unread':                                'Ungelesen',
+  'Today':                                 'Heute',
+  'Last 7 days':                           'Letzte 7 Tage',
+  'Has price':                             'Mit Preis',
+  // Quotation/inquiry table columns
+  'Items':                                 'Positionen',
+  'Options':                               'Optionen',
+  'Date':                                  'Datum',
+  'From inquiry':                          'Aus Anfrage',
+  'Open source inquiry':                   'Ursprüngliche Anfrage öffnen',
+  'Responded':                             'Beantwortet',
 }
 
 export const LANGS = ['en', 'sr', 'de'] as const

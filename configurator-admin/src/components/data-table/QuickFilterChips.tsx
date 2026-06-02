@@ -1,4 +1,5 @@
 import { cn } from '@/lib/utils'
+import { t } from '@/i18n'
 
 export interface QuickFilter {
   id:    string
@@ -29,7 +30,7 @@ export function QuickFilterChips({ filters, active, onToggle }: Props) {
                 : 'bg-card text-muted-foreground border-input hover:text-foreground hover:bg-accent',
             )}
           >
-            {f.label}
+            {t(f.label)}
           </button>
         )
       })}
