@@ -18,6 +18,10 @@ import {
   type CharModifierSchedule,
   type ProductTaxPreset,
   type ProductAdjustmentPreset,
+  type ProductPriceScheduleInsert,
+  type CharModifierScheduleInsert,
+  type ProductTaxPresetInsert,
+  type ProductAdjustmentPresetInsert,
 } from '@/lib/pricing'
 import { supabase } from '@/lib/supabase'
 import type { Product } from '@/types/database'
@@ -87,7 +91,7 @@ function BasePricesTab({ products, tenantId }: { products: Product[], tenantId: 
     if (!selectedProduct) return
     setLoading(true)
     try { setSchedules(await fetchPriceSchedules(selectedProduct)) }
-    catch (e: any) { toast({ title: t('Error'), description: e.message, variant: 'destructive' }) }
+    catch (e) { toast({ title: t('Error'), description: e instanceof Error ? e.message : String(e), variant: 'destructive' }) }
     finally { setLoading(false) }
   }, [selectedProduct])
 
@@ -119,7 +123,7 @@ function BasePricesTab({ products, tenantId }: { products: Product[], tenantId: 
         valid_to: form.valid_to || null,
         note: form.note || null,
       }
-      const saved = await upsertPriceSchedule(row as any)
+      const saved = await upsertPriceSchedule(row as ProductPriceScheduleInsert & { id?: string })
       const productName = products.find(p => p.id === selectedProduct)?.name ?? null
       const entityName = productName ? `${productName} — ${form.valid_from}` : form.valid_from
       logChange({
@@ -137,7 +141,7 @@ function BasePricesTab({ products, tenantId }: { products: Product[], tenantId: 
       setDialogOpen(false)
       await load()
       toast({ title: editing ? t('Updated') : t('Created') })
-    } catch (e: any) { toast({ title: t('Error'), description: e.message, variant: 'destructive' }) }
+    } catch (e) { toast({ title: t('Error'), description: e instanceof Error ? e.message : String(e), variant: 'destructive' }) }
   }
 
   async function handleDelete() {
@@ -156,7 +160,7 @@ function BasePricesTab({ products, tenantId }: { products: Product[], tenantId: 
       await load()
       toast({ title: t('Deleted') })
     }
-    catch (e: any) { toast({ title: t('Error'), description: e.message, variant: 'destructive' }) }
+    catch (e) { toast({ title: t('Error'), description: e instanceof Error ? e.message : String(e), variant: 'destructive' }) }
     finally { setDeleteId(null) }
   }
 
@@ -289,14 +293,16 @@ function ModifiersTab({ tenantId }: { products: Product[], tenantId: string }) {
       const { data: chars } = await supabase
         .from('characteristics')
         .select('id, name')
+      const charRows = (chars ?? []) as { id: string; name: string }[]
+      const valueRows = (data ?? []) as { id: string; label: string; characteristic_id: string }[]
       const charMap: Record<string, string> = {}
-      for (const c of (chars ?? [])) charMap[(c as any).id] = (c as any).name
-      setCharValues((data ?? []).map((v: any) => ({
+      for (const c of charRows) charMap[c.id] = c.name
+      setCharValues(valueRows.map(v => ({
         id: v.id,
         label: v.label,
         charName: charMap[v.characteristic_id] ?? '—',
       })))
-    } catch (e: any) { toast({ title: t('Error'), description: e.message, variant: 'destructive' }) }
+    } catch (e) { toast({ title: t('Error'), description: e instanceof Error ? e.message : String(e), variant: 'destructive' }) }
     finally { setLoading(false) }
   }, [])
 
@@ -329,7 +335,7 @@ function ModifiersTab({ tenantId }: { products: Product[], tenantId: string }) {
         valid_to: form.valid_to || null,
         note: form.note || null,
       }
-      const saved = await upsertModifierSchedule(row as any)
+      const saved = await upsertModifierSchedule(row as CharModifierScheduleInsert & { id?: string })
       const cv = charValues.find(c => c.id === form.characteristic_value_id)
       const entityName = cv ? `${cv.charName}: ${cv.label} — ${form.valid_from}` : form.valid_from
       logChange({
@@ -347,7 +353,7 @@ function ModifiersTab({ tenantId }: { products: Product[], tenantId: string }) {
       setDialogOpen(false)
       await loadData()
       toast({ title: editing ? t('Updated') : t('Created') })
-    } catch (e: any) { toast({ title: t('Error'), description: e.message, variant: 'destructive' }) }
+    } catch (e) { toast({ title: t('Error'), description: e instanceof Error ? e.message : String(e), variant: 'destructive' }) }
   }
 
   async function handleDelete() {
@@ -365,7 +371,7 @@ function ModifiersTab({ tenantId }: { products: Product[], tenantId: string }) {
       })
       await loadData(); toast({ title: t('Deleted') })
     }
-    catch (e: any) { toast({ title: t('Error'), description: e.message, variant: 'destructive' }) }
+    catch (e) { toast({ title: t('Error'), description: e instanceof Error ? e.message : String(e), variant: 'destructive' }) }
     finally { setDeleteId(null) }
   }
 
@@ -495,7 +501,7 @@ function TaxRatesTab({ products, tenantId }: { products: Product[], tenantId: st
     if (!selectedProduct) return
     setLoading(true)
     try { setPresets(await fetchTaxPresets(selectedProduct)) }
-    catch (e: any) { toast({ title: t('Error'), description: e.message, variant: 'destructive' }) }
+    catch (e) { toast({ title: t('Error'), description: e instanceof Error ? e.message : String(e), variant: 'destructive' }) }
     finally { setLoading(false) }
   }, [selectedProduct])
 
@@ -528,7 +534,7 @@ function TaxRatesTab({ products, tenantId }: { products: Product[], tenantId: st
         valid_from: form.valid_from,
         valid_to: form.valid_to || null,
       }
-      const saved = await upsertTaxPreset(row as any)
+      const saved = await upsertTaxPreset(row as ProductTaxPresetInsert & { id?: string })
       const productName = products.find(p => p.id === selectedProduct)?.name ?? null
       logChange({
         entityType: 'pricing_schedule',
@@ -546,7 +552,7 @@ function TaxRatesTab({ products, tenantId }: { products: Product[], tenantId: st
       setDialogOpen(false)
       await load()
       toast({ title: editing ? t('Updated') : t('Created') })
-    } catch (e: any) { toast({ title: t('Error'), description: e.message, variant: 'destructive' }) }
+    } catch (e) { toast({ title: t('Error'), description: e instanceof Error ? e.message : String(e), variant: 'destructive' }) }
   }
 
   async function handleDelete() {
@@ -564,7 +570,7 @@ function TaxRatesTab({ products, tenantId }: { products: Product[], tenantId: st
       })
       await load(); toast({ title: t('Deleted') })
     }
-    catch (e: any) { toast({ title: t('Error'), description: e.message, variant: 'destructive' }) }
+    catch (e) { toast({ title: t('Error'), description: e instanceof Error ? e.message : String(e), variant: 'destructive' }) }
     finally { setDeleteId(null) }
   }
 
@@ -679,7 +685,7 @@ function AdjustmentPresetsTab({ products, tenantId }: { products: Product[], ten
     if (!selectedProduct) return
     setLoading(true)
     try { setPresets(await fetchAdjustmentPresets(selectedProduct)) }
-    catch (e: any) { toast({ title: t('Error'), description: e.message, variant: 'destructive' }) }
+    catch (e) { toast({ title: t('Error'), description: e instanceof Error ? e.message : String(e), variant: 'destructive' }) }
     finally { setLoading(false) }
   }, [selectedProduct])
 
@@ -714,7 +720,7 @@ function AdjustmentPresetsTab({ products, tenantId }: { products: Product[], ten
         valid_from: form.valid_from,
         valid_to: form.valid_to || null,
       }
-      const saved = await upsertAdjustmentPreset(row as any)
+      const saved = await upsertAdjustmentPreset(row as ProductAdjustmentPresetInsert & { id?: string })
       const productName = products.find(p => p.id === selectedProduct)?.name ?? null
       logChange({
         entityType: 'pricing_schedule',
@@ -732,7 +738,7 @@ function AdjustmentPresetsTab({ products, tenantId }: { products: Product[], ten
       setDialogOpen(false)
       await load()
       toast({ title: editing ? t('Updated') : t('Created') })
-    } catch (e: any) { toast({ title: t('Error'), description: e.message, variant: 'destructive' }) }
+    } catch (e) { toast({ title: t('Error'), description: e instanceof Error ? e.message : String(e), variant: 'destructive' }) }
   }
 
   async function handleDelete() {
@@ -750,7 +756,7 @@ function AdjustmentPresetsTab({ products, tenantId }: { products: Product[], ten
       })
       await load(); toast({ title: t('Deleted') })
     }
-    catch (e: any) { toast({ title: t('Error'), description: e.message, variant: 'destructive' }) }
+    catch (e) { toast({ title: t('Error'), description: e instanceof Error ? e.message : String(e), variant: 'destructive' }) }
     finally { setDeleteId(null) }
   }
 

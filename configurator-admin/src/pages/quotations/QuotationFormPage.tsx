@@ -160,12 +160,12 @@ export function QuotationFormPage() {
         setCustomerCompany(q.customer_company ?? '')
         setCustomerPhone(q.customer_phone ?? '')
         setCustomerAddress(q.customer_address ?? '')
-        setCustomerVatNumber((q as any).customer_vat_number ?? '')
-        setDeliveryAddress((q as any).delivery_address ?? '')
-        setTitle((q as any).title ?? '')
+        setCustomerVatNumber(q.customer_vat_number ?? '')
+        setDeliveryAddress(q.delivery_address ?? '')
+        setTitle(q.title ?? '')
         setValidUntil(q.valid_until ?? defaultExpiry())
         setCurrency(q.currency)
-        setPaymentTerms((q as any).payment_terms ?? '')
+        setPaymentTerms(q.payment_terms ?? '')
         setNotes(q.notes ?? '')
 
         const items = (Array.isArray(q.line_items) ? q.line_items : []) as unknown as QuotationLineItem[]
@@ -207,13 +207,13 @@ export function QuotationFormPage() {
       ])
       // Attach translated names so the quotation snapshot can capture the
       // formula name in the right language.
-      let formulas = ((formulasData as any).data ?? []) as PricingFormula[]
+      let formulas = ((formulasData as { data: PricingFormula[] | null }).data ?? []) as PricingFormula[]
       if (needFormulas && formulas.length > 0) {
         const nameRows = await fetchFormulaNameTexts(formulas.map(f => f.id))
         formulas = formulas.map(f => ({ ...f, name_i18n: resolveTextI18n(nameRows, 'pricing_formula', f.id, 'name') }))
       }
       setDetailsCache(prev      => ({ ...prev, [productId]: details }))
-      setRulesCache(prev        => ({ ...prev, [productId]: ((rulesData as any).data ?? []) as ConfigurationRule[] }))
+      setRulesCache(prev        => ({ ...prev, [productId]: ((rulesData as { data: ConfigurationRule[] | null }).data ?? []) as ConfigurationRule[] }))
       setFormulasCache(prev     => ({ ...prev, [productId]: formulas }))
     } catch {
       toast({ title: t('Failed to load product details'), variant: 'destructive' })

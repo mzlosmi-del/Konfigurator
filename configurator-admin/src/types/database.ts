@@ -641,6 +641,7 @@ export type Profile = Database['public']['Tables']['profiles']['Row']
 export type Product = Database['public']['Tables']['products']['Row']
 export type Characteristic = Database['public']['Tables']['characteristics']['Row']
 export type CharacteristicValue = Database['public']['Tables']['characteristic_values']['Row']
+export type CharacteristicValueInsert = Database['public']['Tables']['characteristic_values']['Insert']
 export type ProductCharacteristic = Database['public']['Tables']['product_characteristics']['Row']
 export type VisualizationAsset = Database['public']['Tables']['visualization_assets']['Row']
 export type ConfigurationRule = Omit<
@@ -652,6 +653,7 @@ export type CharacteristicClass  = Database['public']['Tables']['characteristic_
 export type ClassMember          = Database['public']['Tables']['characteristic_class_members']['Row']
 export type ProductClass         = Database['public']['Tables']['product_classes']['Row']
 export type PricingFormula       = Database['public']['Tables']['pricing_formulas']['Row']
+export type PricingFormulaInsert = Database['public']['Tables']['pricing_formulas']['Insert']
 export type Quotation                  = Database['public']['Tables']['quotations']['Row']
 // product_texts table was dropped in migration 078; its content lives in
 // tenant_texts now. The legacy `ProductText` / `ProductTextType` exports

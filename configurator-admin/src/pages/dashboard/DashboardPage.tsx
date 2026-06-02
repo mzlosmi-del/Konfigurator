@@ -35,14 +35,17 @@ export function DashboardPage() {
   const navigate = useNavigate()
 
   const [products, setProducts] = useState<Product[]>([])
-  const [inquiries, setInquiries] = useState<(Inquiry & { product: { name: string } | null })[]>([])
+  type InquiryWithProduct = Inquiry & { product: { name: string } | null }
+  const [inquiries, setInquiries] = useState<InquiryWithProduct[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     Promise.all([fetchProducts(), fetchInquiries()])
       .then(([p, i]) => {
         setProducts(p)
-        setInquiries(i as any)
+        // fetchInquiries selects `product:products(name)` but is typed Inquiry[];
+        // the runtime rows carry the joined product, so re-type here.
+        setInquiries(i as unknown as InquiryWithProduct[])
       })
       .finally(() => setLoading(false))
   }, [])

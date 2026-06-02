@@ -1,6 +1,6 @@
 import { supabase } from './supabase'
 import { resolveTextI18n } from './texts'
-import type { PricingFormula, FormulaNode, TenantText } from '@/types/database'
+import type { PricingFormula, PricingFormulaInsert, FormulaNode, TenantText } from '@/types/database'
 
 export async function fetchFormulas(productId: string): Promise<PricingFormula[]> {
   const { data, error } = await supabase
@@ -44,7 +44,11 @@ export async function createFormula(input: {
 }): Promise<PricingFormula> {
   const { data, error } = await supabase
     .from('pricing_formulas')
-    .insert(input as any)
+    // tenant_id / is_active / sort_order are filled by DB defaults & triggers,
+    // so `input` is a partial of the generated Insert type. The Supabase typed
+    // client narrows the insert arg to `never`, so assert through it — same
+    // pattern as `updateFormula` below.
+    .insert(input satisfies Partial<PricingFormulaInsert> as unknown as never)
     .select()
     .single()
   if (error) throw new Error(error.message)

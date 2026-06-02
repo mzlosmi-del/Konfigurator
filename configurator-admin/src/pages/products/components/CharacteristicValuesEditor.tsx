@@ -10,7 +10,7 @@ import {
   fetchValuesForCharacteristic,
 } from '@/lib/products'
 import { CONTENT_LANGUAGES } from '@/lib/languages'
-import type { CharacteristicValue } from '@/types/database'
+import type { CharacteristicValue, CharacteristicValueInsert } from '@/types/database'
 import { setEntityI18nText } from '@/lib/texts'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -77,14 +77,15 @@ export function CharacteristicValuesEditor({
 
   async function handleAdd(data: ValueForm) {
     try {
-      const created = await createCharacteristicValue({
+      const newValue: Omit<CharacteristicValueInsert, 'id'> = {
         characteristic_id: characteristicId,
         tenant_id: tenantId,
         label: data.label,
         price_modifier: data.price_modifier,
         sort_order: values.length,
         hex_color: data.hex_color?.trim() || null,
-      } as any)
+      }
+      const created = await createCharacteristicValue(newValue)
       logChange({ entityType: 'characteristic_value', entityId: created.id, entityName: created.label, changeType: 'create', changedByName: userName })
       onChange([...values, created])
       reset({ label: '', price_modifier: 0, hex_color: '' })

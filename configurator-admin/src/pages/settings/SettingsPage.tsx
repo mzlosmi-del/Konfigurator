@@ -145,8 +145,8 @@ export function SettingsPage() {
   const [companyWebsite, setCompanyWebsite] = useState(tenant?.company_website ?? '')
   const [contactPerson,     setContactPerson]     = useState(tenant?.contact_person  ?? '')
   const [logoUrl,           setLogoUrl]           = useState(tenant?.logo_url        ?? '')
-  const [vatNumber,         setVatNumber]         = useState((tenant as any)?.vat_number          ?? '')
-  const [companyRegNumber,  setCompanyRegNumber]  = useState((tenant as any)?.company_reg_number  ?? '')
+  const [vatNumber,         setVatNumber]         = useState(tenant?.vat_number          ?? '')
+  const [companyRegNumber,  setCompanyRegNumber]  = useState(tenant?.company_reg_number  ?? '')
   const [savingProfile,     setSavingProfile]     = useState(false)
   const [uploadingLogo,     setUploadingLogo]     = useState(false)
 
@@ -1673,9 +1673,9 @@ export function SettingsPage() {
                     {planLabel(tenant?.plan ?? 'free')}
                   </Badge>
                 </CardTitle>
-                {(tenant as any)?.subscription_status && (
+                {(tenant as { subscription_status?: string | null } | null)?.subscription_status && (
                   <CardDescription>
-                    {t('Subscription status')}: {(tenant as any).subscription_status}
+                    {t('Subscription status')}: {(tenant as { subscription_status?: string | null }).subscription_status}
                   </CardDescription>
                 )}
               </CardHeader>
@@ -1708,9 +1708,9 @@ export function SettingsPage() {
                     <UsageRow label={t('AI setups this month')} used={monthlyUsage?.ai_setup_count ?? 0} max={planLimits.ai_setup_per_month} />
                     */}
                   </div>
-                  {(tenant as any)?.grace_period_ends_at && (
+                  {(tenant as { grace_period_ends_at?: string | null } | null)?.grace_period_ends_at && (
                     <div className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
-                      {t('Payment failed. Service continues until')} {new Date((tenant as any).grace_period_ends_at).toLocaleDateString()}.
+                      {t('Payment failed. Service continues until')} {new Date((tenant as { grace_period_ends_at?: string | null }).grace_period_ends_at!).toLocaleDateString()}.
                       {' '}{t('Update your payment method to avoid downgrade.')}
                     </div>
                   )}
@@ -1719,7 +1719,7 @@ export function SettingsPage() {
             </Card>
 
             {/* Over-limit banner */}
-            {(tenant as any)?.subscription_status === 'canceled' && (
+            {(tenant as { subscription_status?: string | null } | null)?.subscription_status === 'canceled' && (
               <div className="rounded-md border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive">
                 {t('Some resources are read-only because your workspace exceeds the free plan limits. Upgrade to restore full access — your data is safe.')}
               </div>

@@ -20,6 +20,9 @@ const NEXT_PLAN: Record<string, string> = {
   free: 'starter', starter: 'growth', growth: 'scale', scale: 'scale',
 }
 
+/** Test-only surface added by the supabase mock below. */
+type MockSupabase = { _setInsertError: (err: { message: string } | null) => void }
+
 function makePlanError(dimension: string, plan: string, current?: number, limit?: number) {
   return {
     code: 'PLAN_LIMIT_EXCEEDED',
@@ -97,22 +100,22 @@ describe('createProduct — plan_limit_exceeded propagation', () => {
   it('throws a human-readable error when DB returns PLAN_LIMIT_EXCEEDED JSON', async () => {
     const structuredMsg = JSON.stringify(makePlanError('products', 'free', 3, 3))
     const { supabase } = await import('@/lib/supabase')
-    ;(supabase as any)._setInsertError({ message: structuredMsg })
+    ;(supabase as unknown as MockSupabase)._setInsertError({ message: structuredMsg })
 
     await expect(createProduct({ name: 'Test', description: null, base_price: 0, currency: 'EUR' }))
       .rejects.toThrow(/Product limit reached/)
 
-    ;(supabase as any)._setInsertError(null)
+    ;(supabase as unknown as MockSupabase)._setInsertError(null)
   })
 
   it('throws a human-readable error for legacy lowercase plan_limit_exceeded', async () => {
     const { supabase } = await import('@/lib/supabase')
-    ;(supabase as any)._setInsertError({ message: 'new row violates check constraint "plan_limit_exceeded"' })
+    ;(supabase as unknown as MockSupabase)._setInsertError({ message: 'new row violates check constraint "plan_limit_exceeded"' })
 
     await expect(createProduct({ name: 'Test', description: null, base_price: 0, currency: 'EUR' }))
       .rejects.toThrow(/Product limit reached/)
 
-    ;(supabase as any)._setInsertError(null)
+    ;(supabase as unknown as MockSupabase)._setInsertError(null)
   })
 })
 
