@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Plus, Trash2, ChevronDown, ChevronRight, ToggleLeft, ToggleRight } from 'lucide-react'
 import { fetchFormulas, createFormula, updateFormula, deleteFormula } from '@/lib/formulas'
 import { fetchProductCharacteristicsWithValues } from '@/lib/products'
@@ -48,9 +48,7 @@ export function FormulaPanel({ productId }: Props) {
   const [editNamesI18n, setEditNamesI18n]   = useState<Record<string, Record<string, string>>>({})
   const [savingId, setSavingId]             = useState<string | null>(null)
 
-  useEffect(() => { load() }, [productId])
-
-  async function load() {
+  const load = useCallback(async () => {
     setLoading(true)
     try {
       const [formulasData, charsWithValues] = await Promise.all([
@@ -65,7 +63,9 @@ export function FormulaPanel({ productId }: Props) {
     } finally {
       setLoading(false)
     }
-  }
+  }, [productId, toast])
+
+  useEffect(() => { load() }, [load])
 
   async function handleCreate() {
     const canonical = canonicalName(newNameI18n)

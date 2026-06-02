@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import {
   DndContext,
   useDraggable,
@@ -401,9 +401,7 @@ export function LibraryPage() {
   const [toDeleteClass, setToDeleteClass] = useState<CharacteristicClass | null>(null)
   const [deletingClass, setDeletingClass] = useState(false)
 
-  useEffect(() => { load() }, [])
-
-  async function load() {
+  const load = useCallback(async () => {
     setLoading(true)
     try {
       const [chars, cls, allMemberships] = await Promise.all([
@@ -431,7 +429,9 @@ export function LibraryPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [toast])
+
+  useEffect(() => { load() }, [load])
 
   function toggleExpand(id: string) {
     setExpanded(prev => ({ ...prev, [id]: !prev[id] }))

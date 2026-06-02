@@ -73,7 +73,7 @@ export function TemplateBuilderPage() {
       .then(r => { setRow(r); setName(r.name); setBlocks(r.definition.blocks ?? []); setPage(r.definition.page ?? {}) })
       .catch(err => toast({ title: t('Failed to load template'), description: String(err), variant: 'destructive' }))
       .finally(() => setLoading(false))
-  }, [id])
+  }, [id, toast])
 
   // Live preview context against the bundled fixture in the chosen language.
   const ctx = useMemo(

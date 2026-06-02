@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Plus, Pencil, Trash2, Eye, EyeOff, Package } from 'lucide-react'
 import { useAuthContext } from '@/components/auth/AuthContext'
@@ -40,9 +40,7 @@ export function ProductsPage() {
   const overLimit    = atLimit(maxProducts, publishedCount)
   const unlimited    = isUnlimited(maxProducts)
 
-  useEffect(() => { load() }, [tenant?.id])
-
-  async function load() {
+  const load = useCallback(async () => {
     if (!tenant?.id) return
     setLoading(true)
     try {
@@ -57,7 +55,9 @@ export function ProductsPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [tenant?.id, toast])
+
+  useEffect(() => { load() }, [load])
 
   async function handleDelete() {
     if (!toDelete) return

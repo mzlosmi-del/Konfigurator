@@ -33,7 +33,7 @@ export function RegisterPage() {
 
   useEffect(() => {
     if (session) navigate('/dashboard', { replace: true })
-  }, [session])
+  }, [session, navigate])
 
   const schema = z.object({
     companyName: z.string().min(2, t('Company name must be at least 2 characters')),

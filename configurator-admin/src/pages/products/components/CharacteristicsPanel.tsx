@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Trash2, ChevronDown, ChevronRight, Tag } from 'lucide-react'
 import {
   fetchClasses,
@@ -32,9 +32,7 @@ export function CharacteristicsPanel({ productId }: Props) {
   const [toDetach, setToDetach]           = useState<ProductClassWithChars | null>(null)
   const [detaching, setDetaching]         = useState(false)
 
-  useEffect(() => { load() }, [productId])
-
-  async function load() {
+  const load = useCallback(async () => {
     setLoading(true)
     try {
       const [assignedData, libData] = await Promise.all([
@@ -49,7 +47,9 @@ export function CharacteristicsPanel({ productId }: Props) {
     } finally {
       setLoading(false)
     }
-  }
+  }, [productId, toast])
+
+  useEffect(() => { load() }, [load])
 
   const unassigned = allClasses.filter(c => !assigned.some(a => a.id === c.id))
 

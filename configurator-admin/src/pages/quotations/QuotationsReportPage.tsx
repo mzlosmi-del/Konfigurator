@@ -63,7 +63,7 @@ export function QuotationsReportPage() {
       .then(setQuotations)
       .catch(() => toast({ title: t('Failed to load quotations'), variant: 'destructive' }))
       .finally(() => setLoading(false))
-  }, [])
+  }, [toast])
 
   function toggleQuick(id: string) {
     setQuick(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])

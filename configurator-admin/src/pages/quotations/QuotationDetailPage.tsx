@@ -87,7 +87,7 @@ export function QuotationDetailPage() {
       .then(([q, reasons]) => { setQuotation(q); setRejectionReasons(reasons) })
       .catch(() => toast({ title: t('Failed to load quotation'), variant: 'destructive' }))
       .finally(() => setLoading(false))
-  }, [id])
+  }, [id, toast])
 
   async function buildTenantProfile(): Promise<TenantProfile> {
     if (tenant?.id) {

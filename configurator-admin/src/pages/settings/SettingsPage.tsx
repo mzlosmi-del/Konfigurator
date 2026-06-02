@@ -520,7 +520,7 @@ export function SettingsPage() {
       .eq('period_month', periodStr)
       .maybeSingle()
       .then(({ data }) => { if (data) setMonthlyUsage(data as MonthlyUsageRow) })
-  }, [tenant?.id])
+  }, [tenant?.id, tenant])
 
   // ── Team ───────────────────────────────────────────────────────────────────
   const [members,       setMembers]       = useState<TeamMember[]>([])
@@ -540,7 +540,7 @@ export function SettingsPage() {
         .gt('expires_at', new Date().toISOString())
         .then(({ data }) => { if (data) setInvitations(data as Invitation[]) })
     }
-  }, [tenant?.id])
+  }, [tenant?.id, tenant])
 
   async function handleSendInvite() {
     if (!inviteEmail.trim()) return
@@ -670,7 +670,7 @@ export function SettingsPage() {
     if (profile?.role !== 'admin' || !tenant) return
     supabase.from('role_permissions').select('*').eq('tenant_id', tenant.id)
       .then(({ data }) => { if (data) setRolePerms(data as RolePermission[]) })
-  }, [tenant?.id, profile?.role])
+  }, [tenant?.id, profile?.role, tenant])
 
   async function handlePermChange(role: 'member' | 'viewer', functionality: string, level: PermLevel) {
     if (!tenant) return

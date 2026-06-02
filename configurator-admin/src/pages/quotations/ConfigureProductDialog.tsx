@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Settings2 } from 'lucide-react'
 import type { CharacteristicWithValues } from '@/lib/products'
 import type { ConfigurationRule, PricingFormula } from '@/types/database'
@@ -44,17 +44,25 @@ export function ConfigureProductDialog({
   const prevDefaultsRef        = useRef<Record<string, string>>({})
   const prevNumericDefaultsRef = useRef<Record<string, number>>({})
 
-  function extractNumericInputs(sel: Record<string, string>): Record<string, number> {
+  const extractNumericInputs = useCallback((sel: Record<string, string>): Record<string, number> => {
     const ni: Record<string, number> = {}
     for (const char of characteristics) {
       if (char.display_type === 'number') ni[char.id] = Number(sel[char.id] ?? 0)
     }
     return ni
-  }
+  }, [characteristics])
+
+  // The reset-on-open effect must fire only when `open` flips, NOT when the
+  // `initialSelection`/`rules` props change identity while the dialog is open
+  // (that would clobber the user's in-progress selection). Read the current
+  // values through a ref so the dep array can stay keyed on `open` alone.
+  const openInputsRef = useRef({ initialSelection, rules, extractNumericInputs })
+  openInputsRef.current = { initialSelection, rules, extractNumericInputs }
 
   // Reset to initial selection each time the dialog opens, applying any already-met defaults
   useEffect(() => {
     if (!open) return
+    const { initialSelection, rules, extractNumericInputs } = openInputsRef.current
     const ni     = extractNumericInputs(initialSelection)
     const effect = evaluateRules(rules, initialSelection, ni)
     const withDef = applyDefaultValues(initialSelection, effect)
@@ -68,7 +76,7 @@ export function ConfigureProductDialog({
 
   const ruleEffect = useMemo(
     () => evaluateRules(rules, selection, extractNumericInputs(selection)),
-    [rules, selection, characteristics]
+    [rules, selection, extractNumericInputs]
   )
 
   const configuredPrice = useMemo(() => {

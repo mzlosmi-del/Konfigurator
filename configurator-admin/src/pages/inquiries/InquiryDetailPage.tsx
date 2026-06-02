@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, Mail, ExternalLink, FileText, ArrowRight } from 'lucide-react'
 import { fetchInquiry, updateInquiryStatus } from '@/lib/inquiries'
@@ -56,12 +56,7 @@ export function InquiryDetailPage() {
 
   const [linkedQuotationId, setLinkedQuotationId] = useState<string | null>(null)
 
-  useEffect(() => {
-    if (!id) return
-    load(id)
-  }, [id])
-
-  async function load(inquiryId: string) {
+  const load = useCallback(async (inquiryId: string) => {
     setLoading(true)
     try {
       const [data, linkedQ] = await Promise.all([
@@ -85,7 +80,12 @@ export function InquiryDetailPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [toast])
+
+  useEffect(() => {
+    if (!id) return
+    load(id)
+  }, [id, load])
 
   async function handleStatusChange(next: InquiryStatus) {
     if (!inquiry) return

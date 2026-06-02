@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Inbox, Circle } from 'lucide-react'
 import { fetchInquiries, timeAgo } from '@/lib/inquiries'
@@ -59,9 +59,7 @@ export function InquiriesPage() {
   const [search, setSearch]           = useState('')
   const [quick, setQuick]             = useState<string[]>([])
 
-  useEffect(() => { load() }, [])
-
-  async function load() {
+  const load = useCallback(async () => {
     setLoading(true)
     try {
       setInquiries(await fetchInquiries() as unknown as InquiryRow[])
@@ -70,7 +68,9 @@ export function InquiriesPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [toast])
+
+  useEffect(() => { load() }, [load])
 
   function toggleQuick(id: string) {
     setQuick(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])

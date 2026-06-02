@@ -93,7 +93,7 @@ function BasePricesTab({ products, tenantId }: { products: Product[], tenantId: 
     try { setSchedules(await fetchPriceSchedules(selectedProduct)) }
     catch (e) { toast({ title: t('Error'), description: e instanceof Error ? e.message : String(e), variant: 'destructive' }) }
     finally { setLoading(false) }
-  }, [selectedProduct])
+  }, [selectedProduct, toast])
 
   useEffect(() => { load() }, [load])
 
@@ -304,7 +304,7 @@ function ModifiersTab({ tenantId }: { products: Product[], tenantId: string }) {
       })))
     } catch (e) { toast({ title: t('Error'), description: e instanceof Error ? e.message : String(e), variant: 'destructive' }) }
     finally { setLoading(false) }
-  }, [])
+  }, [toast])
 
   useEffect(() => { loadData() }, [loadData])
 
@@ -503,7 +503,7 @@ function TaxRatesTab({ products, tenantId }: { products: Product[], tenantId: st
     try { setPresets(await fetchTaxPresets(selectedProduct)) }
     catch (e) { toast({ title: t('Error'), description: e instanceof Error ? e.message : String(e), variant: 'destructive' }) }
     finally { setLoading(false) }
-  }, [selectedProduct])
+  }, [selectedProduct, toast])
 
   useEffect(() => { load() }, [load])
 
@@ -687,7 +687,7 @@ function AdjustmentPresetsTab({ products, tenantId }: { products: Product[], ten
     try { setPresets(await fetchAdjustmentPresets(selectedProduct)) }
     catch (e) { toast({ title: t('Error'), description: e instanceof Error ? e.message : String(e), variant: 'destructive' }) }
     finally { setLoading(false) }
-  }, [selectedProduct])
+  }, [selectedProduct, toast])
 
   useEffect(() => { load() }, [load])
 

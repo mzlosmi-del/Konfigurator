@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ChevronDown, ChevronRight, History } from 'lucide-react'
 import { fetchAuditLog } from '@/lib/auditLog'
 import type { AuditEntityType, AuditLog } from '@/types/database'
@@ -63,7 +63,7 @@ export function AuditLogPage() {
     if (profile && profile.role !== 'admin') navigate('/dashboard', { replace: true })
   }, [profile, navigate])
 
-  async function load(p = 0) {
+  const load = useCallback(async (p = 0) => {
     setLoading(true)
     try {
       const data = await fetchAuditLog({
@@ -81,9 +81,9 @@ export function AuditLogPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [entityType, fromDate, toDate, toast])
 
-  useEffect(() => { load(0) }, [entityType, fromDate, toDate])
+  useEffect(() => { load(0) }, [load])
 
   const entityLabelMap = useMemo(() => {
     const m: Record<string, string> = {}

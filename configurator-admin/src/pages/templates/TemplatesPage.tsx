@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { LayoutTemplate, Plus, Trash2, FileText, FileType2, FileSpreadsheet } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -43,7 +43,7 @@ export function TemplatesPage() {
   }
   const [deleteId, setDeleteId] = useState<string | null>(null)
 
-  async function load() {
+  const load = useCallback(async () => {
     setLoading(true)
     try {
       setRows(await listTemplates())
@@ -52,8 +52,8 @@ export function TemplatesPage() {
     } finally {
       setLoading(false)
     }
-  }
-  useEffect(() => { load() }, [])
+  }, [toast])
+  useEffect(() => { load() }, [load])
 
   async function handleCreate() {
     if (!newName.trim() || !tenant) return

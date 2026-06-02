@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Plus, Search, Trash2, Save } from 'lucide-react'
 import {
   fetchTexts, upsertText, deleteText,
@@ -88,9 +88,7 @@ export function CentralTextsPage() {
   const [toDelete, setToDelete] = useState<TenantText | null>(null)
   const [deleting, setDeleting] = useState(false)
 
-  useEffect(() => { void load() }, [])
-
-  async function load() {
+  const load = useCallback(async () => {
     setLoading(true)
     try {
       const [textRows, prods, chars] = await Promise.all([
@@ -118,7 +116,9 @@ export function CentralTextsPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [toast])
+
+  useEffect(() => { void load() }, [load])
 
   const valueById = useMemo(() => {
     const m: Record<string, CharacteristicValue> = {}
@@ -138,7 +138,7 @@ export function CentralTextsPage() {
     return m
   }, [rows])
 
-  function referenceLabel(row: TenantText): string {
+  const referenceLabel = useCallback((row: TenantText): string => {
     switch (row.level) {
       case 'tenant':               return '—'
       case 'product':              return productById[row.reference_id ?? '']?.name ?? row.reference_id ?? '?'
@@ -157,7 +157,7 @@ export function CentralTextsPage() {
         // every formula has a backfilled English name row).
         return formulaNameById[row.reference_id ?? ''] ?? row.reference_id ?? '?'
     }
-  }
+  }, [productById, characteristicById, valueById, formulaNameById])
 
   const slotOptions = useMemo(() => {
     const all = new Set<string>()
@@ -178,7 +178,7 @@ export function CentralTextsPage() {
       }
       return true
     })
-  }, [rows, filterLevel, filterLanguage, filterSlot, search, productById, characteristicById, valueById, formulaNameById])
+  }, [rows, filterLevel, filterLanguage, filterSlot, search, referenceLabel])
 
   function patchEdit(id: string, patch: Partial<EditState>) {
     setEdits(prev => {

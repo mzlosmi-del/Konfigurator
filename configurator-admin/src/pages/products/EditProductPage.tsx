@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useParams, Link } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
 import { fetchProduct, updateProduct } from '@/lib/products'
@@ -59,13 +59,15 @@ export function EditProductPage() {
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<Tab>('details')
 
-  useEffect(() => {
+  const load = useCallback(() => {
     if (!id) return
     fetchProduct(id)
       .then(setProduct)
       .catch(() => toast({ title: t('Product not found'), variant: 'destructive' }))
       .finally(() => setLoading(false))
-  }, [id])
+  }, [id, toast])
+
+  useEffect(() => { load() }, [load])
 
   async function handleSaveDetails(values: ProductFormValues) {
     if (!product) return

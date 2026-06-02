@@ -22,7 +22,7 @@ export function LoginPage() {
   // Navigate only once the auth context has actually picked up the session
   useEffect(() => {
     if (session) navigate('/dashboard', { replace: true })
-  }, [session])
+  }, [session, navigate])
 
   const schema = z.object({
     email: z.string().email(t('Enter a valid email')),

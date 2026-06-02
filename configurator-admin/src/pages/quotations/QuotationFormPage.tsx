@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import { useNavigate, useParams, useSearchParams, Link } from 'react-router-dom'
 import { Plus, Trash2, ArrowLeft, Settings2, Inbox, CalendarRange } from 'lucide-react'
 import {
@@ -102,6 +102,11 @@ export function QuotationFormPage() {
   const [detailsCache,      setDetailsCache]      = useState<Record<string, CharacteristicWithValues[]>>({})
   const [rulesCache,        setRulesCache]        = useState<Record<string, ConfigurationRule[]>>({})
   const [formulasCache,     setFormulasCache]     = useState<Record<string, PricingFormula[]>>({})
+  // Stable mirrors of the three caches so `ensureProductData` can read current
+  // values without taking them as deps (which would change its identity on
+  // every fetch and re-trigger the data-loading effects below).
+  const cachesRef = useRef({ details: detailsCache, rules: rulesCache, formulas: formulasCache })
+  cachesRef.current = { details: detailsCache, rules: rulesCache, formulas: formulasCache }
   // Product texts now live in `tenant_texts` and are read directly by the
   // quotation renderer in QuotationDetailPage, so the form no longer caches
   // them here.
@@ -140,7 +145,36 @@ export function QuotationFormPage() {
     fetchProducts()
       .then(ps => setProducts(ps.filter(p => p.status === 'published')))
       .catch(() => toast({ title: t('Failed to load products'), variant: 'destructive' }))
-  }, [])
+  }, [toast])
+
+  // ── Load product details + rules on demand ─────────────────────────────────
+  const ensureProductData = useCallback(async (productId: string) => {
+    if (!productId) return
+    const caches = cachesRef.current
+    const needDetails  = !caches.details[productId]
+    const needRules    = !caches.rules[productId]
+    const needFormulas = !caches.formulas[productId]
+    if (!needDetails && !needRules && !needFormulas) return
+    try {
+      const [details, rulesData, formulasData] = await Promise.all([
+        needDetails  ? fetchProductCharacteristicsWithValues(productId) : Promise.resolve(caches.details[productId]),
+        needRules    ? supabase.from('configuration_rules').select('*').eq('product_id', productId).eq('is_active', true) : Promise.resolve({ data: caches.rules[productId] }),
+        needFormulas ? supabase.from('pricing_formulas').select('*').eq('product_id', productId).eq('is_active', true).order('sort_order') : Promise.resolve({ data: caches.formulas[productId] }),
+      ])
+      // Attach translated names so the quotation snapshot can capture the
+      // formula name in the right language.
+      let formulas = ((formulasData as { data: PricingFormula[] | null }).data ?? []) as PricingFormula[]
+      if (needFormulas && formulas.length > 0) {
+        const nameRows = await fetchFormulaNameTexts(formulas.map(f => f.id))
+        formulas = formulas.map(f => ({ ...f, name_i18n: resolveTextI18n(nameRows, 'pricing_formula', f.id, 'name') }))
+      }
+      setDetailsCache(prev      => ({ ...prev, [productId]: details }))
+      setRulesCache(prev        => ({ ...prev, [productId]: ((rulesData as { data: ConfigurationRule[] | null }).data ?? []) as ConfigurationRule[] }))
+      setFormulasCache(prev     => ({ ...prev, [productId]: formulas }))
+    } catch {
+      toast({ title: t('Failed to load product details'), variant: 'destructive' })
+    }
+  }, [toast])
 
   useEffect(() => {
     if (!isEdit || !id) return
@@ -190,35 +224,7 @@ export function QuotationFormPage() {
       })
       .catch(() => toast({ title: t('Failed to load quotation'), variant: 'destructive' }))
       .finally(() => setPageLoading(false))
-  }, [id])
-
-  // ── Load product details + rules on demand ─────────────────────────────────
-  const ensureProductData = useCallback(async (productId: string) => {
-    if (!productId) return
-    const needDetails  = !detailsCache[productId]
-    const needRules    = !rulesCache[productId]
-    const needFormulas = !formulasCache[productId]
-    if (!needDetails && !needRules && !needFormulas) return
-    try {
-      const [details, rulesData, formulasData] = await Promise.all([
-        needDetails  ? fetchProductCharacteristicsWithValues(productId) : Promise.resolve(detailsCache[productId]),
-        needRules    ? supabase.from('configuration_rules').select('*').eq('product_id', productId).eq('is_active', true) : Promise.resolve({ data: rulesCache[productId] }),
-        needFormulas ? supabase.from('pricing_formulas').select('*').eq('product_id', productId).eq('is_active', true).order('sort_order') : Promise.resolve({ data: formulasCache[productId] }),
-      ])
-      // Attach translated names so the quotation snapshot can capture the
-      // formula name in the right language.
-      let formulas = ((formulasData as { data: PricingFormula[] | null }).data ?? []) as PricingFormula[]
-      if (needFormulas && formulas.length > 0) {
-        const nameRows = await fetchFormulaNameTexts(formulas.map(f => f.id))
-        formulas = formulas.map(f => ({ ...f, name_i18n: resolveTextI18n(nameRows, 'pricing_formula', f.id, 'name') }))
-      }
-      setDetailsCache(prev      => ({ ...prev, [productId]: details }))
-      setRulesCache(prev        => ({ ...prev, [productId]: ((rulesData as { data: ConfigurationRule[] | null }).data ?? []) as ConfigurationRule[] }))
-      setFormulasCache(prev     => ({ ...prev, [productId]: formulas }))
-    } catch {
-      toast({ title: t('Failed to load product details'), variant: 'destructive' })
-    }
-  }, [detailsCache, rulesCache, formulasCache])
+  }, [id, isEdit, navigate, toast, ensureProductData])
 
   // ── Line item helpers ───────────────────────────────────────────────────────
   function addLineItem() {
@@ -305,7 +311,7 @@ export function QuotationFormPage() {
       }
     })()
     return () => { cancelled = true }
-  }, [isEdit, inquiryIdParam])
+  }, [isEdit, inquiryIdParam, ensureProductData, toast])
 
   // ── Price calculation ──────────────────────────────────────────────────────
   function buildFormulaCtx(

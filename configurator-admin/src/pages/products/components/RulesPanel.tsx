@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Plus, Trash2, X } from 'lucide-react'
 import { fetchRules, createRule, deleteRule } from '@/lib/rules'
 import { fetchProductCharacteristicsWithValues } from '@/lib/products'
@@ -57,9 +57,7 @@ export function RulesPanel({ productId }: Props) {
   const [draftEffects,   setDraftEffects]   = useState<RuleEffect[]>([])
   const [saving, setSaving]                 = useState(false)
 
-  useEffect(() => { load() }, [productId])
-
-  async function load() {
+  const load = useCallback(async () => {
     setLoading(true)
     try {
       const [rulesData, charsWithValues] = await Promise.all([
@@ -80,7 +78,9 @@ export function RulesPanel({ productId }: Props) {
     } finally {
       setLoading(false)
     }
-  }
+  }, [productId, toast])
+
+  useEffect(() => { load() }, [load])
 
   async function handleAdd() {
     // Light client-side validation; the rules-engine evaluator tolerates a

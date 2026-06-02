@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Plus, Trash2, Star, StarOff, Upload, Link, ArrowUp, ArrowDown, Network } from 'lucide-react'
 import {
   fetchAssetsForProduct,
@@ -103,15 +103,7 @@ export function VisualizationPanel({ productId, arEnabled = true, onArToggle, ar
   // Mesh names parsed client-side from the selected GLB file before upload
   const [pendingMeshNames, setPendingMeshNames] = useState<string[]>([])
 
-  useEffect(() => {
-    load()
-  }, [productId])
-
-  useEffect(() => {
-    if (assets.some(a => a.asset_type === '3d_model')) loadModelViewer()
-  }, [assets])
-
-  async function load() {
+  const load = useCallback(async () => {
     setLoading(true)
     try {
       const [assetData, charsData] = await Promise.all([
@@ -125,7 +117,15 @@ export function VisualizationPanel({ productId, arEnabled = true, onArToggle, ar
     } finally {
       setLoading(false)
     }
-  }
+  }, [productId, toast])
+
+  useEffect(() => {
+    load()
+  }, [load])
+
+  useEffect(() => {
+    if (assets.some(a => a.asset_type === '3d_model')) loadModelViewer()
+  }, [assets])
 
   const allValues = chars.flatMap(c =>
     c.characteristic_values.map(v => ({

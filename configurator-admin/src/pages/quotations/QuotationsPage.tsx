@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { BarChart2, FileText, Plus, Copy, ExternalLink } from 'lucide-react'
 import { fetchQuotations, duplicateQuotation } from '@/lib/quotations'
@@ -63,9 +63,7 @@ export function QuotationsPage() {
   const [statusFilter, setStatusFilter] = useState<QuotationStatus | 'all'>('all')
   const [quick, setQuick]             = useState<string[]>([])
 
-  useEffect(() => { load() }, [])
-
-  async function load() {
+  const load = useCallback(async () => {
     setLoading(true)
     try {
       setQuotations(await fetchQuotations())
@@ -74,7 +72,9 @@ export function QuotationsPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [toast])
+
+  useEffect(() => { load() }, [load])
 
   async function handleDuplicate(e: React.MouseEvent, sourceId: string) {
     e.stopPropagation()
