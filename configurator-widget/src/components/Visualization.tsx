@@ -166,6 +166,36 @@ function applyMeshRules(
   })
   // eslint-disable-next-line no-console
   console.log(`[viz ${(performance.now() | 0)}] applyMeshRules set`, _dbgVis)
+  forceRender(mv, scene)
+}
+
+// model-viewer renders lazily — mutating node.visible directly does NOT request
+// a repaint, so the change isn't visible until model-viewer next renders for some
+// other reason (auto-rotate kicking in, a texture finishing). Nudge it to render now.
+function forceRender(mv: HTMLElement, scene: ThreeScene | null) {
+  const s = scene as any
+  // ModelScene (THREE.Scene subclass) exposes queueRender(); the element has a
+  // back-reference whose renderer can also be poked.
+  const methods: string[] = []
+  try {
+    if (s && typeof s.queueRender === 'function') { methods.push('scene.queueRender'); s.queueRender() }
+    if (s && s.element && typeof s.element.dispatchEvent === 'function') methods.push('has scene.element')
+    const anyMv = mv as any
+    if (typeof anyMv.dispatchEvent === 'function') { /* no-op probe */ }
+    // Toggling a watched attribute forces model-viewer to re-render.
+    if (anyMv.queueRender && typeof anyMv.queueRender === 'function') { methods.push('mv.queueRender'); anyMv.queueRender() }
+  } catch (e) { /* probe only */ }
+  // Enumerate methods across the prototype chain (queueRender etc. live on protos).
+  const protoMethods = new Set<string>()
+  let o: any = s
+  for (let depth = 0; o && depth < 4; depth++) {
+    for (const k of Object.getOwnPropertyNames(o)) {
+      try { if (typeof o[k] === 'function') protoMethods.add(k) } catch { /* getter */ }
+    }
+    o = Object.getPrototypeOf(o)
+  }
+  // eslint-disable-next-line no-console
+  console.log(`[viz ${(performance.now() | 0)}] forceRender called`, methods, 'sceneMethods', [...protoMethods].filter(m => /render|render|need|queue|update|invalid/i.test(m)))
 }
 
 // Tween dimension + translate rules from current values to targets over `duration` ms.
@@ -499,7 +529,11 @@ function ModelViewer3D({
       console.log(`[viz ${(performance.now() | 0)}] LOAD; opacity=${mv.style.opacity}`)
       applyMeshRules(mv, rules, selectionRef.current, numericInputsRef.current)
       applyTextureRules(mv, rules, selectionRef.current)
+      // forceRender (inside applyMeshRules) requested a repaint; reveal after the
+      // next frame so the rule-applied frame is what gets composited.
       requestAnimationFrame(() => requestAnimationFrame(() => {
+        // eslint-disable-next-line no-console
+        console.log(`[viz ${(performance.now() | 0)}] REVEAL opacity->1`)
         mv.style.opacity = '1'
       }))
       if (arEnabled && hintRef.current) hintRef.current.style.display = 'block'
