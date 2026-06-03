@@ -169,6 +169,77 @@ function DroppableClass({ cls, memberIds, characteristics, onAssign, onRemoveMem
   )
 }
 
+// ─── Numeric bounds editor ───────────────────────────────────────────────────
+// Shown only for `display_type === 'number'` characteristics. Each bound is
+// independently optional (empty input = no bound). Mirrors the DB CHECK from
+// migration 088 with an inline guard so the user gets immediate feedback.
+
+function NumericBoundsEditor({
+  numericMin,
+  numericMax,
+  onSave,
+}: {
+  numericMin: number | null
+  numericMax: number | null
+  onSave: (min: number | null, max: number | null) => void
+}) {
+  const [minStr, setMinStr] = useState(numericMin != null ? String(numericMin) : '')
+  const [maxStr, setMaxStr] = useState(numericMax != null ? String(numericMax) : '')
+  const [error, setError]   = useState<string | null>(null)
+
+  function parseBound(s: string): number | null {
+    const trimmed = s.trim()
+    if (trimmed === '') return null
+    const n = parseFloat(trimmed)
+    return Number.isNaN(n) ? null : n
+  }
+
+  function commit() {
+    const min = parseBound(minStr)
+    const max = parseBound(maxStr)
+    if (min != null && max != null && min > max) {
+      setError(t('Minimum must not be greater than maximum'))
+      return
+    }
+    setError(null)
+    // Normalise the inputs to the parsed values (drops invalid characters).
+    setMinStr(min != null ? String(min) : '')
+    setMaxStr(max != null ? String(max) : '')
+    if (min !== numericMin || max !== numericMax) onSave(min, max)
+  }
+
+  return (
+    <div>
+      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1.5">
+        {t('Allowed range')}
+      </p>
+      <div className="flex items-center gap-2">
+        <Input
+          type="number"
+          className="w-32 h-8"
+          placeholder={t('Minimum')}
+          value={minStr}
+          onChange={e => setMinStr(e.target.value)}
+          onBlur={commit}
+        />
+        <span className="text-muted-foreground text-sm">–</span>
+        <Input
+          type="number"
+          className="w-32 h-8"
+          placeholder={t('Maximum')}
+          value={maxStr}
+          onChange={e => setMaxStr(e.target.value)}
+          onBlur={commit}
+        />
+      </div>
+      {error && <p className="text-xs text-destructive mt-1">{error}</p>}
+      <p className="text-[11px] text-muted-foreground mt-1">
+        {t('Leave a field empty for no limit.')}
+      </p>
+    </div>
+  )
+}
+
 // ─── DraggableChar row ────────────────────────────────────────────────────────
 
 interface DraggableCharProps {
@@ -182,6 +253,7 @@ interface DraggableCharProps {
   onUpdateI18n: (i18n: Record<string, string>) => void
   onUpdateDescriptionI18n: (i18n: Record<string, string>) => void
   onChangeType: (type: Characteristic['display_type']) => void
+  onUpdateBounds: (min: number | null, max: number | null) => void
   onDelete: () => void
   onAssignToClass: (classId: string) => void
   tenantId: string
@@ -199,6 +271,7 @@ function DraggableChar({
   onUpdateI18n,
   onUpdateDescriptionI18n,
   onChangeType,
+  onUpdateBounds,
   onDelete,
   onAssignToClass,
   tenantId,
@@ -352,6 +425,15 @@ function DraggableChar({
               multiline
             />
           </div>
+
+          {/* Numeric bounds — only for number characteristics */}
+          {char.display_type === 'number' && (
+            <NumericBoundsEditor
+              numericMin={char.numeric_min}
+              numericMax={char.numeric_max}
+              onSave={onUpdateBounds}
+            />
+          )}
 
           {/* Values editor */}
           <div>
@@ -543,6 +625,17 @@ export function LibraryPage() {
       setChars(prev => prev.map(c => c.id === char.id ? updated : c))
     } catch {
       toast({ title: t('Failed to update type'), variant: 'destructive' })
+    }
+  }
+
+  async function handleUpdateBounds(char: Characteristic, numeric_min: number | null, numeric_max: number | null) {
+    try {
+      const updated = await updateCharacteristic(char.id, { numeric_min, numeric_max })
+      const diff = computeDiff(char as unknown as Record<string, unknown>, updated as unknown as Record<string, unknown>, CHARACTERISTIC_LABELS)
+      logChange({ entityType: 'characteristic', entityId: updated.id, entityName: updated.name, changeType: 'update', diff, changedByName: userName })
+      setChars(prev => prev.map(c => c.id === char.id ? updated : c))
+    } catch {
+      toast({ title: t('Failed to update allowed range'), variant: 'destructive' })
     }
   }
 
@@ -799,6 +892,7 @@ export function LibraryPage() {
                     onUpdateI18n={i18n => handleUpdateCharI18n(char, i18n)}
                     onUpdateDescriptionI18n={i18n => handleUpdateCharDescriptionI18n(char, i18n)}
                     onChangeType={type => handleChangeType(char, type)}
+                    onUpdateBounds={(min, max) => handleUpdateBounds(char, min, max)}
                     onDelete={() => setToDelete(char)}
                     onAssignToClass={classId => handleAssign(classId, char.id)}
                     tenantId={tenant?.id ?? ''}

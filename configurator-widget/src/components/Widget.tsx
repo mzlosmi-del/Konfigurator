@@ -1,6 +1,7 @@
 import { h } from 'preact'
 import { useState, useEffect, useMemo, useRef } from 'preact/hooks'
 import type { FullProductConfig, Selection, NumericInputs, WidgetConfig, ConfigLineItem } from '../types'
+import { isNumericInRange } from '../types'
 import { loadProductConfig } from '../api'
 import { evaluateRules, calculatePrice, buildOptionBreakdown, sanitizeSelection, applyDefaultValues, applyNumericDefaults } from '../rules'
 import { calculateFormulaTotal, calculateFormulaBreakdown } from '../formulaEngine'
@@ -168,7 +169,11 @@ export function Widget({ config, track, onThemeLoad }: Props) {
   const allSelected = useMemo(() => {
     if (state.phase !== 'ready') return false
     return state.data.characteristics.every(c => {
-      if (c.display_type === 'number') return numericInputs[c.id] !== undefined
+      if (c.display_type === 'number') {
+        const val = numericInputs[c.id]
+        // Must be entered AND within the optional min/max bounds (migration 088).
+        return val !== undefined && isNumericInRange(val, c.numeric_min, c.numeric_max)
+      }
       // Boolean characteristics are always optional — leaving the box
       // unchecked must not block submission.
       if (c.display_type === 'boolean') return true

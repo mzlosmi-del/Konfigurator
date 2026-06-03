@@ -18,6 +18,8 @@ export const CHARACTERISTIC_LABELS: Record<string, string> = {
   display_type: 'Display type',
   required:     'Required',
   sort_order:   'Sort order',
+  numeric_min:  'Minimum value',
+  numeric_max:  'Maximum value',
 }
 
 export const CHARACTERISTIC_VALUE_LABELS: Record<string, string> = {

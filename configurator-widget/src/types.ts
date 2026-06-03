@@ -45,6 +45,22 @@ export interface Characteristic {
   display_type: 'select' | 'radio' | 'swatch' | 'toggle' | 'number' | 'boolean'
   sort_order: number
   values: CharacteristicValue[]
+  /** Optional bounds for 'number' characteristics (migration 088). */
+  numeric_min?: number | null
+  numeric_max?: number | null
+}
+
+/** True when `value` satisfies the optional min/max bounds. A null/undefined
+ *  bound is treated as "no limit". Shared by CharacteristicInput (inline error)
+ *  and Widget (submission gate). */
+export function isNumericInRange(
+  value: number,
+  min: number | null | undefined,
+  max: number | null | undefined,
+): boolean {
+  if (min != null && value < min) return false
+  if (max != null && value > max) return false
+  return true
 }
 
 export type MeshVisibilityRule = {
