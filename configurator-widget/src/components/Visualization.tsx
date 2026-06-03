@@ -119,12 +119,16 @@ function applyMeshRules(
   numericInputs: NumericInputs,
 ) {
   const scene = findScene(mv)
+  // eslint-disable-next-line no-console
+  console.log('[viz] applyMeshRules', { sceneFound: !!scene, selection: { ...selection } })
   if (!scene) return
 
   const selectedValueIds = new Set(Object.values(selection))
   const meshesWithRules = new Set(
     rules.filter(r => r.type === 'visibility').map(r => r.mesh_name),
   )
+  // eslint-disable-next-line no-console
+  const _vizDecisions: Record<string, boolean> = {}
 
   scene.traverse((node: unknown) => {
     const n = node as {
@@ -138,6 +142,7 @@ function applyMeshRules(
     if (meshesWithRules.has(n.name)) {
       const matching = rules.filter(r => r.type === 'visibility' && r.mesh_name === n.name)
       n.visible = matching.some(r => selectedValueIds.has(r.value_id))
+      _vizDecisions[n.name] = !!n.visible
     }
 
     for (const rule of rules) {
@@ -162,6 +167,8 @@ function applyMeshRules(
       }
     }
   })
+  // eslint-disable-next-line no-console
+  console.log('[viz] applyMeshRules decisions', _vizDecisions)
 }
 
 // Tween dimension + translate rules from current values to targets over `duration` ms.
@@ -491,6 +498,8 @@ function ModelViewer3D({
     mv.addEventListener('load', () => {
       loadedRef.current = true
       prevSelectionRef.current = { ...selectionRef.current }
+      // eslint-disable-next-line no-console
+      console.log('[viz] LOAD fired', { url, selectionAtLoad: { ...selectionRef.current } })
       applyMeshRules(mv, rules, selectionRef.current, numericInputsRef.current)
       applyTextureRules(mv, rules, selectionRef.current)
       // Reveal now that the starting combination is in place (applyMeshRules is
@@ -575,6 +584,8 @@ function ModelViewer3D({
 
   // Visibility + texture update on discrete selection change (instant)
   useEffect(() => {
+    // eslint-disable-next-line no-console
+    console.log('[viz] visibility EFFECT', { loaded: loadedRef.current, hasMv: !!mvRef.current, selection: { ...selection } })
     if (!mvRef.current || !loadedRef.current) return
     applyVisibilityRules(mvRef.current, rules, selection)
     applyTextureRules(mvRef.current, rules, selection)
@@ -726,6 +737,9 @@ export function Visualization({ assets, selection, previewSelection, numericInpu
   const url3d  = resolve3DAsset(assets, selection3d)
   const urlImg = resolveImage(assets, selection)
   const [failed, setFailed] = useState(false)
+
+  // eslint-disable-next-line no-console
+  console.log('[viz] render', { url3d, selection3d: { ...selection3d }, selection: { ...selection } })
 
   useEffect(() => { setFailed(false) }, [urlImg])
   useEffect(() => { if (url3d) loadModelViewer() }, [url3d])
