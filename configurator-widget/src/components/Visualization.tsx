@@ -66,6 +66,7 @@ function applyVisibilityRules(
     const matching = rules.filter(r => r.type === 'visibility' && r.mesh_name === n.name)
     n.visible = matching.some(r => selectedValueIds.has(r.value_id))
   })
+  forceRender(scene)
 }
 
 // Apply texture rules via model-viewer Materials API (async, best-effort).
@@ -125,7 +126,6 @@ function applyMeshRules(
   const meshesWithRules = new Set(
     rules.filter(r => r.type === 'visibility').map(r => r.mesh_name),
   )
-  const _dbgVis: Record<string, boolean> = {}
 
   scene.traverse((node: unknown) => {
     const n = node as {
@@ -139,7 +139,6 @@ function applyMeshRules(
     if (meshesWithRules.has(n.name)) {
       const matching = rules.filter(r => r.type === 'visibility' && r.mesh_name === n.name)
       n.visible = matching.some(r => selectedValueIds.has(r.value_id))
-      _dbgVis[n.name] = !!n.visible
     }
 
     for (const rule of rules) {
@@ -164,38 +163,18 @@ function applyMeshRules(
       }
     }
   })
-  // eslint-disable-next-line no-console
-  console.log(`[viz ${(performance.now() | 0)}] applyMeshRules set`, _dbgVis)
-  forceRender(mv, scene)
+  forceRender(scene)
 }
 
-// model-viewer renders lazily — mutating node.visible directly does NOT request
-// a repaint, so the change isn't visible until model-viewer next renders for some
-// other reason (auto-rotate kicking in, a texture finishing). Nudge it to render now.
-function forceRender(mv: HTMLElement, scene: ThreeScene | null) {
-  const s = scene as any
-  // ModelScene (THREE.Scene subclass) exposes queueRender(); the element has a
-  // back-reference whose renderer can also be poked.
-  const methods: string[] = []
-  try {
-    if (s && typeof s.queueRender === 'function') { methods.push('scene.queueRender'); s.queueRender() }
-    if (s && s.element && typeof s.element.dispatchEvent === 'function') methods.push('has scene.element')
-    const anyMv = mv as any
-    if (typeof anyMv.dispatchEvent === 'function') { /* no-op probe */ }
-    // Toggling a watched attribute forces model-viewer to re-render.
-    if (anyMv.queueRender && typeof anyMv.queueRender === 'function') { methods.push('mv.queueRender'); anyMv.queueRender() }
-  } catch (e) { /* probe only */ }
-  // Enumerate methods across the prototype chain (queueRender etc. live on protos).
-  const protoMethods = new Set<string>()
-  let o: any = s
-  for (let depth = 0; o && depth < 4; depth++) {
-    for (const k of Object.getOwnPropertyNames(o)) {
-      try { if (typeof o[k] === 'function') protoMethods.add(k) } catch { /* getter */ }
-    }
-    o = Object.getPrototypeOf(o)
-  }
-  // eslint-disable-next-line no-console
-  console.log(`[viz ${(performance.now() | 0)}] forceRender called`, methods, 'sceneMethods', [...protoMethods].filter(m => /render|render|need|queue|update|invalid/i.test(m)))
+// model-viewer renders lazily — mutating node.visible directly does NOT request a
+// repaint, so the change stays invisible until model-viewer next renders for some
+// other reason (auto-rotate kicking in, a texture finishing) which can be a second
+// or two later. On first load that meant the unconfigured all-meshes-visible model
+// stayed on screen until then. The ModelScene (a THREE.Scene subclass) exposes
+// queueRender() to request an immediate frame; call it after mutating the scene.
+function forceRender(scene: ThreeScene | null) {
+  const s = scene as { queueRender?: () => void } | null
+  if (s && typeof s.queueRender === 'function') s.queueRender()
 }
 
 // Tween dimension + translate rules from current values to targets over `duration` ms.
@@ -525,34 +504,15 @@ function ModelViewer3D({
     mv.addEventListener('load', () => {
       loadedRef.current = true
       prevSelectionRef.current = { ...selectionRef.current }
-      // eslint-disable-next-line no-console
-      console.log(`[viz ${(performance.now() | 0)}] LOAD; opacity=${mv.style.opacity}`)
       applyMeshRules(mv, rules, selectionRef.current, numericInputsRef.current)
       applyTextureRules(mv, rules, selectionRef.current)
-      // forceRender (inside applyMeshRules) requested a repaint; reveal after the
-      // next frame so the rule-applied frame is what gets composited.
+      // applyMeshRules calls queueRender() to repaint the rule-applied scene.
+      // Reveal after the next frame so that configured frame — not the raw
+      // all-meshes-visible one — is what the customer first sees.
       requestAnimationFrame(() => requestAnimationFrame(() => {
-        // eslint-disable-next-line no-console
-        console.log(`[viz ${(performance.now() | 0)}] REVEAL opacity->1`)
         mv.style.opacity = '1'
       }))
       if (arEnabled && hintRef.current) hintRef.current.style.display = 'block'
-
-      // DEBUG: re-check whether model-viewer resets our visibility after load.
-      for (const ms of [100, 500, 1000, 1500, 2000]) {
-        setTimeout(() => {
-          const scene = findScene(mv)
-          if (!scene) return
-          const snapshot: Record<string, boolean> = {}
-          const ruled = new Set(rules.filter(r => r.type === 'visibility').map(r => r.mesh_name))
-          scene.traverse((node: unknown) => {
-            const n = node as { name?: string; visible?: boolean }
-            if (n.name && ruled.has(n.name)) snapshot[n.name] = !!n.visible
-          })
-          // eslint-disable-next-line no-console
-          console.log(`[viz ${(performance.now() | 0)}] +${ms}ms visibility`, snapshot)
-        }, ms)
-      }
 
       const clips = ((mv as any).availableAnimations ?? []) as string[]
       setAnimations(clips)
@@ -631,8 +591,6 @@ function ModelViewer3D({
 
   // Visibility + texture update on discrete selection change (instant)
   useEffect(() => {
-    // eslint-disable-next-line no-console
-    console.log(`[viz ${(performance.now() | 0)}] vis EFFECT loaded=${loadedRef.current} sel=${Object.values(selection).join(',')}`)
     if (!mvRef.current || !loadedRef.current) return
     applyVisibilityRules(mvRef.current, rules, selection)
     applyTextureRules(mvRef.current, rules, selection)
