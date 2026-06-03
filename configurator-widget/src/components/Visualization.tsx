@@ -125,6 +125,7 @@ function applyMeshRules(
   const meshesWithRules = new Set(
     rules.filter(r => r.type === 'visibility').map(r => r.mesh_name),
   )
+  const _dbgVis: Record<string, boolean> = {}
 
   scene.traverse((node: unknown) => {
     const n = node as {
@@ -138,6 +139,7 @@ function applyMeshRules(
     if (meshesWithRules.has(n.name)) {
       const matching = rules.filter(r => r.type === 'visibility' && r.mesh_name === n.name)
       n.visible = matching.some(r => selectedValueIds.has(r.value_id))
+      _dbgVis[n.name] = !!n.visible
     }
 
     for (const rule of rules) {
@@ -162,6 +164,8 @@ function applyMeshRules(
       }
     }
   })
+  // eslint-disable-next-line no-console
+  console.log(`[viz ${(performance.now() | 0)}] applyMeshRules set`, _dbgVis)
 }
 
 // Tween dimension + translate rules from current values to targets over `duration` ms.
@@ -491,18 +495,30 @@ function ModelViewer3D({
     mv.addEventListener('load', () => {
       loadedRef.current = true
       prevSelectionRef.current = { ...selectionRef.current }
+      // eslint-disable-next-line no-console
+      console.log(`[viz ${(performance.now() | 0)}] LOAD; opacity=${mv.style.opacity}`)
       applyMeshRules(mv, rules, selectionRef.current, numericInputsRef.current)
       applyTextureRules(mv, rules, selectionRef.current)
-      // applyMeshRules sets node.visible synchronously, but model-viewer only
-      // paints that change on its NEXT render frame. Revealing in the same tick
-      // would composite the already-rendered all-meshes-visible frame, so the
-      // customer would see the unconfigured model flash and then snap to the
-      // starting combination. Defer the reveal two frames: one for model-viewer
-      // to render the rule-applied scene, one to ensure that frame is painted.
       requestAnimationFrame(() => requestAnimationFrame(() => {
         mv.style.opacity = '1'
       }))
       if (arEnabled && hintRef.current) hintRef.current.style.display = 'block'
+
+      // DEBUG: re-check whether model-viewer resets our visibility after load.
+      for (const ms of [100, 500, 1000, 1500, 2000]) {
+        setTimeout(() => {
+          const scene = findScene(mv)
+          if (!scene) return
+          const snapshot: Record<string, boolean> = {}
+          const ruled = new Set(rules.filter(r => r.type === 'visibility').map(r => r.mesh_name))
+          scene.traverse((node: unknown) => {
+            const n = node as { name?: string; visible?: boolean }
+            if (n.name && ruled.has(n.name)) snapshot[n.name] = !!n.visible
+          })
+          // eslint-disable-next-line no-console
+          console.log(`[viz ${(performance.now() | 0)}] +${ms}ms visibility`, snapshot)
+        }, ms)
+      }
 
       const clips = ((mv as any).availableAnimations ?? []) as string[]
       setAnimations(clips)
@@ -581,6 +597,8 @@ function ModelViewer3D({
 
   // Visibility + texture update on discrete selection change (instant)
   useEffect(() => {
+    // eslint-disable-next-line no-console
+    console.log(`[viz ${(performance.now() | 0)}] vis EFFECT loaded=${loadedRef.current} sel=${Object.values(selection).join(',')}`)
     if (!mvRef.current || !loadedRef.current) return
     applyVisibilityRules(mvRef.current, rules, selection)
     applyTextureRules(mvRef.current, rules, selection)
