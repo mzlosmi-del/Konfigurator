@@ -456,6 +456,10 @@ function ModelViewer3D({
     mv.setAttribute('environment-image', 'neutral')
     mv.style.width  = '100%'
     mv.style.height = '100%'
+    // Stay hidden until the 'load' handler has applied the starting combination,
+    // so the customer never sees the raw/unconfigured model snap into place.
+    mv.style.opacity    = '0'
+    mv.style.transition = 'opacity 120ms ease'
 
     if (arEnabled) {
       mv.setAttribute('ar', '')
@@ -489,6 +493,9 @@ function ModelViewer3D({
       prevSelectionRef.current = { ...selectionRef.current }
       applyMeshRules(mv, rules, selectionRef.current, numericInputsRef.current)
       applyTextureRules(mv, rules, selectionRef.current)
+      // Reveal now that the starting combination is in place (applyMeshRules is
+      // synchronous, so mesh visibility is already correct here).
+      mv.style.opacity = '1'
       if (arEnabled && hintRef.current) hintRef.current.style.display = 'block'
 
       const clips = ((mv as any).availableAnimations ?? []) as string[]
