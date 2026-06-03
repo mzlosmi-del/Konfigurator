@@ -124,11 +124,18 @@ function applyMeshRules(
   if (!scene) return
 
   const selectedValueIds = new Set(Object.values(selection))
-  const meshesWithRules = new Set(
-    rules.filter(r => r.type === 'visibility').map(r => r.mesh_name),
-  )
+  const visRules = rules.filter(r => r.type === 'visibility')
+  const meshesWithRules = new Set(visRules.map(r => r.mesh_name))
   // eslint-disable-next-line no-console
   const _vizDecisions: Record<string, boolean> = {}
+  const _sceneNodeNames: string[] = []
+  // eslint-disable-next-line no-console
+  console.log('[viz] rule mesh_names', {
+    count: visRules.length,
+    meshNames: [...meshesWithRules],
+    selectedValueIds: [...selectedValueIds],
+    rules: visRules.map(r => ({ mesh_name: r.mesh_name, value_id: r.value_id })),
+  })
 
   scene.traverse((node: unknown) => {
     const n = node as {
@@ -138,6 +145,7 @@ function applyMeshRules(
       position?: { x: number; y: number; z: number }
     }
     if (!n.name) return
+    _sceneNodeNames.push(n.name)
 
     if (meshesWithRules.has(n.name)) {
       const matching = rules.filter(r => r.type === 'visibility' && r.mesh_name === n.name)
@@ -169,6 +177,8 @@ function applyMeshRules(
   })
   // eslint-disable-next-line no-console
   console.log('[viz] applyMeshRules decisions', _vizDecisions)
+  // eslint-disable-next-line no-console
+  console.log('[viz] scene node names', _sceneNodeNames)
 }
 
 // Tween dimension + translate rules from current values to targets over `duration` ms.
