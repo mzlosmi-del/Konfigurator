@@ -119,23 +119,12 @@ function applyMeshRules(
   numericInputs: NumericInputs,
 ) {
   const scene = findScene(mv)
-  // eslint-disable-next-line no-console
-  console.log('[viz] applyMeshRules', { sceneFound: !!scene, selection: { ...selection } })
   if (!scene) return
 
   const selectedValueIds = new Set(Object.values(selection))
-  const visRules = rules.filter(r => r.type === 'visibility')
-  const meshesWithRules = new Set(visRules.map(r => r.mesh_name))
-  // eslint-disable-next-line no-console
-  const _vizDecisions: Record<string, boolean> = {}
-  const _sceneNodeNames: string[] = []
-  // eslint-disable-next-line no-console
-  console.log('[viz] rule mesh_names', {
-    count: visRules.length,
-    meshNames: [...meshesWithRules],
-    selectedValueIds: [...selectedValueIds],
-    rules: visRules.map(r => ({ mesh_name: r.mesh_name, value_id: r.value_id })),
-  })
+  const meshesWithRules = new Set(
+    rules.filter(r => r.type === 'visibility').map(r => r.mesh_name),
+  )
 
   scene.traverse((node: unknown) => {
     const n = node as {
@@ -145,12 +134,10 @@ function applyMeshRules(
       position?: { x: number; y: number; z: number }
     }
     if (!n.name) return
-    _sceneNodeNames.push(n.name)
 
     if (meshesWithRules.has(n.name)) {
       const matching = rules.filter(r => r.type === 'visibility' && r.mesh_name === n.name)
       n.visible = matching.some(r => selectedValueIds.has(r.value_id))
-      _vizDecisions[n.name] = !!n.visible
     }
 
     for (const rule of rules) {
@@ -175,10 +162,6 @@ function applyMeshRules(
       }
     }
   })
-  // eslint-disable-next-line no-console
-  console.log('[viz] applyMeshRules decisions', _vizDecisions)
-  // eslint-disable-next-line no-console
-  console.log('[viz] scene node names', _sceneNodeNames)
 }
 
 // Tween dimension + translate rules from current values to targets over `duration` ms.
@@ -508,13 +491,17 @@ function ModelViewer3D({
     mv.addEventListener('load', () => {
       loadedRef.current = true
       prevSelectionRef.current = { ...selectionRef.current }
-      // eslint-disable-next-line no-console
-      console.log('[viz] LOAD fired', { url, selectionAtLoad: { ...selectionRef.current } })
       applyMeshRules(mv, rules, selectionRef.current, numericInputsRef.current)
       applyTextureRules(mv, rules, selectionRef.current)
-      // Reveal now that the starting combination is in place (applyMeshRules is
-      // synchronous, so mesh visibility is already correct here).
-      mv.style.opacity = '1'
+      // applyMeshRules sets node.visible synchronously, but model-viewer only
+      // paints that change on its NEXT render frame. Revealing in the same tick
+      // would composite the already-rendered all-meshes-visible frame, so the
+      // customer would see the unconfigured model flash and then snap to the
+      // starting combination. Defer the reveal two frames: one for model-viewer
+      // to render the rule-applied scene, one to ensure that frame is painted.
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        mv.style.opacity = '1'
+      }))
       if (arEnabled && hintRef.current) hintRef.current.style.display = 'block'
 
       const clips = ((mv as any).availableAnimations ?? []) as string[]
@@ -594,8 +581,6 @@ function ModelViewer3D({
 
   // Visibility + texture update on discrete selection change (instant)
   useEffect(() => {
-    // eslint-disable-next-line no-console
-    console.log('[viz] visibility EFFECT', { loaded: loadedRef.current, hasMv: !!mvRef.current, selection: { ...selection } })
     if (!mvRef.current || !loadedRef.current) return
     applyVisibilityRules(mvRef.current, rules, selection)
     applyTextureRules(mvRef.current, rules, selection)
@@ -747,9 +732,6 @@ export function Visualization({ assets, selection, previewSelection, numericInpu
   const url3d  = resolve3DAsset(assets, selection3d)
   const urlImg = resolveImage(assets, selection)
   const [failed, setFailed] = useState(false)
-
-  // eslint-disable-next-line no-console
-  console.log('[viz] render', { url3d, selection3d: { ...selection3d }, selection: { ...selection } })
 
   useEffect(() => { setFailed(false) }, [urlImg])
   useEffect(() => { if (url3d) loadModelViewer() }, [url3d])
