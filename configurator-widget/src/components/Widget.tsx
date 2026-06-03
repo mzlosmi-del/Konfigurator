@@ -270,11 +270,17 @@ export function Widget({ config, track, onThemeLoad }: Props) {
   // sort order — so the model renders whole on first paint. This never feeds
   // price, the form, or the "all selected" gate; it's purely what the 3D
   // viewer shows. Real selections always take precedence.
+  //
+  // Boolean characteristics are excluded: an unchecked boolean is a deliberate
+  // "off" state, not an unset value awaiting a default. Auto-filling it would
+  // pin its value into previewSelection permanently, so toggling the checkbox
+  // would never change the model.
   const previewSelection = useMemo<Selection>(() => {
     if (state.phase !== 'ready') return selection
     const next: Selection = { ...selection }
     for (const char of characteristics) {
       if (char.display_type === 'number') continue
+      if (char.display_type === 'boolean') continue
       if (next[char.id]) continue
       const ruleDefault = ruleEffect.defaultValues[char.id]
       const fallback = char.values[0]?.id   // values arrive sorted by sort_order
