@@ -100,7 +100,7 @@ export async function loadProductConfig(config: WidgetConfig): Promise<FullProdu
   // a default visualization asset with no configurable characteristics.
   const [charResult, valuesResult, assetsResult, rulesResult, formulasResult] = await Promise.all([
     characteristicIds.length > 0
-      ? sb.from('characteristics').select('id, name, display_type, sort_order').in('id', characteristicIds)
+      ? sb.from('characteristics').select('id, name, display_type, sort_order, numeric_min, numeric_max').in('id', characteristicIds)
       : Promise.resolve({ data: [], error: null }),
     characteristicIds.length > 0
       ? sb.from('characteristic_values')

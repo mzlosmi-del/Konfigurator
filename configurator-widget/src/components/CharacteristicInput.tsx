@@ -1,7 +1,8 @@
 import { h } from 'preact'
 import type { Characteristic, CharacteristicValue, NumericInputs } from '../types'
+import { isNumericInRange } from '../types'
 import type { RuleEffect } from '../rules'
-import { t, tSelect, pickTranslation, type Lang } from '../i18n'
+import { t, tSelect, tNumericRange, pickTranslation, type Lang } from '../i18n'
 
 interface Props {
   characteristic: Characteristic
@@ -47,13 +48,22 @@ export function CharacteristicInput({
     const displayValue    = isNumericLocked
       ? ruleEffect.lockedNumericValues[id]
       : (numericInputs[id] ?? '')
+    const { numeric_min, numeric_max } = characteristic
+    // Out-of-range only matters once the customer has actually entered a value
+    // (and the field isn't rule-locked, which is admin-controlled).
+    const currentVal = numericInputs[id]
+    const outOfRange = !isNumericLocked
+      && currentVal !== undefined
+      && !isNumericInRange(currentVal, numeric_min, numeric_max)
     return (
       <div>
         <div class="cw-char-label">{charName}</div>
         <input
           type="number"
-          class={`cw-number-input${(isLocked || isNumericLocked) ? ' locked' : ''}`}
+          class={`cw-number-input${(isLocked || isNumericLocked) ? ' locked' : ''}${outOfRange ? ' error' : ''}`}
           value={displayValue}
+          min={numeric_min ?? undefined}
+          max={numeric_max ?? undefined}
           disabled={isLocked || isNumericLocked}
           onInput={(e) => {
             const val = parseFloat((e.target as HTMLInputElement).value)
@@ -61,6 +71,9 @@ export function CharacteristicInput({
           }}
         />
         {(isLocked || isNumericLocked) && <span class="cw-locked-badge">{t('Auto-set')}</span>}
+        {outOfRange && (
+          <div class="cw-number-error">{tNumericRange(numeric_min, numeric_max)}</div>
+        )}
       </div>
     )
   }

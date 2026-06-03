@@ -38,6 +38,19 @@ const sr: Record<string, string> = {
   'Product visualization':                 'Vizualizacija proizvoda',
 }
 
+// Numeric bounds validation message. Built here (not as a flat key) because it
+// interpolates the min/max values. Mirrors `isNumericInRange` in types.ts.
+export function tNumericRange(min: number | null | undefined, max: number | null | undefined): string {
+  const en = _lang === 'en'
+  if (min != null && max != null) {
+    return en ? `Value must be between ${min} and ${max}` : `Vrednost mora biti između ${min} i ${max}`
+  }
+  if (min != null) {
+    return en ? `Value must be at least ${min}` : `Vrednost mora biti najmanje ${min}`
+  }
+  return en ? `Value must be at most ${max}` : `Vrednost mora biti najviše ${max}`
+}
+
 // Widget *user* languages that are actually translated and selectable today.
 export const LANGS = ['en', 'sr'] as const
 export type Lang = typeof LANGS[number]

@@ -403,6 +403,9 @@ export const WIDGET_STYLES = `
   .cw-number-input:hover { border-color: var(--cw-text); }
   .cw-number-input:focus { outline: none; border-color: var(--cw-text); box-shadow: 0 0 0 3px var(--cw-surface-alt); }
   .cw-number-input.locked { background: var(--cw-surface); color: var(--cw-text-muted); cursor: not-allowed; }
+  .cw-number-input.error { border-color: #dc2626; }
+  .cw-number-input.error:focus { border-color: #dc2626; box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.12); }
+  .cw-number-error { margin-top: 4px; font-size: 12px; color: #dc2626; }
 
   /* Locked value display */
   .cw-locked-value {

@@ -274,6 +274,9 @@ export interface Database {
           name: string
           display_type: DisplayType
           sort_order: number
+          /** Optional bounds for `display_type = 'number'` characteristics (migration 088). */
+          numeric_min: number | null
+          numeric_max: number | null
           /** In-memory translations populated from `tenant_texts`. */
           name_i18n?:        Record<string, string>
           description_i18n?: Record<string, string>
