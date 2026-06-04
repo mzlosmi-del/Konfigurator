@@ -313,6 +313,9 @@ const sr: Record<string, string> = {
 
   // Rules panel
   'Rule added':                            'Pravilo dodato',
+  'Rule updated':                          'Pravilo ažurirano',
+  'Failed to update rule':                 'Ažuriranje pravila nije uspelo',
+  'Edit rule':                             'Izmeni pravilo',
   'No rules yet. Add one below.':          'Nema još pravila. Dodajte jedno ispod.',
   'Hide value':                            'Sakrij vrednost',
   'Disable value':                         'Onemogući vrednost',
@@ -1926,6 +1929,9 @@ const de: Record<string, string> = {
   'Conditional':                           'Bedingung',
   'Base':                                  'Basis',
   'Rule added':                            'Regel hinzugefügt',
+  'Rule updated':                          'Regel aktualisiert',
+  'Failed to update rule':                 'Aktualisierung der Regel fehlgeschlagen',
+  'Edit rule':                             'Regel bearbeiten',
   'No rules yet. Add one below.':          'Noch keine Regeln. Fügen Sie unten eine hinzu.',
   'Hide value':                            'Wert ausblenden',
   'Disable value':                         'Wert deaktivieren',
