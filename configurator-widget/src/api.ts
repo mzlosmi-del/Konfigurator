@@ -9,8 +9,10 @@ import type {
   PricingFormula,
   InquiryPayload,
   WidgetConfig,
+  CharacteristicGroup,
 } from './types'
 import { applyCharacteristicOrder, type CharOrderRow } from './charOrder'
+import { buildCharacteristicGroups, type ClassMeta, type ClassMemberRow } from './charGroups'
 
 export function createSupabaseClient(config: WidgetConfig) {
   return createClient(config.supabaseUrl, config.supabaseAnonKey, {
@@ -47,7 +49,7 @@ export async function loadProductConfig(config: WidgetConfig): Promise<FullProdu
   //    rebuilt below from `tenant_texts`.
   const { data: product, error: productError } = await sb
     .from('products')
-    .select('id, name, description, base_price, currency, ar_enabled, ar_placement, form_config, widget_theme, show_price_breakdown, preview_defaults')
+    .select('id, name, description, base_price, currency, ar_enabled, ar_placement, form_config, widget_theme, show_price_breakdown, group_into_tabs, preview_defaults')
     .eq('id', config.productId)
     .eq('status', 'published')
     .single()
@@ -114,7 +116,7 @@ export async function loadProductConfig(config: WidgetConfig): Promise<FullProdu
   // Load assets, rules and formulas in parallel with characteristic data.
   // Do NOT return early when characteristicIds is empty — a product may have
   // a default visualization asset with no configurable characteristics.
-  const [charResult, valuesResult, assetsResult, rulesResult, formulasResult] = await Promise.all([
+  const [charResult, valuesResult, assetsResult, rulesResult, formulasResult, classesResult] = await Promise.all([
     characteristicIds.length > 0
       ? sb.from('characteristics').select('id, name, display_type, sort_order, numeric_min, numeric_max').in('id', characteristicIds)
       : Promise.resolve({ data: [], error: null }),
@@ -137,6 +139,12 @@ export async function loadProductConfig(config: WidgetConfig): Promise<FullProdu
       .eq('product_id', config.productId)
       .eq('is_active', true)
       .order('sort_order', { ascending: true }),
+    // Class names + translations for the characteristic tabs. `name_i18n` is a
+    // JSONB column still present on this table (migration 078 deliberately kept
+    // it, unlike other entities whose i18n moved to tenant_texts).
+    classIds.length > 0
+      ? sb.from('characteristic_classes').select('id, name, name_i18n').in('id', classIds)
+      : Promise.resolve({ data: [], error: null }),
   ])
 
   if (charResult.error) throw new Error('Failed to load characteristic details')
@@ -144,6 +152,7 @@ export async function loadProductConfig(config: WidgetConfig): Promise<FullProdu
   if (assetsResult.error) throw new Error('Failed to load visualization assets')
   if (rulesResult.error) throw new Error('Failed to load rules')
   if (formulasResult.error) throw new Error('Failed to load pricing formulas')
+  if (classesResult.error) throw new Error('Failed to load characteristic classes')
 
   const charData     = charResult.data
   const valuesData   = valuesResult.data
@@ -232,6 +241,30 @@ export async function loadProductConfig(config: WidgetConfig): Promise<FullProdu
     .filter(id => charById[id])
     .map(id => ({ ...charById[id], values: valuesByCharId[id] ?? [] }))
 
+  // Per-class grouping for the widget tabs. Built from the same class/member
+  // data as the flat order above, partitioned per class instead of flattened.
+  // The flat `characteristics` array stays the source of truth for pricing,
+  // selection, preview and the completion gate — `groups` is purely a view.
+  const classNameById: Record<string, { name: string; name_i18n?: Record<string, string> }> = {}
+  for (const c of (classesResult.data ?? []) as Array<{ id: string; name: string; name_i18n: Record<string, string> | null }>) {
+    classNameById[c.id] = { name: c.name, name_i18n: c.name_i18n ?? undefined }
+  }
+  const classMetas: ClassMeta[] = (productClasses ?? []).map((pc: any) => ({
+    id:         pc.class_id,
+    sort_order: pc.sort_order,
+    name:       classNameById[pc.class_id]?.name ?? '',
+    name_i18n:  classNameById[pc.class_id]?.name_i18n,
+  }))
+  const groups: CharacteristicGroup[] = buildCharacteristicGroups(
+    classMetas,
+    (members ?? []) as ClassMemberRow[],
+    (orderOverrides ?? []) as CharOrderRow[],
+  )
+    // Drop ids that didn't resolve to a published characteristic, then any group
+    // left empty — mirrors the `.filter(id => charById[id])` guard above.
+    .map(g => ({ ...g, characteristicIds: g.characteristicIds.filter(id => charById[id]) }))
+    .filter(g => g.characteristicIds.length > 0)
+
   // Load branding flag (tenant post-inquiry message comes from textRows).
   const brandingResult = await sb.rpc('get_widget_branding', { p_product_id: config.productId })
 
@@ -256,6 +289,7 @@ export async function loadProductConfig(config: WidgetConfig): Promise<FullProdu
   return {
     product: enrichedProduct,
     characteristics,
+    groups,
     assets:    (assetsData    ?? []) as VisualizationAsset[],
     rules:     (rulesData     ?? []) as ConfigurationRule[],
     formulas:  ((formulasData ?? []) as PricingFormula[]).map(f => ({

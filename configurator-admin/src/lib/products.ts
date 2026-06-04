@@ -99,7 +99,7 @@ export async function fetchProduct(id: string): Promise<Product> {
 
 export async function createProduct(
   input: Pick<Product, 'name' | 'description' | 'base_price' | 'currency'>
-    & { sku?: string | null; unit_of_measure?: string | null; show_price_breakdown?: boolean }
+    & { sku?: string | null; unit_of_measure?: string | null; show_price_breakdown?: boolean; group_into_tabs?: boolean }
 ): Promise<Product> {
   // i18n maps no longer go through this call — they are persisted in
   // tenant_texts via `setEntityI18nText` from the inline editors.
@@ -127,7 +127,7 @@ export async function updateProduct(
   id: string,
   /** i18n maps are stored in `tenant_texts` (see `setEntityI18nText`). This
    *  function only persists the scalar product columns. */
-  input: Partial<Pick<Product, 'name' | 'description' | 'base_price' | 'currency' | 'status' | 'sku' | 'unit_of_measure' | 'ar_enabled' | 'ar_placement' | 'form_config' | 'public_preview_enabled' | 'show_price_breakdown' | 'preview_defaults'>>
+  input: Partial<Pick<Product, 'name' | 'description' | 'base_price' | 'currency' | 'status' | 'sku' | 'unit_of_measure' | 'ar_enabled' | 'ar_placement' | 'form_config' | 'public_preview_enabled' | 'show_price_breakdown' | 'group_into_tabs' | 'preview_defaults'>>
 ): Promise<Product> {
   // Strip any stray i18n keys callers might still pass in during the
   // deprecation window — Postgres will reject them now that 078 dropped

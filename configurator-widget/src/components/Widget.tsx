@@ -1,6 +1,6 @@
 import { h } from 'preact'
 import { useState, useEffect, useMemo, useRef } from 'preact/hooks'
-import type { FullProductConfig, Selection, NumericInputs, WidgetConfig, ConfigLineItem } from '../types'
+import type { FullProductConfig, Selection, NumericInputs, WidgetConfig, ConfigLineItem, Characteristic } from '../types'
 import { isNumericInRange } from '../types'
 import { loadProductConfig } from '../api'
 import { evaluateRules, calculatePrice, buildOptionBreakdown, sanitizeSelection, applyDefaultValues, applyNumericDefaults } from '../rules'
@@ -27,6 +27,7 @@ export function Widget({ config, track, onThemeLoad }: Props) {
   const [selection, setSelection] = useState<Selection>({})
   const [numericInputs, setNumericInputs] = useState<NumericInputs>({})
   const [showForm, setShowForm] = useState(false)
+  const [activeTab, setActiveTab] = useState(0)
   const [lang, setLangState] = useState<Lang>(getLang())
   const prevDefaultsRef        = useRef<Record<string, string>>({})
   const prevNumericDefaultsRef = useRef<Record<string, number>>({})
@@ -41,6 +42,7 @@ export function Widget({ config, track, onThemeLoad }: Props) {
     loadProductConfig(config)
       .then(data => {
         setState({ phase: 'ready', data })
+        setActiveTab(0)
 
         // Apply initial rules (set_value_default / locked)
         const initial: Selection        = {}
@@ -261,7 +263,22 @@ export function Widget({ config, track, onThemeLoad }: Props) {
     )
   }
 
-  const { product, characteristics, assets, removeBranding } = state.data
+  const { product, characteristics, assets, removeBranding, groups } = state.data
+
+  // Tabs are shown only when the product opts in (group_into_tabs) AND has more
+  // than one characteristic class. Otherwise the widget renders the flat list
+  // exactly as before. The price, completion gate and preview always span the
+  // full `characteristics` array regardless of which tab is active.
+  const showTabs = !!product.group_into_tabs && groups.length > 1
+  const charById = useMemo(
+    () => new Map(characteristics.map(c => [c.id, c])),
+    [characteristics],
+  )
+  const visibleChars = useMemo<Characteristic[]>(() => {
+    if (!showTabs) return characteristics
+    const g = groups[Math.min(activeTab, groups.length - 1)]
+    return g.characteristicIds.map(id => charById.get(id)).filter(Boolean) as Characteristic[]
+  }, [showTabs, groups, activeTab, characteristics, charById])
 
   // Display-only selection for the 3D preview: before the customer picks
   // anything, mesh-visibility rules would hide every configurable mesh and the
@@ -308,10 +325,29 @@ export function Widget({ config, track, onThemeLoad }: Props) {
           <div class="cw-product-desc">{pickTranslation(product.description_i18n, lang, product.description)}</div>
         )}
 
-        {/* Characteristics */}
-        {characteristics.length > 0 && (
+        {/* Characteristic tabs — one per assigned class, shown only when there
+            is more than one group. */}
+        {showTabs && (
+          <div class="cw-tabs" role="tablist">
+            {groups.map((g, i) => (
+              <button
+                key={g.id}
+                type="button"
+                role="tab"
+                aria-selected={i === activeTab}
+                class={`cw-tab${i === activeTab ? ' cw-tab--active' : ''}`}
+                onClick={() => { setActiveTab(i); track('tab_changed', { class_id: g.id, index: i }) }}
+              >
+                {pickTranslation(g.name_i18n, lang, g.name)}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Characteristics — filtered to the active tab when tabs are shown. */}
+        {visibleChars.length > 0 && (
           <div class="cw-characteristics">
-            {characteristics.map(char => (
+            {visibleChars.map(char => (
               <CharacteristicInput
                 key={char.id}
                 characteristic={char}

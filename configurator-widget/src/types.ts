@@ -27,6 +27,10 @@ export interface ProductData {
   form_config: FormConfig
   widget_theme: string
   show_price_breakdown: boolean
+  /** When true, the widget groups characteristics into tabs by class (only if
+   *  the product has >1 class). When false/absent, renders the flat list.
+   *  Migration 091. Rows fetched before it default to flat. */
+  group_into_tabs?: boolean
   /** Default combination of characteristic values the visualization shows at
    *  start: { [characteristic_id]: value_id }. Preview-only. May be absent on
    *  rows fetched before migration 090. */
@@ -179,9 +183,24 @@ export interface PricingFormula {
   sort_order: number
 }
 
+/** A group of characteristics that becomes one tab in the widget. Derived from
+ *  the product's assigned characteristic classes — see buildCharacteristicGroups
+ *  in charGroups.ts. The widget shows tabs only when there is more than one
+ *  group; with a single group it renders the flat list as before. */
+export interface CharacteristicGroup {
+  id: string                          // class_id
+  name: string                        // characteristic_classes.name (EN fallback)
+  name_i18n?: Record<string, string>  // characteristic_classes.name_i18n JSONB
+  characteristicIds: string[]         // ordered, deduped, this group only
+}
+
 export interface FullProductConfig {
   product: ProductData
   characteristics: Characteristic[]
+  /** Per-class grouping of `characteristics`, used to render tabs. The flat
+   *  `characteristics` array above stays the source of truth for pricing,
+   *  selection, preview and the completion gate. */
+  groups: CharacteristicGroup[]
   assets: VisualizationAsset[]
   rules: ConfigurationRule[]
   formulas: PricingFormula[]

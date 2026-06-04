@@ -234,6 +234,10 @@ export interface Database {
           form_config: Json
           widget_theme: string
           show_price_breakdown: boolean
+          /** When true, the widget splits characteristics into one tab per
+           *  assigned characteristic class (tabs render only with >1 class).
+           *  When false (default) it renders the flat list. See migration 091. */
+          group_into_tabs: boolean
           /** Default combination of characteristic values shown by the
            *  visualization at start: { [characteristic_id]: value_id }.
            *  Preview-only — never feeds the form, price, or the gate. See
@@ -247,7 +251,7 @@ export interface Database {
           created_at: string
           updated_at: string
         }
-        Insert: Omit<Database['public']['Tables']['products']['Row'], 'id' | 'created_at' | 'updated_at' | 'show_price_breakdown' | 'preview_defaults' | 'name_i18n' | 'description_i18n'> & { id?: string; show_price_breakdown?: boolean; preview_defaults?: Record<string, string> }
+        Insert: Omit<Database['public']['Tables']['products']['Row'], 'id' | 'created_at' | 'updated_at' | 'show_price_breakdown' | 'group_into_tabs' | 'preview_defaults' | 'name_i18n' | 'description_i18n'> & { id?: string; show_price_breakdown?: boolean; group_into_tabs?: boolean; preview_defaults?: Record<string, string> }
         Update: Partial<Database['public']['Tables']['products']['Insert']>
       }
       characteristic_classes: {

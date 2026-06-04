@@ -112,6 +112,7 @@ export function NewProductPage() {
         sku:              values.sku?.trim() || null,
         unit_of_measure:  values.unit_of_measure?.trim() || null,
         show_price_breakdown: values.show_price_breakdown,
+        group_into_tabs:  values.group_into_tabs,
       })
       // Mirror form i18n maps into tenant_texts (the JSONB columns are gone).
       if (tenant?.id) {

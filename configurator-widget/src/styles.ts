@@ -208,6 +208,37 @@ export const WIDGET_STYLES = `
     max-width: 56ch;
   }
 
+  /* ── Characteristic tabs ────────────────────────── */
+  .cw-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 24px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--cw-border);
+  }
+  .cw-tab {
+    appearance: none;
+    border: 1px solid var(--cw-border);
+    background: var(--cw-bg);
+    color: var(--cw-text-muted);
+    font: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    padding: 7px 14px;
+    border-radius: var(--cw-radius-btn);
+    cursor: pointer;
+    transition: background .12s, color .12s, border-color .12s;
+  }
+  .cw-tab:hover { color: var(--cw-text-heading); border-color: var(--cw-text-heading); }
+  .cw-tab--active {
+    background: var(--cw-text-heading);
+    border-color: var(--cw-text-heading);
+    color: var(--cw-primary-text);
+  }
+  .cw-tab--active:hover { color: var(--cw-primary-text); }
+
   /* ── Characteristics ────────────────────────────── */
   .cw-characteristics { display: flex; flex-direction: column; gap: 16px; }
 
