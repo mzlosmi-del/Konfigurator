@@ -234,6 +234,11 @@ export interface Database {
           form_config: Json
           widget_theme: string
           show_price_breakdown: boolean
+          /** Default combination of characteristic values shown by the
+           *  visualization at start: { [characteristic_id]: value_id }.
+           *  Preview-only — never feeds the form, price, or the gate. See
+           *  migration 090. Empty object means "no override". */
+          preview_defaults: Record<string, string>
           /** In-memory translation maps populated from `tenant_texts` by the
            *  fetch helpers. The DB columns were dropped in migration 078 —
            *  these fields are not selected from PostgreSQL anymore. */
@@ -242,7 +247,7 @@ export interface Database {
           created_at: string
           updated_at: string
         }
-        Insert: Omit<Database['public']['Tables']['products']['Row'], 'id' | 'created_at' | 'updated_at' | 'show_price_breakdown' | 'name_i18n' | 'description_i18n'> & { id?: string; show_price_breakdown?: boolean }
+        Insert: Omit<Database['public']['Tables']['products']['Row'], 'id' | 'created_at' | 'updated_at' | 'show_price_breakdown' | 'preview_defaults' | 'name_i18n' | 'description_i18n'> & { id?: string; show_price_breakdown?: boolean; preview_defaults?: Record<string, string> }
         Update: Partial<Database['public']['Tables']['products']['Insert']>
       }
       characteristic_classes: {

@@ -277,18 +277,24 @@ export function Widget({ config, track, onThemeLoad }: Props) {
   // would never change the model.
   const previewSelection = useMemo<Selection>(() => {
     if (state.phase !== 'ready') return selection
+    const previewDefaults = product.preview_defaults ?? {}
     const next: Selection = { ...selection }
     for (const char of characteristics) {
       if (char.display_type === 'number') continue
       if (char.display_type === 'boolean') continue
       if (next[char.id]) continue
-      const ruleDefault = ruleEffect.defaultValues[char.id]
-      const fallback = char.values[0]?.id   // values arrive sorted by sort_order
-      const chosen = ruleDefault ?? fallback
+      // Precedence: rule default → admin-set preview default → first value by
+      // sort order. The admin default is only honoured if it still points at a
+      // value this characteristic owns (stale ids fall through to the first).
+      const ruleDefault    = ruleEffect.defaultValues[char.id]
+      const adminDefaultId = previewDefaults[char.id]
+      const adminDefault   = char.values.some(v => v.id === adminDefaultId) ? adminDefaultId : undefined
+      const fallback       = char.values[0]?.id   // values arrive sorted by sort_order
+      const chosen = ruleDefault ?? adminDefault ?? fallback
       if (chosen) next[char.id] = chosen
     }
     return next
-  }, [state, selection, characteristics, ruleEffect])
+  }, [state, selection, characteristics, ruleEffect, product.preview_defaults])
 
   return (
     <div class="cw-root">

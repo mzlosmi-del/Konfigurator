@@ -27,6 +27,10 @@ export interface ProductData {
   form_config: FormConfig
   widget_theme: string
   show_price_breakdown: boolean
+  /** Default combination of characteristic values the visualization shows at
+   *  start: { [characteristic_id]: value_id }. Preview-only. May be absent on
+   *  rows fetched before migration 090. */
+  preview_defaults?: Record<string, string>
 }
 
 export interface CharacteristicValue {

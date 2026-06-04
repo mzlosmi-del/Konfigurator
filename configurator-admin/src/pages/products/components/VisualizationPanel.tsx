@@ -8,7 +8,7 @@ import {
   reorderAssets,
   uploadAssetFile,
 } from '@/lib/assets'
-import { fetchProductCharacteristicsWithValues, type CharacteristicWithValues } from '@/lib/products'
+import { fetchProductCharacteristicsWithValues, fetchProduct, updateProduct, type CharacteristicWithValues } from '@/lib/products'
 import { parseMeshNames } from '@/lib/glbParser'
 import type { VisualizationAsset, AssetType } from '@/types/database'
 import { Button } from '@/components/ui/button'
@@ -103,15 +103,24 @@ export function VisualizationPanel({ productId, arEnabled = true, onArToggle, ar
   // Mesh names parsed client-side from the selected GLB file before upload
   const [pendingMeshNames, setPendingMeshNames] = useState<string[]>([])
 
+  // Default combination of characteristic values the visualization shows at
+  // start (preview-only). Map of characteristic_id → value_id; '' = Auto.
+  const [previewDefaults, setPreviewDefaults] = useState<Record<string, string>>({})
+  const [previewDirty, setPreviewDirty] = useState(false)
+  const [savingPreview, setSavingPreview] = useState(false)
+
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const [assetData, charsData] = await Promise.all([
+      const [assetData, charsData, productData] = await Promise.all([
         fetchAssetsForProduct(productId),
         fetchProductCharacteristicsWithValues(productId),
+        fetchProduct(productId),
       ])
       setAssets(assetData)
       setChars(charsData)
+      setPreviewDefaults(productData.preview_defaults ?? {})
+      setPreviewDirty(false)
     } catch {
       toast({ title: 'Failed to load visualization assets', variant: 'destructive' })
     } finally {
@@ -132,6 +141,15 @@ export function VisualizationPanel({ productId, arEnabled = true, onArToggle, ar
       id: v.id,
       label: `${c.name} → ${v.label}`,
     }))
+  )
+
+  // Characteristics eligible for a preview default — same exclusions the widget
+  // applies when building previewSelection (number/boolean are skipped), and
+  // they must have at least one value to choose from.
+  const previewChars = chars.filter(
+    c => c.display_type !== 'number' &&
+         c.display_type !== 'boolean' &&
+         c.characteristic_values.length > 0
   )
 
   const formIsDefault =
@@ -198,6 +216,29 @@ export function VisualizationPanel({ productId, arEnabled = true, onArToggle, ar
         description: e instanceof Error ? e.message : undefined,
         variant: 'destructive',
       })
+    }
+  }
+
+  function handlePreviewDefaultChange(charId: string, valueId: string) {
+    setPreviewDefaults(prev => {
+      const next = { ...prev }
+      if (valueId) next[charId] = valueId
+      else delete next[charId]   // '' = Auto: store no entry
+      return next
+    })
+    setPreviewDirty(true)
+  }
+
+  async function handleSavePreviewDefaults() {
+    setSavingPreview(true)
+    try {
+      await updateProduct(productId, { preview_defaults: previewDefaults })
+      setPreviewDirty(false)
+      toast({ title: t('Default combination saved') })
+    } catch {
+      toast({ title: t('Failed to save default combination'), variant: 'destructive' })
+    } finally {
+      setSavingPreview(false)
     }
   }
 
@@ -380,6 +421,44 @@ export function VisualizationPanel({ productId, arEnabled = true, onArToggle, ar
               )}
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Default preview combination (3D) */}
+      {assets.some(a => a.asset_type === '3d_model') && previewChars.length > 0 && (
+        <div className="rounded-lg border bg-card p-4 space-y-3">
+          <div className="flex items-start gap-2">
+            <div className="flex-1">
+              <h4 className="text-sm font-medium">{t('Default preview combination')}</h4>
+              <p className="text-xs text-muted-foreground">
+                {t('Which characteristic values the 3D model shows at start, before the customer selects anything. This affects the preview only — not the form or price.')}
+              </p>
+            </div>
+            <Button
+              size="sm"
+              onClick={handleSavePreviewDefaults}
+              disabled={!previewDirty}
+              loading={savingPreview}
+            >
+              {t('Save')}
+            </Button>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {previewChars.map(char => (
+              <label key={char.id} className="flex flex-col gap-1">
+                <span className="text-xs font-medium">{char.name}</span>
+                <Select
+                  value={previewDefaults[char.id] ?? ''}
+                  onChange={e => handlePreviewDefaultChange(char.id, e.target.value)}
+                >
+                  <option value="">{t('Auto (first value)')}</option>
+                  {char.characteristic_values.map(v => (
+                    <option key={v.id} value={v.id}>{v.label}</option>
+                  ))}
+                </Select>
+              </label>
+            ))}
+          </div>
         </div>
       )}
 

@@ -127,7 +127,7 @@ export async function updateProduct(
   id: string,
   /** i18n maps are stored in `tenant_texts` (see `setEntityI18nText`). This
    *  function only persists the scalar product columns. */
-  input: Partial<Pick<Product, 'name' | 'description' | 'base_price' | 'currency' | 'status' | 'sku' | 'unit_of_measure' | 'ar_enabled' | 'ar_placement' | 'form_config' | 'public_preview_enabled' | 'show_price_breakdown'>>
+  input: Partial<Pick<Product, 'name' | 'description' | 'base_price' | 'currency' | 'status' | 'sku' | 'unit_of_measure' | 'ar_enabled' | 'ar_placement' | 'form_config' | 'public_preview_enabled' | 'show_price_breakdown' | 'preview_defaults'>>
 ): Promise<Product> {
   // Strip any stray i18n keys callers might still pass in during the
   // deprecation window — Postgres will reject them now that 078 dropped
