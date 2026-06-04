@@ -217,9 +217,20 @@ export async function fetchAllMemberships(): Promise<ClassMember[]> {
 }
 
 export async function addCharacteristicToClass(classId: string, charId: string): Promise<void> {
+  // Append at the end of the class so new members land in a deterministic
+  // position (the Library can drag-reorder members within a class afterwards).
+  const { data: maxRow } = await supabase
+    .from('characteristic_class_members')
+    .select('sort_order')
+    .eq('class_id', classId)
+    .order('sort_order', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  const maxOrder = (maxRow as { sort_order: number } | null)?.sort_order
+  const nextOrder = (maxOrder ?? -1) + 1
   const { error } = await supabase
     .from('characteristic_class_members')
-    .insert({ class_id: classId, characteristic_id: charId } as any)
+    .insert({ class_id: classId, characteristic_id: charId, sort_order: nextOrder } as any)
   if (error) throw new Error(error.message)
 }
 
@@ -230,6 +241,23 @@ export async function removeCharacteristicFromClass(classId: string, charId: str
     .eq('class_id', classId)
     .eq('characteristic_id', charId)
   if (error) throw new Error(error.message)
+}
+
+// Reorder members within a class: apply new sort_order values in a batch.
+// Mirrors reorderAssets in lib/assets.ts.
+export async function reorderClassMembers(
+  classId: string,
+  updates: { characteristic_id: string; sort_order: number }[],
+): Promise<void> {
+  await Promise.all(
+    updates.map(({ characteristic_id, sort_order }) =>
+      supabase
+        .from('characteristic_class_members')
+        .update({ sort_order } as unknown as never)
+        .eq('class_id', classId)
+        .eq('characteristic_id', characteristic_id)
+    )
+  )
 }
 
 // ─── Product ↔ Class assignments ─────────────────────────────────────────────
