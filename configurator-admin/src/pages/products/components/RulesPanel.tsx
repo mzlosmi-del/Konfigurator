@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Plus, Trash2, X } from 'lucide-react'
-import { fetchRules, createRule, deleteRule } from '@/lib/rules'
+import { Pencil, Plus, Trash2, X } from 'lucide-react'
+import { fetchRules, createRule, updateRule, deleteRule } from '@/lib/rules'
 import { fetchProductCharacteristicsWithValues } from '@/lib/products'
 import type {
   Characteristic, CharacteristicValue, ConfigurationRule,
@@ -57,6 +57,12 @@ export function RulesPanel({ productId }: Props) {
   const [draftEffects,   setDraftEffects]   = useState<RuleEffect[]>([])
   const [saving, setSaving]                 = useState(false)
 
+  // Inline edit of an existing rule — one rule at a time.
+  const [editingId,     setEditingId]     = useState<string | null>(null)
+  const [editCondition, setEditCondition] = useState<RuleCondition>(emptyCondition())
+  const [editEffects,   setEditEffects]   = useState<RuleEffect[]>([])
+  const [savingEdit,    setSavingEdit]    = useState(false)
+
   const load = useCallback(async () => {
     setLoading(true)
     try {
@@ -82,18 +88,23 @@ export function RulesPanel({ productId }: Props) {
 
   useEffect(() => { load() }, [load])
 
-  async function handleAdd() {
-    // Light client-side validation; the rules-engine evaluator tolerates a
-    // missing field by simply not firing, but a half-built rule is almost
-    // certainly a user mistake.
-    if (draftCondition.predicates.length === 0) {
+  // Light client-side validation; the rules-engine evaluator tolerates a
+  // missing field by simply not firing, but a half-built rule is almost
+  // certainly a user mistake. Returns false (and shows a toast) when invalid.
+  function validateDraft(condition: RuleCondition, effects: RuleEffect[]): boolean {
+    if (condition.predicates.length === 0) {
       toast({ title: t('Add at least one condition'), variant: 'destructive' })
-      return
+      return false
     }
-    if (draftEffects.length === 0) {
+    if (effects.length === 0) {
       toast({ title: t('Add at least one effect'), variant: 'destructive' })
-      return
+      return false
     }
+    return true
+  }
+
+  async function handleAdd() {
+    if (!validateDraft(draftCondition, draftEffects)) return
     setSaving(true)
     try {
       const created = await createRule({
@@ -116,8 +127,41 @@ export function RulesPanel({ productId }: Props) {
     try {
       await deleteRule(id)
       setRules(prev => prev.filter(r => r.id !== id))
+      if (editingId === id) cancelEdit()
     } catch {
       toast({ title: t('Failed to delete rule'), variant: 'destructive' })
+    }
+  }
+
+  function startEdit(rule: ConfigurationRule) {
+    setEditingId(rule.id)
+    // Deep-copy so the inline editor never mutates the saved rule in place.
+    setEditCondition(structuredClone(rule.condition))
+    setEditEffects(structuredClone(rule.effects))
+  }
+
+  function cancelEdit() {
+    setEditingId(null)
+    setEditCondition(emptyCondition())
+    setEditEffects([])
+  }
+
+  async function handleSaveEdit() {
+    if (!editingId) return
+    if (!validateDraft(editCondition, editEffects)) return
+    setSavingEdit(true)
+    try {
+      const updated = await updateRule(editingId, {
+        condition: editCondition,
+        effects:   editEffects,
+      })
+      setRules(prev => prev.map(r => (r.id === updated.id ? updated : r)))
+      cancelEdit()
+      toast({ title: t('Rule updated') })
+    } catch (e) {
+      toast({ title: t('Failed to update rule'), description: e instanceof Error ? e.message : undefined, variant: 'destructive' })
+    } finally {
+      setSavingEdit(false)
     }
   }
 
@@ -132,21 +176,60 @@ export function RulesPanel({ productId }: Props) {
         <p className="text-sm text-muted-foreground py-2">{t('No rules yet. Add one below.')}</p>
       ) : (
         <div className="space-y-2">
-          {rules.map(rule => (
-            <div key={rule.id} className="flex items-start gap-2 rounded-lg border bg-muted/20 px-4 py-3">
-              <div className="flex-1 min-w-0 space-y-1.5 text-sm">
-                <RuleSummary rule={rule} chars={characteristics} valuesMap={valuesMap} lang={lang} />
+          {rules.map(rule =>
+            rule.id === editingId ? (
+              <div key={rule.id} className="rounded-lg border border-primary/40 p-4 space-y-4 bg-muted/10">
+                <p className="text-sm font-medium">{t('Edit rule')}</p>
+
+                <ConditionEditor
+                  value={editCondition}
+                  onChange={setEditCondition}
+                  chars={characteristics}
+                  valuesMap={valuesMap}
+                  lang={lang}
+                />
+
+                <EffectsEditor
+                  value={editEffects}
+                  onChange={setEditEffects}
+                  chars={characteristics}
+                  valuesMap={valuesMap}
+                  lang={lang}
+                />
+
+                <div className="flex justify-end gap-2">
+                  <Button variant="outline" size="sm" onClick={cancelEdit} disabled={savingEdit}>
+                    {t('Cancel')}
+                  </Button>
+                  <Button size="sm" onClick={handleSaveEdit} loading={savingEdit} disabled={savingEdit}>
+                    {t('Save changes')}
+                  </Button>
+                </div>
               </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7 text-destructive hover:text-destructive shrink-0"
-                onClick={() => handleDelete(rule.id)}
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-              </Button>
-            </div>
-          ))}
+            ) : (
+              <div key={rule.id} className="flex items-start gap-2 rounded-lg border bg-muted/20 px-4 py-3">
+                <div className="flex-1 min-w-0 space-y-1.5 text-sm">
+                  <RuleSummary rule={rule} chars={characteristics} valuesMap={valuesMap} lang={lang} />
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 shrink-0"
+                  onClick={() => startEdit(rule)}
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 text-destructive hover:text-destructive shrink-0"
+                  onClick={() => handleDelete(rule.id)}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            ),
+          )}
         </div>
       )}
 
