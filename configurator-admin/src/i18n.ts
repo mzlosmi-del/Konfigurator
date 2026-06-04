@@ -406,6 +406,19 @@ const sr: Record<string, string> = {
   'Failed to add characteristic to class': 'Dodavanje karakteristike u klasu nije uspelo',
   'Failed to remove characteristic from class': 'Uklanjanje karakteristike iz klase nije uspelo',
   'Drag to assign to class':               'Prevucite da biste dodelili klasi',
+  // Library — navigation redesign
+  'Manage all characteristics and classes. Drag a characteristic onto a class to assign it.':
+    'Upravljajte svim karakteristikama i klasama. Prevucite karakteristiku na klasu da je dodelite.',
+  'Search characteristics…':               'Pretraži karakteristike…',
+  'Type: all':                             'Tip: svi',
+  'All characteristics':                   'Sve karakteristike',
+  'Unassigned':                            'Nedodeljene',
+  'unassigned':                            'nedodeljena',
+  'characteristics':                       'karakteristike',
+  'Drag onto a class in the rail to assign': 'Prevucite na klasu u traci da biste dodelili',
+  'Drag rows to set the order characteristics appear in this class.':
+    'Prevucite redove da podesite redosled karakteristika u ovoj klasi.',
+  'No characteristics match your filters.': 'Nijedna karakteristika ne odgovara filterima.',
 
   // Settings page
   'Manage your account and workspace.':   'Upravljajte vašim nalogom i radnim prostorom.',
@@ -2018,6 +2031,19 @@ const de: Record<string, string> = {
   'Failed to add characteristic to class': 'Merkmal konnte der Klasse nicht hinzugefügt werden',
   'Failed to remove characteristic from class': 'Merkmal konnte nicht aus der Klasse entfernt werden',
   'Drag to assign to class':               'Ziehen, um einer Klasse zuzuweisen',
+  // Library — navigation redesign
+  'Manage all characteristics and classes. Drag a characteristic onto a class to assign it.':
+    'Verwalten Sie alle Merkmale und Klassen. Ziehen Sie ein Merkmal auf eine Klasse, um es zuzuweisen.',
+  'Search characteristics…':               'Merkmale suchen…',
+  'Type: all':                             'Typ: alle',
+  'All characteristics':                   'Alle Merkmale',
+  'Unassigned':                            'Nicht zugewiesen',
+  'unassigned':                            'nicht zugewiesen',
+  'characteristics':                       'Merkmale',
+  'Drag onto a class in the rail to assign': 'Auf eine Klasse in der Leiste ziehen, um zuzuweisen',
+  'Drag rows to set the order characteristics appear in this class.':
+    'Ziehen Sie die Zeilen, um die Reihenfolge der Merkmale in dieser Klasse festzulegen.',
+  'No characteristics match your filters.': 'Keine Merkmale entsprechen Ihren Filtern.',
   'Manage your account and workspace.':   'Verwalten Sie Ihr Konto und Ihren Arbeitsbereich.',
   'Workspace':                             'Arbeitsbereich',
   'Your tenant details':                   'Ihre Mandantendetails',

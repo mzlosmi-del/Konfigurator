@@ -1,13 +1,18 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   DndContext,
-  useDraggable,
-  useDroppable,
   DragOverlay,
+  PointerSensor,
+  useSensor,
+  useSensors,
 } from '@dnd-kit/core'
 import type { DragEndEvent, DragStartEvent } from '@dnd-kit/core'
-import { Plus, Trash2, ChevronDown, ChevronRight, GripVertical, Tag } from 'lucide-react'
-import { I18nEditor } from '@/components/ui/i18n-editor'
+import {
+  SortableContext,
+  arrayMove,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable'
+import { GripVertical } from 'lucide-react'
 import {
   fetchCharacteristics,
   createCharacteristic,
@@ -20,438 +25,29 @@ import {
   fetchAllMemberships,
   addCharacteristicToClass,
   removeCharacteristicFromClass,
+  reorderClassMembers,
   fetchValuesForCharacteristic,
 } from '@/lib/products'
 import { CharacteristicDeletionDialog } from './CharacteristicDeletionDialog'
+import { DraggableChar } from './DraggableChar'
+import { LibraryToolbar } from './LibraryToolbar'
+import { ClassRail } from './ClassRail'
+import { ClassDetailHeader } from './ClassDetailHeader'
+import type { LibraryView, TypeFilter } from './types'
 import type { Characteristic, CharacteristicClass, CharacteristicValue } from '@/types/database'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Spinner } from '@/components/ui/spinner'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
-import { CharacteristicValuesEditor } from '@/pages/products/components/CharacteristicValuesEditor'
 import { useToast } from '@/hooks/useToast'
 import { Toaster } from '@/components/ui/toast'
 import { useAuthContext } from '@/components/auth/AuthContext'
 import { t } from '@/i18n'
 import { computeDiff, logChange } from '@/lib/auditLog'
 import { CHARACTERISTIC_LABELS, CLASS_LABELS } from '@/lib/auditLabels'
-import { AssignAutocomplete } from '@/components/library/AssignAutocomplete'
 import { setEntityI18nText } from '@/lib/texts'
-
-// ─── DroppableClass card ─────────────────────────────────────────────────────
-
-interface DroppableClassProps {
-  cls: CharacteristicClass
-  memberIds: string[]
-  characteristics: Characteristic[]
-  onAssign: (classId: string, charId: string) => void
-  onRemoveMember: (classId: string, charId: string) => void
-  onDeleteClass: (cls: CharacteristicClass) => void
-  onRenameClass: (id: string, name: string) => void
-  onUpdateClassI18n: (id: string, i18n: Record<string, string>) => void
-}
-
-function DroppableClass({ cls, memberIds, characteristics, onAssign, onRemoveMember, onDeleteClass, onRenameClass, onUpdateClassI18n }: DroppableClassProps) {
-  const { setNodeRef, isOver } = useDroppable({ id: cls.id })
-  const [editing, setEditing] = useState(false)
-  const i18n = (cls.name_i18n as Record<string, string> | null) ?? {}
-  const translatedLangs = Object.keys(i18n)
-
-  return (
-    <div
-      ref={setNodeRef}
-      className={[
-        'rounded-lg border bg-card p-3 transition-all min-h-[80px] flex flex-col gap-2',
-        isOver ? 'ring-2 ring-primary border-primary bg-primary/5' : '',
-      ].join(' ')}
-    >
-      {/* Header */}
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-1.5 min-w-0 flex-1">
-          <Tag className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-          {editing ? (
-            <input
-              className="flex-1 text-sm font-medium bg-transparent border-b border-primary outline-none min-w-0"
-              defaultValue={cls.name}
-              autoFocus
-              onBlur={e => { onRenameClass(cls.id, e.target.value); setEditing(false) }}
-              onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
-              placeholder={t('Name (default)')}
-            />
-          ) : (
-            <button
-              type="button"
-              className="text-sm font-medium truncate hover:text-primary transition-colors text-left"
-              onClick={() => setEditing(true)}
-              title={t('Click to rename')}
-            >
-              {cls.name}
-              {translatedLangs.length > 0 && (
-                <span className="ml-1 text-xs text-muted-foreground font-normal">
-                  {translatedLangs.map(l => l.toUpperCase()).join('/')}
-                </span>
-              )}
-            </button>
-          )}
-          <span className="font-mono text-[10px] text-muted-foreground/50 shrink-0 select-all" title={cls.id}>
-            #{cls.id.slice(0, 8)}
-          </span>
-          <span className="text-xs text-muted-foreground shrink-0">
-            ({memberIds.length})
-          </span>
-        </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-6 w-6 text-destructive hover:text-destructive shrink-0"
-          onClick={() => onDeleteClass(cls)}
-        >
-          <Trash2 className="h-3 w-3" />
-        </Button>
-      </div>
-
-      {/* Translations */}
-      <div>
-        <I18nEditor
-          value={i18n}
-          onChange={newI18n => onUpdateClassI18n(cls.id, newI18n)}
-          placeholder={cls.name}
-        />
-      </div>
-
-      {/* Member chips */}
-      {memberIds.length === 0 ? (
-        <p className="text-xs text-muted-foreground italic">
-          {isOver ? t('Drop here to add') : t('Drag characteristics here')}
-        </p>
-      ) : (
-        <div className="flex flex-wrap gap-1.5">
-          {memberIds.map(charId => {
-            const char = characteristics.find(c => c.id === charId)
-            if (!char) return null
-            return (
-              <span
-                key={charId}
-                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-primary/10 text-primary font-medium"
-              >
-                {char.name}
-                <button
-                  type="button"
-                  onClick={() => onRemoveMember(cls.id, charId)}
-                  className="hover:text-destructive transition-colors"
-                  aria-label={`Remove ${char.name} from ${cls.name}`}
-                >
-                  ×
-                </button>
-              </span>
-            )
-          })}
-          {isOver && (
-            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs border border-dashed border-primary text-primary">
-              {t('+ drop here')}
-            </span>
-          )}
-        </div>
-      )}
-
-      {/* Type-to-assign: alternative to drag-and-drop */}
-      <AssignAutocomplete
-        placeholder={t('Type characteristic name to add…')}
-        options={characteristics
-          .filter(c => !memberIds.includes(c.id))
-          .map(c => ({ id: c.id, label: c.name }))}
-        onSelect={charId => onAssign(cls.id, charId)}
-      />
-    </div>
-  )
-}
-
-// ─── Numeric bounds editor ───────────────────────────────────────────────────
-// Shown only for `display_type === 'number'` characteristics. Each bound is
-// independently optional (empty input = no bound). Mirrors the DB CHECK from
-// migration 088 with an inline guard so the user gets immediate feedback.
-
-function NumericBoundsEditor({
-  numericMin,
-  numericMax,
-  onSave,
-}: {
-  numericMin: number | null
-  numericMax: number | null
-  onSave: (min: number | null, max: number | null) => void
-}) {
-  const [minStr, setMinStr] = useState(numericMin != null ? String(numericMin) : '')
-  const [maxStr, setMaxStr] = useState(numericMax != null ? String(numericMax) : '')
-  const [error, setError]   = useState<string | null>(null)
-
-  function parseBound(s: string): number | null {
-    const trimmed = s.trim()
-    if (trimmed === '') return null
-    const n = parseFloat(trimmed)
-    return Number.isNaN(n) ? null : n
-  }
-
-  function commit() {
-    const min = parseBound(minStr)
-    const max = parseBound(maxStr)
-    if (min != null && max != null && min > max) {
-      setError(t('Minimum must not be greater than maximum'))
-      return
-    }
-    setError(null)
-    // Normalise the inputs to the parsed values (drops invalid characters).
-    setMinStr(min != null ? String(min) : '')
-    setMaxStr(max != null ? String(max) : '')
-    if (min !== numericMin || max !== numericMax) onSave(min, max)
-  }
-
-  return (
-    <div>
-      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1.5">
-        {t('Allowed range')}
-      </p>
-      <div className="flex items-center gap-2">
-        <Input
-          type="number"
-          className="w-32 h-8"
-          placeholder={t('Minimum')}
-          value={minStr}
-          onChange={e => setMinStr(e.target.value)}
-          onBlur={commit}
-        />
-        <span className="text-muted-foreground text-sm">–</span>
-        <Input
-          type="number"
-          className="w-32 h-8"
-          placeholder={t('Maximum')}
-          value={maxStr}
-          onChange={e => setMaxStr(e.target.value)}
-          onBlur={commit}
-        />
-      </div>
-      {error && <p className="text-xs text-destructive mt-1">{error}</p>}
-      <p className="text-[11px] text-muted-foreground mt-1">
-        {t('Leave a field empty for no limit.')}
-      </p>
-    </div>
-  )
-}
-
-// ─── DraggableChar row ────────────────────────────────────────────────────────
-
-interface DraggableCharProps {
-  char: Characteristic
-  classesForChar: CharacteristicClass[]
-  allClasses: CharacteristicClass[]
-  values: CharacteristicValue[]
-  expanded: boolean
-  onToggleExpand: () => void
-  onRename: (name: string) => void
-  onUpdateI18n: (i18n: Record<string, string>) => void
-  onUpdateDescriptionI18n: (i18n: Record<string, string>) => void
-  onChangeType: (type: Characteristic['display_type']) => void
-  onUpdateBounds: (min: number | null, max: number | null) => void
-  onDelete: () => void
-  onAssignToClass: (classId: string) => void
-  tenantId: string
-  onValuesChange: (updated: CharacteristicValue[]) => void
-}
-
-function DraggableChar({
-  char,
-  classesForChar,
-  allClasses,
-  values,
-  expanded,
-  onToggleExpand,
-  onRename,
-  onUpdateI18n,
-  onUpdateDescriptionI18n,
-  onChangeType,
-  onUpdateBounds,
-  onDelete,
-  onAssignToClass,
-  tenantId,
-  onValuesChange,
-}: DraggableCharProps) {
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: char.id })
-  const i18n = (char.name_i18n as Record<string, string> | null) ?? {}
-  const descriptionI18n = (char.description_i18n as Record<string, string> | null) ?? {}
-  const descriptionLangs = Object.entries(descriptionI18n)
-    .filter(([, v]) => typeof v === 'string' && v.trim().length > 0)
-    .map(([k]) => k)
-
-  return (
-    <div
-      ref={setNodeRef}
-      className={[
-        'rounded-lg border bg-card overflow-hidden transition-opacity',
-        isDragging ? 'opacity-40' : '',
-      ].join(' ')}
-    >
-      {/* Row */}
-      <div className="flex items-center gap-2 px-2 py-2.5">
-        {/* Drag handle */}
-        <button
-          type="button"
-          className="touch-none cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground shrink-0"
-          {...attributes}
-          {...listeners}
-          aria-label={t('Drag to assign to class')}
-        >
-          <GripVertical className="h-4 w-4" />
-        </button>
-
-        {/* Expand toggle */}
-        <button
-          type="button"
-          onClick={onToggleExpand}
-          className="text-muted-foreground hover:text-foreground transition-colors shrink-0"
-          title={t('Expand to edit name translations and description')}
-          aria-label={t('Expand to edit name translations and description')}
-        >
-          {expanded
-            ? <ChevronDown className="h-4 w-4" />
-            : <ChevronRight className="h-4 w-4" />}
-        </button>
-
-        {/* Editable name */}
-        <input
-          className="flex-1 bg-transparent text-sm font-medium outline-none focus:ring-0 min-w-0"
-          defaultValue={char.name}
-          onBlur={e => onRename(e.target.value)}
-        />
-
-        {/* Description status — surfaces a feature that lives inside the
-            expanded section so users can find it without hunting for the
-            chevron. Mirrors the class card's translated-langs badge. */}
-        {descriptionLangs.length > 0 ? (
-          <span
-            className="shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-primary/10 text-primary"
-            title={t('Description')}
-          >
-            {t('Desc')}: {descriptionLangs.map(l => l.toUpperCase()).join('/')}
-          </span>
-        ) : (
-          <button
-            type="button"
-            onClick={onToggleExpand}
-            className="shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium border border-dashed border-muted-foreground/40 text-muted-foreground hover:text-primary hover:border-primary transition-colors"
-          >
-            + {t('Add description')}
-          </button>
-        )}
-
-        <span className="font-mono text-[10px] text-muted-foreground/50 shrink-0 select-all" title={char.id}>
-          #{char.id.slice(0, 8)}
-        </span>
-
-        {/* Type selector */}
-        <Select
-          value={char.display_type}
-          onChange={e => onChangeType(e.target.value as Characteristic['display_type'])}
-          className="text-xs h-7 py-0 w-32 shrink-0"
-        >
-          <option value="select">{t('Select')}</option>
-          <option value="radio">{t('Radio')}</option>
-          <option value="swatch">{t('Swatch')}</option>
-          <option value="toggle">{t('Toggle')}</option>
-          <option value="number">{t('Number')}</option>
-          <option value="boolean">{t('Boolean')}</option>
-        </Select>
-
-        {/* Class membership tags + type-to-assign input */}
-        <div className="flex gap-1 flex-wrap items-center max-w-[280px] shrink-0">
-          {classesForChar.map(cls => (
-            <span
-              key={cls.id}
-              className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-muted text-muted-foreground"
-            >
-              {cls.name}
-            </span>
-          ))}
-          <AssignAutocomplete
-            className="w-40"
-            placeholder={t('Type class name…')}
-            options={allClasses
-              .filter(c => !classesForChar.some(x => x.id === c.id))
-              .map(c => ({ id: c.id, label: c.name }))}
-            onSelect={classId => onAssignToClass(classId)}
-          />
-        </div>
-
-        {/* Value count */}
-        <span className="text-xs text-muted-foreground shrink-0 w-14 text-right">
-          {values.length} {values.length !== 1 ? t('vals') : t('val')}
-        </span>
-
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7 text-destructive hover:text-destructive shrink-0"
-          onClick={onDelete}
-        >
-          <Trash2 className="h-3.5 w-3.5" />
-        </Button>
-      </div>
-
-      {/* Expanded section */}
-      {expanded && (
-        <div className="px-4 pb-4 pt-2 border-t bg-muted/10 space-y-3">
-          {/* Name translations */}
-          <div>
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1.5">
-              {t('Name translations')}
-            </p>
-            <I18nEditor
-              value={i18n}
-              onChange={onUpdateI18n}
-              placeholder={char.name}
-            />
-          </div>
-
-          {/* Description translations (optional, shown on quotation PDFs if toggled on) */}
-          <div>
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1.5">
-              {t('Description (optional, per language)')}
-            </p>
-            <I18nEditor
-              value={descriptionI18n}
-              onChange={onUpdateDescriptionI18n}
-              placeholder={t('Shown on the quotation PDF when descriptions are enabled')}
-              multiline
-            />
-          </div>
-
-          {/* Numeric bounds — only for number characteristics */}
-          {char.display_type === 'number' && (
-            <NumericBoundsEditor
-              numericMin={char.numeric_min}
-              numericMax={char.numeric_max}
-              onSave={onUpdateBounds}
-            />
-          )}
-
-          {/* Values editor */}
-          <div>
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
-              {t('Values')}
-            </p>
-            <CharacteristicValuesEditor
-              characteristicId={char.id}
-              tenantId={tenantId}
-              values={values}
-              onChange={onValuesChange}
-            />
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 
@@ -468,6 +64,11 @@ export function LibraryPage() {
   const [expanded, setExpanded]           = useState<Record<string, boolean>>({})
   const [activeCharId, setActiveCharId]   = useState<string | null>(null)
 
+  // Navigation / filter state.
+  const [activeView, setActiveView]       = useState<LibraryView>('all')
+  const [search, setSearch]               = useState('')
+  const [typeFilter, setTypeFilter]       = useState<TypeFilter>('all')
+
   const [showNewChar, setShowNewChar]     = useState(false)
   const [newName, setNewName]             = useState('')
   const [newType, setNewType]             = useState<Characteristic['display_type']>('select')
@@ -483,6 +84,10 @@ export function LibraryPage() {
   const [toDeleteClass, setToDeleteClass] = useState<CharacteristicClass | null>(null)
   const [deletingClass, setDeletingClass] = useState(false)
 
+  // A small activation distance keeps clicks on inline controls from starting
+  // a drag (so the name input, selects, and chevrons stay usable).
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
+
   const load = useCallback(async () => {
     setLoading(true)
     try {
@@ -494,6 +99,8 @@ export function LibraryPage() {
       setChars(chars)
       setClasses(cls)
 
+      // allMemberships is already ordered by sort_order, so each class's
+      // member array preserves the intended characteristic order.
       const memberMap: Record<string, string[]> = {}
       for (const m of allMemberships) {
         if (!memberMap[m.class_id]) memberMap[m.class_id] = []
@@ -519,8 +126,94 @@ export function LibraryPage() {
     setExpanded(prev => ({ ...prev, [id]: !prev[id] }))
   }
 
+  // ── Derived data ──────────────────────────────────────────────────────────
+
+  const memberCounts = useMemo(() => {
+    const counts: Record<string, number> = {}
+    for (const cls of classes) counts[cls.id] = memberships[cls.id]?.length ?? 0
+    return counts
+  }, [classes, memberships])
+
+  const assignedIds = useMemo(() => {
+    const set = new Set<string>()
+    for (const ids of Object.values(memberships)) for (const id of ids) set.add(id)
+    return set
+  }, [memberships])
+
+  const unassignedCount = useMemo(
+    () => characteristics.filter(c => !assignedIds.has(c.id)).length,
+    [characteristics, assignedIds],
+  )
+
+  function classesForChar(charId: string): CharacteristicClass[] {
+    return classes.filter(cls => memberships[cls.id]?.includes(charId))
+  }
+
+  const activeClass = activeView !== 'all' && activeView !== 'unassigned'
+    ? classes.find(c => c.id === activeView) ?? null
+    : null
+  const isReorderView = !!activeClass
+
+  // The list shown in the right pane, in the order it should render.
+  const visibleChars = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    const byType = (c: Characteristic) => typeFilter === 'all' || c.display_type === typeFilter
+    const byName = (c: Characteristic) => q === '' || c.name.toLowerCase().includes(q)
+
+    let base: Characteristic[]
+    if (activeView === 'all') {
+      base = characteristics
+    } else if (activeView === 'unassigned') {
+      base = characteristics.filter(c => !assignedIds.has(c.id))
+    } else {
+      // Single class: render in the class's stored membership order.
+      const order = memberships[activeView] ?? []
+      const charById = new Map(characteristics.map(c => [c.id, c]))
+      base = order.map(id => charById.get(id)).filter((c): c is Characteristic => !!c)
+    }
+    return base.filter(c => byType(c) && byName(c))
+  }, [activeView, characteristics, assignedIds, memberships, search, typeFilter])
+
+  // ── Drag handling ───────────────────────────────────────────────────────────
+
   function handleDragStart({ active }: DragStartEvent) {
     setActiveCharId(active.id as string)
+  }
+
+  async function handleDragEnd({ active, over }: DragEndEvent) {
+    setActiveCharId(null)
+    if (!over) return
+    const activeId = active.id as string
+    const overId = over.id as string
+
+    if (isReorderView && activeClass) {
+      // Reorder within the active class. `over` is another characteristic row.
+      if (activeId === overId) return
+      await reorderActiveClass(activeClass.id, activeId, overId)
+      return
+    }
+
+    // Assign: `over` is a class id in the rail.
+    await handleAssign(overId, activeId)
+  }
+
+  async function reorderActiveClass(classId: string, activeId: string, overId: string) {
+    const current = memberships[classId] ?? []
+    const from = current.indexOf(activeId)
+    const to = current.indexOf(overId)
+    if (from === -1 || to === -1) return
+    const next = arrayMove(current, from, to)
+    setMemberships(prev => ({ ...prev, [classId]: next }))
+    try {
+      await reorderClassMembers(
+        classId,
+        next.map((characteristic_id, sort_order) => ({ characteristic_id, sort_order })),
+      )
+    } catch {
+      // Roll back to the prior order on failure.
+      setMemberships(prev => ({ ...prev, [classId]: current }))
+      toast({ title: t('Failed to reorder'), variant: 'destructive' })
+    }
   }
 
   async function handleAssign(classId: string, charId: string) {
@@ -536,12 +229,6 @@ export function LibraryPage() {
     }
   }
 
-  async function handleDragEnd({ active, over }: DragEndEvent) {
-    setActiveCharId(null)
-    if (!over) return
-    await handleAssign(over.id as string, active.id as string)
-  }
-
   async function handleRemoveMember(classId: string, charId: string) {
     try {
       await removeCharacteristicFromClass(classId, charId)
@@ -554,6 +241,8 @@ export function LibraryPage() {
     }
   }
 
+  // ── Characteristic CRUD ───────────────────────────────────────────────────
+
   async function handleCreateChar() {
     if (!newName.trim()) return
     setCreatingChar(true)
@@ -562,6 +251,8 @@ export function LibraryPage() {
       logChange({ entityType: 'characteristic', entityId: created.id, entityName: created.name, changeType: 'create', changedByName: userName })
       setChars(prev => [...prev, created])
       setValues(prev => ({ ...prev, [created.id]: [] }))
+      // If a class is selected, assign the new characteristic to it.
+      if (activeClass) await handleAssign(activeClass.id, created.id)
       setNewName('')
       setNewType('select')
       setShowNewChar(false)
@@ -594,7 +285,6 @@ export function LibraryPage() {
         slot: 'name',
         i18n,
       })
-      // Keep the in-memory copy in sync without re-fetching every row.
       setChars(prev => prev.map(c => c.id === char.id ? { ...c, name_i18n: i18n } : c))
     } catch {
       toast({ title: t('Failed to save translation'), variant: 'destructive' })
@@ -665,6 +355,8 @@ export function LibraryPage() {
     }
   }
 
+  // ── Class CRUD ──────────────────────────────────────────────────────────────
+
   async function handleCreateClass() {
     if (!newClassName.trim()) return
     setCreatingClass(true)
@@ -717,6 +409,8 @@ export function LibraryPage() {
         delete next[toDeleteClass.id]
         return next
       })
+      // If we were viewing the deleted class, fall back to All.
+      if (activeView === toDeleteClass.id) setActiveView('all')
       setToDeleteClass(null)
     } catch {
       toast({ title: t('Failed to delete class'), variant: 'destructive' })
@@ -727,183 +421,155 @@ export function LibraryPage() {
 
   const activeChar = activeCharId ? characteristics.find(c => c.id === activeCharId) : null
 
-  function classesForChar(charId: string): CharacteristicClass[] {
-    return classes.filter(cls => memberships[cls.id]?.includes(charId))
-  }
-
   if (loading) {
     return <div className="flex justify-center py-20"><Spinner /></div>
   }
+
+  const rightPaneTitle = activeView === 'all'
+    ? t('All characteristics')
+    : activeView === 'unassigned'
+      ? t('Unassigned')
+      : activeClass?.name ?? ''
+
+  const charRows = (
+    <div className="space-y-1.5">
+      {visibleChars.map(char => (
+        <DraggableChar
+          key={char.id}
+          char={char}
+          classesForChar={classesForChar(char.id)}
+          allClasses={classes}
+          values={values[char.id] ?? []}
+          expanded={!!expanded[char.id]}
+          sortable={isReorderView}
+          unassigned={activeView === 'all' && !assignedIds.has(char.id)}
+          onToggleExpand={() => toggleExpand(char.id)}
+          onRename={name => handleRenameChar(char, name)}
+          onUpdateI18n={i18n => handleUpdateCharI18n(char, i18n)}
+          onUpdateDescriptionI18n={i18n => handleUpdateCharDescriptionI18n(char, i18n)}
+          onChangeType={type => handleChangeType(char, type)}
+          onUpdateBounds={(min, max) => handleUpdateBounds(char, min, max)}
+          onDelete={() => setToDelete(char)}
+          onAssignToClass={classId => handleAssign(classId, char.id)}
+          onRemoveFromClass={activeClass ? (classId => handleRemoveMember(classId, char.id)) : undefined}
+          tenantId={tenant?.id ?? ''}
+          onValuesChange={updated => setValues(prev => ({ ...prev, [char.id]: updated }))}
+        />
+      ))}
+    </div>
+  )
 
   return (
     <div className="animate-fade-in">
       <PageHeader
         title={t('Characteristic Library')}
-        description={t('Manage all characteristics and classes. Drag a characteristic onto a class card to assign it.')}
+        description={t('Manage all characteristics and classes. Drag a characteristic onto a class to assign it.')}
       />
 
-      <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-        <div className="p-6 space-y-6 max-w-5xl">
+      <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+        <LibraryToolbar
+          search={search}
+          onSearchChange={setSearch}
+          typeFilter={typeFilter}
+          onTypeFilterChange={setTypeFilter}
+          onNewCharacteristic={() => setShowNewChar(true)}
+          onNewClass={() => { setShowNewClass(true); setActiveView('all') }}
+        />
 
-          {/* ── Classes ───────────────────────────────────────────────────── */}
-          <Card>
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <Tag className="h-4 w-4 text-muted-foreground" />
-                    {t('Classes')}
-                  </CardTitle>
-                  <CardDescription className="mt-1">
-                    {t('Group characteristics into named sections. Assign classes to products.')}
-                  </CardDescription>
-                </div>
-                {!showNewClass && (
-                  <Button size="sm" variant="outline" onClick={() => setShowNewClass(true)}>
-                    <Plus className="h-4 w-4 mr-1" />
-                    {t('New class')}
-                  </Button>
-                )}
+        <div className="flex min-h-[60vh]">
+          <ClassRail
+            classes={classes}
+            memberCounts={memberCounts}
+            totalCount={characteristics.length}
+            unassignedCount={unassignedCount}
+            activeView={activeView}
+            onSelectView={setActiveView}
+            showNewClass={showNewClass}
+            newClassName={newClassName}
+            newClassI18n={newClassI18n}
+            creatingClass={creatingClass}
+            onShowNewClass={() => setShowNewClass(true)}
+            onNewClassNameChange={setNewClassName}
+            onNewClassI18nChange={setNewClassI18n}
+            onCreateClass={handleCreateClass}
+            onCancelNewClass={() => { setShowNewClass(false); setNewClassName(''); setNewClassI18n({}) }}
+          />
+
+          {/* Right pane */}
+          <div className="flex-1 p-4 overflow-x-auto">
+            {activeClass && (
+              <ClassDetailHeader
+                cls={activeClass}
+                memberCount={memberCounts[activeClass.id] ?? 0}
+                onRename={handleRenameClass}
+                onUpdateI18n={handleUpdateClassI18n}
+                onDelete={setToDeleteClass}
+              />
+            )}
+
+            <div className="mb-2 flex items-center justify-between">
+              <div className="text-sm">
+                <span className="font-semibold">{rightPaneTitle}</span>
+                <span className="text-muted-foreground"> · {visibleChars.length}</span>
               </div>
-            </CardHeader>
-            <CardContent>
-              {classes.length === 0 && !showNewClass && (
-                <p className="text-sm text-muted-foreground mb-3">{t('No classes yet.')}</p>
+              {!isReorderView && (
+                <span className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                  {t('Drag onto a class in the rail to assign')}
+                </span>
               )}
+            </div>
 
-              {classes.length > 0 && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-3">
-                  {classes.map(cls => (
-                    <DroppableClass
-                      key={cls.id}
-                      cls={cls}
-                      memberIds={memberships[cls.id] ?? []}
-                      characteristics={characteristics}
-                      onAssign={handleAssign}
-                      onRemoveMember={handleRemoveMember}
-                      onDeleteClass={setToDeleteClass}
-                      onRenameClass={handleRenameClass}
-                      onUpdateClassI18n={handleUpdateClassI18n}
-                    />
-                  ))}
-                </div>
-              )}
-
-              {showNewClass && (
-                <div className="rounded-lg border p-3 space-y-2 bg-muted/10">
+            {/* New characteristic form */}
+            {showNewChar && (
+              <div className="mb-3 rounded-lg border p-4 space-y-3 bg-muted/10">
+                <p className="text-sm font-medium">{t('New characteristic')}</p>
+                <div className="flex gap-2">
                   <Input
-                    placeholder={t('Class name (e.g. Dimensions, Material)')}
-                    value={newClassName}
-                    onChange={e => setNewClassName(e.target.value)}
-                    onKeyDown={e => { if (e.key === 'Enter') handleCreateClass() }}
+                    placeholder={t('Name (e.g. Material, Width)')}
+                    value={newName}
+                    onChange={e => setNewName(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') handleCreateChar() }}
                     autoFocus
-                    className="text-sm"
+                    className="flex-1"
                   />
-                  <I18nEditor
-                    value={newClassI18n}
-                    onChange={setNewClassI18n}
-                    placeholder={newClassName || t('Translated name')}
-                  />
-                  <div className="flex gap-2">
-                    <Button size="sm" onClick={handleCreateClass} loading={creatingClass} disabled={!newClassName.trim()}>
-                      {t('Create')}
-                    </Button>
-                    <Button size="sm" variant="ghost" onClick={() => { setShowNewClass(false); setNewClassName(''); setNewClassI18n({}) }}>
-                      {t('Cancel')}
-                    </Button>
-                  </div>
+                  <Select
+                    value={newType}
+                    onChange={e => setNewType(e.target.value as Characteristic['display_type'])}
+                    className="w-36"
+                  >
+                    <option value="select">{t('Select')}</option>
+                    <option value="radio">{t('Radio')}</option>
+                    <option value="swatch">{t('Swatch')}</option>
+                    <option value="toggle">{t('Toggle')}</option>
+                    <option value="number">{t('Number')}</option>
+                    <option value="boolean">{t('Boolean')}</option>
+                  </Select>
                 </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* ── Characteristics pool ──────────────────────────────────────── */}
-          <Card>
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="text-base">{t('Characteristics')}</CardTitle>
-                  <CardDescription className="mt-1">
-                    {t('Manage all characteristics and classes. Drag a characteristic onto a class card to assign it.')}
-                  </CardDescription>
-                </div>
-                {!showNewChar && (
-                  <Button size="sm" variant="outline" onClick={() => setShowNewChar(true)}>
-                    <Plus className="h-4 w-4 mr-1" />
-                    {t('New characteristic')}
+                <div className="flex gap-2">
+                  <Button size="sm" onClick={handleCreateChar} loading={creatingChar} disabled={!newName.trim()}>
+                    {t('Create')}
                   </Button>
-                )}
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-3">
-
-              {/* New characteristic form */}
-              {showNewChar && (
-                <div className="rounded-lg border p-4 space-y-3 bg-muted/10">
-                  <p className="text-sm font-medium">{t('New characteristic ')}</p>
-                  <div className="flex gap-2">
-                    <Input
-                      placeholder={t('Name (e.g. Material, Width)')}
-                      value={newName}
-                      onChange={e => setNewName(e.target.value)}
-                      onKeyDown={e => { if (e.key === 'Enter') handleCreateChar() }}
-                      autoFocus
-                      className="flex-1"
-                    />
-                    <Select
-                      value={newType}
-                      onChange={e => setNewType(e.target.value as Characteristic['display_type'])}
-                      className="w-36"
-                    >
-                      <option value="select">{t('Select')}</option>
-                      <option value="radio">{t('Radio')}</option>
-                      <option value="swatch">{t('Swatch')}</option>
-                      <option value="toggle">{t('Toggle')}</option>
-                      <option value="number">{t('Number')}</option>
-                      <option value="boolean">{t('Boolean')}</option>
-                    </Select>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button size="sm" onClick={handleCreateChar} loading={creatingChar} disabled={!newName.trim()}>
-                      {t('Create')}
-                    </Button>
-                    <Button size="sm" variant="ghost" onClick={() => { setShowNewChar(false); setNewName('') }}>
-                      {t('Cancel')}
-                    </Button>
-                  </div>
+                  <Button size="sm" variant="ghost" onClick={() => { setShowNewChar(false); setNewName('') }}>
+                    {t('Cancel')}
+                  </Button>
                 </div>
-              )}
-
-              {characteristics.length === 0 && !showNewChar && (
-                <p className="text-sm text-muted-foreground">{t('No characteristics yet.')}</p>
-              )}
-
-              <div className="space-y-1.5">
-                {characteristics.map(char => (
-                  <DraggableChar
-                    key={char.id}
-                    char={char}
-                    classesForChar={classesForChar(char.id)}
-                    allClasses={classes}
-                    values={values[char.id] ?? []}
-                    expanded={!!expanded[char.id]}
-                    onToggleExpand={() => toggleExpand(char.id)}
-                    onRename={name => handleRenameChar(char, name)}
-                    onUpdateI18n={i18n => handleUpdateCharI18n(char, i18n)}
-                    onUpdateDescriptionI18n={i18n => handleUpdateCharDescriptionI18n(char, i18n)}
-                    onChangeType={type => handleChangeType(char, type)}
-                    onUpdateBounds={(min, max) => handleUpdateBounds(char, min, max)}
-                    onDelete={() => setToDelete(char)}
-                    onAssignToClass={classId => handleAssign(classId, char.id)}
-                    tenantId={tenant?.id ?? ''}
-                    onValuesChange={updated => setValues(prev => ({ ...prev, [char.id]: updated }))}
-                  />
-                ))}
               </div>
+            )}
 
-            </CardContent>
-          </Card>
-
+            {visibleChars.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-8 text-center">
+                {search.trim() || typeFilter !== 'all'
+                  ? t('No characteristics match your filters.')
+                  : t('No characteristics yet.')}
+              </p>
+            ) : isReorderView ? (
+              <SortableContext items={visibleChars.map(c => c.id)} strategy={verticalListSortingStrategy}>
+                {charRows}
+              </SortableContext>
+            ) : (
+              charRows
+            )}
+          </div>
         </div>
 
         {/* Drag overlay */}

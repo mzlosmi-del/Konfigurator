@@ -8,3 +8,7 @@ dist/
 # Playwright (visual tests live in configurator-admin/tests-visual/)
 playwright-report/
 test-results/
+
+# Claude Code / Superpowers local artifacts
+.claude/
+.superpowers/
