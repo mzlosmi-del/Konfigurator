@@ -81,6 +81,7 @@ export function EditProductPage() {
         sku:              values.sku?.trim() || null,
         unit_of_measure:  values.unit_of_measure?.trim() || null,
         show_price_breakdown: values.show_price_breakdown,
+        group_into_tabs:  values.group_into_tabs,
       })
       // i18n maps are persisted in `tenant_texts`. The legacy JSONB columns
       // were dropped by migration 078.

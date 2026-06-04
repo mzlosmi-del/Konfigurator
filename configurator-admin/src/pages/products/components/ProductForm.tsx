@@ -23,6 +23,7 @@ export type ProductFormValues = {
   sku?: string
   unit_of_measure?: string
   show_price_breakdown: boolean
+  group_into_tabs: boolean
 }
 
 interface ProductFormProps {
@@ -46,6 +47,7 @@ export function ProductForm({
     sku:             z.string().max(100).optional().or(z.literal('')),
     unit_of_measure: z.string().max(50).optional().or(z.literal('')),
     show_price_breakdown: z.boolean(),
+    group_into_tabs: z.boolean(),
   })
 
   const {
@@ -58,6 +60,7 @@ export function ProductForm({
       currency:             'EUR',
       base_price:           0,
       show_price_breakdown: true,
+      group_into_tabs:      false,
       ...defaultValues,
     },
   })
@@ -187,6 +190,22 @@ export function ProductForm({
         </label>
       </FormField>
 
+      <FormField
+        label={t('Characteristic layout in the widget')}
+        htmlFor="group_into_tabs"
+        hint={t('When on, characteristics are split into tabs by their class (only if the product has more than one class). When off, they show as a single list.')}
+      >
+        <label className="flex items-center gap-2 text-sm cursor-pointer">
+          <input
+            id="group_into_tabs"
+            type="checkbox"
+            className="h-4 w-4 rounded border-input"
+            {...register('group_into_tabs')}
+          />
+          {t('Group characteristics into tabs')}
+        </label>
+      </FormField>
+
       <div className="flex justify-end gap-2 pt-2">
         {onCancel && (
           <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>
@@ -212,5 +231,6 @@ export function productToFormValues(p: Product): ProductFormValues {
     sku:             p.sku ?? '',
     unit_of_measure: p.unit_of_measure ?? '',
     show_price_breakdown: p.show_price_breakdown ?? true,
+    group_into_tabs: p.group_into_tabs ?? false,
   }
 }
