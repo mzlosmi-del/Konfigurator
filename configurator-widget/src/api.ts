@@ -10,6 +10,7 @@ import type {
   InquiryPayload,
   WidgetConfig,
 } from './types'
+import { applyCharacteristicOrder, type CharOrderRow } from './charOrder'
 
 export function createSupabaseClient(config: WidgetConfig) {
   return createClient(config.supabaseUrl, config.supabaseAnonKey, {
@@ -82,16 +83,31 @@ export async function loadProductConfig(config: WidgetConfig): Promise<FullProdu
   for (const pc of productClasses ?? []) classOrder[(pc as any).class_id] = (pc as any).sort_order
 
   const seen = new Set<string>()
-  const orderedCharIds: string[] = []
+  const classDerivedCharIds: string[] = []
   const sortedMembers = [...(members ?? [])].sort(
     (a: any, b: any) => (classOrder[a.class_id] ?? 0) - (classOrder[b.class_id] ?? 0) || a.sort_order - b.sort_order
   )
   for (const m of sortedMembers as any[]) {
     if (!seen.has(m.characteristic_id)) {
       seen.add(m.characteristic_id)
-      orderedCharIds.push(m.characteristic_id)
+      classDerivedCharIds.push(m.characteristic_id)
     }
   }
+
+  // Apply the per-product flat display-order override (migration 089) on top of
+  // the class-derived order. Characteristics with no override row keep their
+  // class-derived position.
+  const { data: orderOverrides, error: orderError } = classDerivedCharIds.length > 0
+    ? await sb.from('product_characteristic_order')
+        .select('characteristic_id, sort_order')
+        .eq('product_id', config.productId)
+    : { data: [], error: null }
+  if (orderError) throw new Error('Failed to load characteristic order')
+
+  const orderedCharIds = applyCharacteristicOrder(
+    classDerivedCharIds,
+    (orderOverrides ?? []) as CharOrderRow[],
+  )
 
   const characteristicIds = orderedCharIds
 

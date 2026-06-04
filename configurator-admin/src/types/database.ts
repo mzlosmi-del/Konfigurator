@@ -374,6 +374,18 @@ export interface Database {
         Insert: { product_id: string; class_id: string; sort_order?: number }
         Update: Partial<Database['public']['Tables']['product_classes']['Insert']>
       }
+      // Per-product override for the flat display order of characteristics in
+      // the widget. A row exists only for explicitly-ordered characteristics;
+      // others fall back to the class-derived order. See migration 089.
+      product_characteristic_order: {
+        Row: {
+          product_id: string
+          characteristic_id: string
+          sort_order: number
+        }
+        Insert: { product_id: string; characteristic_id: string; sort_order?: number }
+        Update: Partial<Database['public']['Tables']['product_characteristic_order']['Insert']>
+      }
       pricing_formulas: {
         Row: {
           id: string

@@ -1,13 +1,30 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Trash2, ChevronDown, ChevronRight, Tag } from 'lucide-react'
+import { Trash2, ChevronDown, ChevronRight, Tag, GripVertical } from 'lucide-react'
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core'
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+  useSortable,
+  arrayMove,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import {
   fetchClasses,
   fetchProductClassesWithChars,
+  fetchProductCharacteristicsOrdered,
+  saveProductCharacteristicOrder,
   attachClassToProduct,
   detachClassFromProduct,
   type ProductClassWithChars,
 } from '@/lib/products'
-import type { CharacteristicClass } from '@/types/database'
+import type { CharacteristicClass, Characteristic } from '@/types/database'
 import { Button } from '@/components/ui/button'
 import { Select } from '@/components/ui/select'
 import { Spinner } from '@/components/ui/spinner'
@@ -18,6 +35,39 @@ import { t } from '@/i18n'
 
 interface Props {
   productId: string
+}
+
+/** A single draggable characteristic row in the flat order list. */
+function SortableCharRow({ char }: { char: Characteristic }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: char.id,
+  })
+  const style: React.CSSProperties = {
+    transform:  CSS.Transform.toString(transform),
+    transition,
+    opacity:    isDragging ? 0.5 : 1,
+  }
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm bg-background border"
+    >
+      <button
+        {...attributes}
+        {...listeners}
+        type="button"
+        className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground shrink-0"
+        aria-label={t('Drag to reorder')}
+      >
+        <GripVertical className="h-4 w-4" />
+      </button>
+      <span className="flex-1 font-medium">{char.name}</span>
+      <span className="text-xs text-muted-foreground capitalize px-1.5 py-0.5 rounded bg-muted">
+        {char.display_type}
+      </span>
+    </div>
+  )
 }
 
 export function CharacteristicsPanel({ productId }: Props) {
@@ -32,15 +82,24 @@ export function CharacteristicsPanel({ productId }: Props) {
   const [toDetach, setToDetach]           = useState<ProductClassWithChars | null>(null)
   const [detaching, setDetaching]         = useState(false)
 
+  const [orderedChars, setOrderedChars]   = useState<Characteristic[]>([])
+  const [orderDirty, setOrderDirty]       = useState(false)
+  const [savingOrder, setSavingOrder]     = useState(false)
+
+  const sensors = useSensors(useSensor(PointerSensor))
+
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const [assignedData, libData] = await Promise.all([
+      const [assignedData, libData, orderedData] = await Promise.all([
         fetchProductClassesWithChars(productId),
         fetchClasses(),
+        fetchProductCharacteristicsOrdered(productId),
       ])
       setAssigned(assignedData)
       setAllClasses(libData)
+      setOrderedChars(orderedData)
+      setOrderDirty(false)
       if (assignedData.length > 0) setExpanded({ [assignedData[0].id]: true })
     } catch {
       toast({ title: t('Failed to load classes'), variant: 'destructive' })
@@ -50,6 +109,31 @@ export function CharacteristicsPanel({ productId }: Props) {
   }, [productId, toast])
 
   useEffect(() => { load() }, [load])
+
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+    setOrderedChars(prev => {
+      const oldIndex = prev.findIndex(c => c.id === active.id)
+      const newIndex = prev.findIndex(c => c.id === over.id)
+      if (oldIndex === -1 || newIndex === -1) return prev
+      return arrayMove(prev, oldIndex, newIndex)
+    })
+    setOrderDirty(true)
+  }
+
+  async function handleSaveOrder() {
+    setSavingOrder(true)
+    try {
+      await saveProductCharacteristicOrder(productId, orderedChars.map(c => c.id))
+      setOrderDirty(false)
+      toast({ title: t('Order saved') })
+    } catch {
+      toast({ title: t('Failed to save order'), variant: 'destructive' })
+    } finally {
+      setSavingOrder(false)
+    }
+  }
 
   const unassigned = allClasses.filter(c => !assigned.some(a => a.id === c.id))
 
@@ -154,6 +238,37 @@ export function CharacteristicsPanel({ productId }: Props) {
               )}
             </div>
           ))}
+        </div>
+      )}
+
+      {/* ── Display order ─────────────────────────────────────────────────── */}
+      {orderedChars.length > 1 && (
+        <div className="rounded-lg border bg-card p-4 space-y-3">
+          <div className="flex items-center gap-2">
+            <div className="flex-1">
+              <h4 className="text-sm font-medium">{t('Display order')}</h4>
+              <p className="text-xs text-muted-foreground">
+                {t('Drag to set the order characteristics appear in the widget.')}
+              </p>
+            </div>
+            <Button
+              size="sm"
+              onClick={handleSaveOrder}
+              disabled={!orderDirty}
+              loading={savingOrder}
+            >
+              {t('Save order')}
+            </Button>
+          </div>
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+            <SortableContext items={orderedChars.map(c => c.id)} strategy={verticalListSortingStrategy}>
+              <div className="space-y-1">
+                {orderedChars.map(char => (
+                  <SortableCharRow key={char.id} char={char} />
+                ))}
+              </div>
+            </SortableContext>
+          </DndContext>
         </div>
       )}
 

@@ -4,6 +4,7 @@
 // components remain fully typed via the return types.
 import { supabase } from './supabase'
 import { storagePathForAssetUrl, PRODUCT_ASSETS_BUCKET } from './assets'
+import { applyCharacteristicOrder, type CharOrderRow } from './charOrder'
 import type {
   Product,
   Characteristic,
@@ -275,6 +276,68 @@ export async function fetchProductClassesWithChars(
     const cls = (classResult.data ?? []).find((c: any) => c.id === pc.class_id) as unknown as CharacteristicClass
     return { ...cls, sort_order: pc.sort_order as number, characteristics: membersByClass[pc.class_id as string] ?? [] }
   })
+}
+
+/**
+ * Fetch a product's characteristics as a single flat, ordered, de-duplicated
+ * list — the order the widget will render them in. Built from the class-derived
+ * order (fetchProductClassesWithChars) with the per-product
+ * product_characteristic_order override applied on top.
+ */
+export async function fetchProductCharacteristicsOrdered(
+  productId: string
+): Promise<Characteristic[]> {
+  const classes = await fetchProductClassesWithChars(productId)
+
+  // Flatten + dedup, preserving class-then-member order (first occurrence wins).
+  const byId = new Map<string, Characteristic>()
+  for (const cls of classes) {
+    for (const char of cls.characteristics) {
+      if (!byId.has(char.id)) byId.set(char.id, char)
+    }
+  }
+  const classDerivedIds = [...byId.keys()]
+
+  const { data: overrides, error } = await supabase
+    .from('product_characteristic_order')
+    .select('characteristic_id, sort_order')
+    .eq('product_id', productId)
+  if (error) throw new Error(error.message)
+
+  const orderedIds = applyCharacteristicOrder(classDerivedIds, (overrides ?? []) as CharOrderRow[])
+  return orderedIds.map(id => byId.get(id)!).filter(Boolean)
+}
+
+/**
+ * Persist a flat per-product characteristic order. Writes one row per id with
+ * its index as sort_order, and removes any stale rows for characteristics no
+ * longer in the list (e.g. a class was detached).
+ */
+export async function saveProductCharacteristicOrder(
+  productId: string,
+  orderedCharacteristicIds: string[]
+): Promise<void> {
+  const rows = orderedCharacteristicIds.map((characteristic_id, i) => ({
+    product_id: productId,
+    characteristic_id,
+    sort_order: i,
+  }))
+
+  const { error: upsertError } = await supabase
+    .from('product_characteristic_order')
+    .upsert(rows as any, { onConflict: 'product_id,characteristic_id' })
+  if (upsertError) throw new Error(upsertError.message)
+
+  // Drop rows for characteristics that are no longer part of the product.
+  let del = supabase
+    .from('product_characteristic_order')
+    .delete()
+    .eq('product_id', productId)
+  if (orderedCharacteristicIds.length > 0) {
+    del = del.not('characteristic_id', 'in', `(${orderedCharacteristicIds.join(',')})`)
+  }
+  const { error: deleteError } = await del
+  if (deleteError) throw new Error(deleteError.message)
 }
 
 export async function attachClassToProduct(
