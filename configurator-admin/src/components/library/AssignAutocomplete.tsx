@@ -90,7 +90,7 @@ export function AssignAutocomplete({ options, placeholder, onSelect, className }
       style={{ position: 'fixed', left: rect.left, top: rect.top + 4, width: rect.width, zIndex: 60 }}
     >
       {filtered.length > 0 ? (
-        <div className="max-h-48 overflow-auto rounded-md border bg-popover shadow-lg">
+        <div className="max-h-48 overflow-auto rounded-md border bg-card shadow-lg">
           {filtered.map((opt, i) => (
             <button
               key={opt.id}
@@ -110,7 +110,7 @@ export function AssignAutocomplete({ options, placeholder, onSelect, className }
           ))}
         </div>
       ) : (
-        <div className="rounded-md border bg-popover shadow-lg px-2.5 py-1.5 text-xs text-muted-foreground">
+        <div className="rounded-md border bg-card shadow-lg px-2.5 py-1.5 text-xs text-muted-foreground">
           No matches
         </div>
       )}
