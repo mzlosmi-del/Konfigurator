@@ -1055,6 +1055,19 @@ const sr: Record<string, string> = {
     'Isti sadržaj kao Moderni, uže margine i manji font. Za kratke ponude koje staju na jednu stranu.',
   'Editorial style. Left accent stripe, coral section labels, accent total band.':
     'Uredni stil. Naglasna traka s leve strane, koralni naslovi sekcija, naglašena traka ukupnog iznosa.',
+  // PDF preview dialog — section labels, controls and tooltips
+  'Show price breakdown':                  'Prikaži razdvajanje cene',
+  'Show characteristic descriptions':      'Prikaži opise karakteristika',
+  'Output language':                       'Jezik izlaza',
+  'PDF only':                              'samo PDF',
+  'Format':                                'Format',
+  'Download DOCX':                         'Preuzmi DOCX',
+  'Download XLSX':                         'Preuzmi XLSX',
+  'Reorder, show or hide sections of the quotation PDF and choose the language before generating it.':
+    'Promenite redosled, prikažite ili sakrijte sekcije PDF ponude i izaberite jezik pre generisanja.',
+  'Portable Document Format':              'Portable Document Format (PDF)',
+  'Microsoft Word document':              'Microsoft Word dokument',
+  'Microsoft Excel spreadsheet':          'Microsoft Excel tabela',
   'View products':                         'Pogledaj proizvode',
   'Receive your first inquiry':            'Primite vaš prvi upit',
   'A customer fills out your configurator and submits a quote request.':
@@ -2618,6 +2631,19 @@ const de: Record<string, string> = {
     'Gleicher Inhalt wie Modern, engere Ränder und kleinere Schrift. Passend für kurze Angebote auf einer Seite.',
   'Editorial style. Left accent stripe, coral section labels, accent total band.':
     'Redaktioneller Stil. Linker Akzentstreifen, korallenfarbene Abschnittsbeschriftungen, farbige Summenleiste.',
+  // PDF preview dialog — section labels, controls and tooltips
+  'Show price breakdown':                  'Preisaufschlüsselung anzeigen',
+  'Show characteristic descriptions':      'Merkmalbeschreibungen anzeigen',
+  'Output language':                       'Ausgabesprache',
+  'PDF only':                              'nur PDF',
+  'Format':                                'Format',
+  'Download DOCX':                         'DOCX herunterladen',
+  'Download XLSX':                         'XLSX herunterladen',
+  'Reorder, show or hide sections of the quotation PDF and choose the language before generating it.':
+    'Ordnen Sie die Abschnitte des Angebots-PDFs neu an, blenden Sie sie ein oder aus und wählen Sie die Sprache vor der Erstellung.',
+  'Portable Document Format':              'Portable Document Format (PDF)',
+  'Microsoft Word document':              'Microsoft Word-Dokument',
+  'Microsoft Excel spreadsheet':          'Microsoft Excel-Tabelle',
   'View products':                         'Produkte anzeigen',
   'Receive your first inquiry':            'Erhalten Sie Ihre erste Anfrage',
   'A customer fills out your configurator and submits a quote request.':
