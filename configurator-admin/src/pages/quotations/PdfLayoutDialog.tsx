@@ -453,7 +453,7 @@ function PreviewA4({ sections, quotation, tenant, globalTexts, productTexts, lan
                       !section.visible ? 'line-through text-[#6C7179]' : '',
                     ].join(' ')}
                   >
-                    {section.label}
+                    {t(section.label)}
                     {section.group && (
                       <span className="font-normal text-[#6C7179] ml-1">({section.group})</span>
                     )}
