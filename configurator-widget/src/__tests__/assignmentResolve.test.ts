@@ -94,4 +94,25 @@ describe('resolveImage assignment table', () => {
     const legacy = [{ ...asset('a', 'oak.png'), characteristic_value_id: 'v-oak' }]
     expect(resolveImage(legacy, sel({ 'c-mat': 'v-oak' }))).toBe('oak.png')
   })
+
+  it('mixed numeric + select conditions in one row (AND)', () => {
+    const rows = [row('r1', 'img-wide', 1, [
+      { characteristic_id: 'c-color', operator: 'eq', value_id: 'v-red', numeric_value: null },
+      { characteristic_id: 'c-w',     operator: 'gt', value_id: null,    numeric_value: 2000 },
+    ])]
+    expect(resolveImage(assets, sel({ 'c-color': 'v-red' }), rows, num({ 'c-w': 2500 }))).toBe('wide.png')
+    // select matches but numeric fails -> no match
+    expect(resolveImage(assets, sel({ 'c-color': 'v-red' }), rows, num({ 'c-w': 1500 }))).toBeNull()
+    // numeric matches but select fails -> no match
+    expect(resolveImage(assets, sel({ 'c-color': 'v-blue' }), rows, num({ 'c-w': 2500 }))).toBeNull()
+  })
+
+  it('skips a non-matching higher-priority row and matches a lower-priority one', () => {
+    const rows = [
+      row('r1', 'img-red',  1, [{ characteristic_id: 'c-color', operator: 'eq', value_id: 'v-red',  numeric_value: null }]),
+      row('r2', 'img-wood', 2, [{ characteristic_id: 'c-color', operator: 'eq', value_id: 'v-blue', numeric_value: null }]),
+    ]
+    // selection matches only the lower-priority (priority 2) row
+    expect(resolveImage(assets, sel({ 'c-color': 'v-blue' }), rows)).toBe('wood.png')
+  })
 })

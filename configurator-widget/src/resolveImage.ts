@@ -74,6 +74,7 @@ function conditionPasses(
       case 'eq': return input === c.numeric_value
       case 'gt': return input > c.numeric_value
       case 'lt': return input < c.numeric_value
+      default: return false
     }
   }
   // Malformed condition (no value_id, no numeric_value) never matches.
