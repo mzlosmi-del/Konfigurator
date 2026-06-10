@@ -22,6 +22,7 @@ import { Toaster } from '@/components/ui/toast'
 import { useAuthContext } from '@/components/auth/AuthContext'
 import { t } from '@/i18n'
 import { MeshRulesEditor, type MeshRule } from './MeshRulesEditor'
+import { AssignmentTableEditor } from './AssignmentTableEditor'
 
 
 const MODEL_VIEWER_CDN = 'https://ajax.googleapis.com/ajax/libs/model-viewer/3.5.0/model-viewer.min.js'
@@ -669,6 +670,14 @@ export function VisualizationPanel({ productId, arEnabled = true, onArToggle, ar
           )}
         </div>
       )}
+
+      <div className="mt-8 border-t pt-6">
+        <h3 className="text-sm font-semibold mb-1">{t('Assignment table')}</h3>
+        <p className="text-sm text-muted-foreground mb-3">
+          {t('Map combinations of characteristic values to an image. Rows are checked top-to-bottom by priority; the first matching row wins. An empty cell matches any value. If no row matches, the default asset is used.')}
+        </p>
+        <AssignmentTableEditor productId={productId} chars={chars} assets={assets} />
+      </div>
 
       <ConfirmDialog
         open={!!toDelete}
