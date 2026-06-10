@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, Mail, ExternalLink, FileText, ArrowRight } from 'lucide-react'
+import { ArrowLeft, Mail, ExternalLink, FileText, ArrowRight, Paperclip, Download } from 'lucide-react'
 import { fetchInquiry, updateInquiryStatus } from '@/lib/inquiries'
+import { listInquiryAttachments, getInquiryAttachmentUrl, formatBytes } from '@/lib/inquiryAttachments'
 import { supabase } from '@/lib/supabase'
-import type { Inquiry, InquiryStatus } from '@/types/database'
+import type { Inquiry, InquiryStatus, InquiryAttachment } from '@/types/database'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -55,20 +56,23 @@ export function InquiryDetailPage() {
   const [updatingStatus, setUpdatingStatus] = useState(false)
 
   const [linkedQuotationId, setLinkedQuotationId] = useState<string | null>(null)
+  const [attachments, setAttachments] = useState<InquiryAttachment[]>([])
 
   const load = useCallback(async (inquiryId: string) => {
     setLoading(true)
     try {
-      const [data, linkedQ] = await Promise.all([
+      const [data, linkedQ, atts] = await Promise.all([
         fetchInquiry(inquiryId),
         supabase
           .from('quotations')
           .select('id')
           .eq('source_inquiry_id', inquiryId)
           .maybeSingle(),
+        listInquiryAttachments(inquiryId).catch(() => [] as InquiryAttachment[]),
       ])
       setInquiry(data as InquiryWithProduct)
       setLinkedQuotationId((linkedQ.data as { id: string } | null)?.id ?? null)
+      setAttachments(atts)
 
       // Auto-mark as read when opened
       if (data.status === 'new') {
@@ -98,6 +102,15 @@ export function InquiryDetailPage() {
       toast({ title: t('Failed to update status'), variant: 'destructive' })
     } finally {
       setUpdatingStatus(false)
+    }
+  }
+
+  async function handleDownloadAttachment(att: InquiryAttachment) {
+    try {
+      const url = await getInquiryAttachmentUrl(att)
+      window.open(url, '_blank', 'noopener')
+    } catch {
+      toast({ title: t('Failed to open file'), variant: 'destructive' })
     }
   }
 
@@ -222,6 +235,40 @@ export function InquiryDetailPage() {
               </CardHeader>
               <CardContent>
                 <p className="text-sm whitespace-pre-wrap">{inquiry.message}</p>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Customer-uploaded attachments */}
+          {attachments.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Paperclip className="h-4 w-4" />
+                  {t('Attachments')}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ul className="space-y-2">
+                  {attachments.map(att => (
+                    <li
+                      key={att.id}
+                      className="flex items-center gap-3 rounded-md border px-3 py-2 text-sm"
+                    >
+                      <span className="flex-1 min-w-0 truncate font-medium">{att.filename}</span>
+                      <span className="text-xs text-muted-foreground tabular-nums">
+                        {formatBytes(att.size_bytes)}
+                      </span>
+                      <button
+                        onClick={() => handleDownloadAttachment(att)}
+                        className="text-primary hover:underline flex items-center gap-1 text-xs"
+                      >
+                        <Download className="h-3.5 w-3.5" />
+                        {t('Download')}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
               </CardContent>
             </Card>
           )}

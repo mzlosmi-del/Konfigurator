@@ -624,6 +624,12 @@ export const WIDGET_STYLES = `
   .cw-bar-cta:hover:not(:disabled) { background: var(--cw-cta-hover); }
   .cw-bar-cta:active:not(:disabled) { transform: translateY(1px); }
   .cw-bar-cta:disabled { background: var(--cw-surface-alt); color: var(--cw-text-placeholder); cursor: not-allowed; }
+  .cw-bar-price-disclaimer {
+    margin: 8px 0 0;
+    font-size: 11px;
+    line-height: 1.4;
+    color: var(--cw-text-muted);
+  }
   @media (max-width: 480px) {
     .cw-bar-row { flex-direction: column; align-items: stretch; gap: 10px; }
     .cw-bar-cta { text-align: center; }
@@ -676,6 +682,65 @@ export const WIDGET_STYLES = `
     box-shadow: 0 0 0 3px var(--cw-surface-alt);
   }
   .cw-field-error { font-size: 11px; color: #b91c1c; }
+  .cw-field-hint {
+    font-size: 11px;
+    line-height: 1.4;
+    color: var(--cw-text-muted);
+    text-transform: none;
+    letter-spacing: 0;
+  }
+  .cw-field input[type="file"] {
+    padding: 7px 10px;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .cw-file-list {
+    list-style: none;
+    margin: 4px 0 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .cw-file-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    border: 1px solid var(--cw-border);
+    border-radius: var(--cw-radius-sm);
+    background: var(--cw-surface-alt);
+    font-size: 13px;
+  }
+  .cw-file-name {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--cw-text);
+  }
+  .cw-file-size {
+    flex: 0 0 auto;
+    font-size: 11px;
+    color: var(--cw-text-muted);
+    font-variant-numeric: tabular-nums;
+  }
+  .cw-file-remove {
+    flex: 0 0 auto;
+    width: 20px;
+    height: 20px;
+    line-height: 18px;
+    text-align: center;
+    border: none;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--cw-text-muted);
+    font-size: 16px;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+  }
+  .cw-file-remove:hover { background: var(--cw-border); color: var(--cw-text); }
 
   .cw-submit-btn {
     margin-top: 4px;

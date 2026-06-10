@@ -409,6 +409,7 @@ export function Widget({ config, track, onThemeLoad }: Props) {
             totalPrice={totalPrice}
             currency={product.currency}
             formConfig={product.form_config}
+            uploadsEnabled={product.uploads_possible === true}
             onSuccess={() => {
               track('inquiry_submitted', { price: totalPrice, currency: product.currency })
               setState({ phase: 'success', data: state.data })
@@ -446,6 +447,9 @@ export function Widget({ config, track, onThemeLoad }: Props) {
               {allSelected ? t('Request a quote') : t('Select all options to continue')}
             </button>
           </div>
+          <p class="cw-bar-price-disclaimer">
+            {t('This is an estimated price. The official quote will be provided by the company after your inquiry.')}
+          </p>
         </div>
       )}
 

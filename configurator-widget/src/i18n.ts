@@ -11,6 +11,8 @@ const sr: Record<string, string> = {
   'Price breakdown':                       'Pregled cene',
   'Request a quote':                       'Zatraži ponudu',
   'Select all options to continue':        'Izaberite sve opcije da biste nastavili',
+  'This is an estimated price. The official quote will be provided by the company after your inquiry.':
+    'Ovo je procenjena cena. Zvaničnu ponudu će vam dostaviti kompanija nakon vašeg upita.',
 
   // Inquiry form
   'Your name *':                           'Vaše ime *',
@@ -27,6 +29,19 @@ const sr: Record<string, string> = {
   'Failed to submit. Please try again.':   'Slanje nije uspelo. Pokušajte ponovo.',
   'Quote requests are temporarily paused. Please contact us directly.':
     'Slanje upita je privremeno pauzirano. Kontaktirajte nas direktno.',
+
+  // File uploads
+  'Attach images (optional)':              'Priložite slike (opciono)',
+  'Allowed formats: JPG, PNG, GIF, WebP, HEIC. Up to 3 files, max 20 MB each.':
+    'Dozvoljeni formati: JPG, PNG, GIF, WebP, HEIC. Najviše 3 fajla, do 20 MB po fajlu.',
+  'Add files':                             'Dodaj fajlove',
+  'Remove':                                'Ukloni',
+  'You can attach up to 3 files.':         'Možete priložiti najviše 3 fajla.',
+  'Each file must be 20 MB or smaller.':   'Svaki fajl mora biti 20 MB ili manji.',
+  'Only image files are allowed (JPG, PNG, GIF, WebP, HEIC).':
+    'Dozvoljene su samo slike (JPG, PNG, GIF, WebP, HEIC).',
+  'Your inquiry was received, but some files could not be uploaded.':
+    'Vaš upit je primljen, ali neki fajlovi nisu mogli biti otpremljeni.',
 
   // Language switcher
   'coming soon':                           'uskoro',

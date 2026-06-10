@@ -234,6 +234,9 @@ export interface Database {
           form_config: Json
           widget_theme: string
           show_price_breakdown: boolean
+          /** When true, the widget lets customers attach up to 3 images
+           *  (max 20 MB each) to their inquiry. Default false. See migration 092. */
+          uploads_possible: boolean
           /** When true, the widget splits characteristics into one tab per
            *  assigned characteristic class (tabs render only with >1 class).
            *  When false (default) it renders the flat list. See migration 091. */
@@ -251,7 +254,7 @@ export interface Database {
           created_at: string
           updated_at: string
         }
-        Insert: Omit<Database['public']['Tables']['products']['Row'], 'id' | 'created_at' | 'updated_at' | 'show_price_breakdown' | 'group_into_tabs' | 'preview_defaults' | 'name_i18n' | 'description_i18n'> & { id?: string; show_price_breakdown?: boolean; group_into_tabs?: boolean; preview_defaults?: Record<string, string> }
+        Insert: Omit<Database['public']['Tables']['products']['Row'], 'id' | 'created_at' | 'updated_at' | 'show_price_breakdown' | 'group_into_tabs' | 'uploads_possible' | 'preview_defaults' | 'name_i18n' | 'description_i18n'> & { id?: string; show_price_breakdown?: boolean; group_into_tabs?: boolean; uploads_possible?: boolean; preview_defaults?: Record<string, string> }
         Update: Partial<Database['public']['Tables']['products']['Insert']>
       }
       characteristic_classes: {
@@ -427,6 +430,20 @@ export interface Database {
         }
         Insert: Omit<Database['public']['Tables']['quotation_attachments']['Row'], 'id' | 'created_at'> & { id?: string }
         Update: Partial<Database['public']['Tables']['quotation_attachments']['Insert']>
+      }
+      inquiry_attachments: {
+        Row: {
+          id:           string
+          tenant_id:    string
+          inquiry_id:   string
+          storage_path: string
+          filename:     string
+          mime_type:    string
+          size_bytes:   number
+          created_at:   string
+        }
+        Insert: Omit<Database['public']['Tables']['inquiry_attachments']['Row'], 'id' | 'created_at'> & { id?: string }
+        Update: Partial<Database['public']['Tables']['inquiry_attachments']['Insert']>
       }
       quotation_rejection_reasons: {
         Row: {
@@ -690,6 +707,7 @@ export type DocumentTemplateInsert     = Database['public']['Tables']['document_
 export type DocumentTemplateUpdate     = Database['public']['Tables']['document_templates']['Update']
 export type QuotationRejectionReason   = Database['public']['Tables']['quotation_rejection_reasons']['Row']
 export type QuotationAttachment        = Database['public']['Tables']['quotation_attachments']['Row']
+export type InquiryAttachment          = Database['public']['Tables']['inquiry_attachments']['Row']
 export type RolePermission             = Database['public']['Tables']['role_permissions']['Row']
 export type PermLevel                  = 'none' | 'view' | 'edit'
 export type AuditLog                   = Database['public']['Tables']['audit_log']['Row']

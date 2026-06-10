@@ -45,6 +45,18 @@ interface InquiryRow {
   created_at: string
 }
 
+interface AttachmentRow {
+  storage_path: string
+  filename:     string
+  size_bytes:   number
+}
+
+interface EmailAttachment {
+  filename: string
+  size_bytes: number
+  url: string
+}
+
 interface ProductRow { name: string }
 interface TenantRow  { name: string; notification_email: string | null }
 interface ProfileRow { id: string }    // auth.users id
@@ -104,6 +116,33 @@ Deno.serve(async (req: Request) => {
 
       const productName = (product as ProductRow | null)?.name ?? 'Unknown product'
 
+      // ── 2b. Fetch any customer-uploaded attachments and sign download URLs ──
+      // Best-effort: a failure here must never block the notification email.
+      let emailAttachments: EmailAttachment[] = []
+      try {
+        const { data: atts } = await sb
+          .from('inquiry_attachments')
+          .select('storage_path, filename, size_bytes')
+          .eq('inquiry_id', inq.id)
+          .order('created_at', { ascending: true })
+
+        const rows = (atts ?? []) as AttachmentRow[]
+        if (rows.length > 0) {
+          const SEVEN_DAYS = 60 * 60 * 24 * 7
+          const signed = await Promise.all(rows.map(async (a) => {
+            const { data } = await sb.storage
+              .from('inquiry-attachments')
+              .createSignedUrl(a.storage_path, SEVEN_DAYS)
+            return data?.signedUrl
+              ? { filename: a.filename, size_bytes: a.size_bytes, url: data.signedUrl }
+              : null
+          }))
+          emailAttachments = signed.filter((x): x is EmailAttachment => x !== null)
+        }
+      } catch (err) {
+        console.warn('notify-inquiry: could not load attachments', err)
+      }
+
       // ── 3. Resolve notification email ───────────────────────────────────────
       // Priority: tenant.notification_email → admin user's auth email
       const { data: tenant } = await sb
@@ -142,6 +181,7 @@ Deno.serve(async (req: Request) => {
         tenantName:    tenantRow?.name ?? 'Your store',
         productName,
         inquiry:       inq,
+        attachments:   emailAttachments,
       })
 
       const res = await fetch('https://api.resend.com/emails', {
@@ -216,10 +256,12 @@ function buildEmailHtml({
   tenantName,
   productName,
   inquiry,
+  attachments,
 }: {
   tenantName: string
   productName: string
   inquiry: InquiryRow
+  attachments: EmailAttachment[]
 }): string {
   const config = Array.isArray(inquiry.configuration) ? inquiry.configuration : []
 
@@ -246,6 +288,19 @@ function buildEmailHtml({
     <div style="margin-top:24px;">
       <p style="margin:0 0 8px;font-weight:600;font-size:14px;">Message</p>
       <p style="margin:0;font-size:14px;color:#374151;white-space:pre-wrap;">${esc(inquiry.message)}</p>
+    </div>` : ''
+
+  const attachmentsBlock = attachments.length > 0 ? `
+    <div style="margin-top:24px;">
+      <p style="margin:0 0 8px;font-weight:600;font-size:14px;">Attachments</p>
+      <ul style="margin:0;padding-left:18px;font-size:14px;color:#374151;">
+        ${attachments.map(a => `
+          <li style="margin:2px 0;">
+            <a href="${esc(a.url)}" style="color:#2563eb;">${esc(a.filename)}</a>
+            <span style="color:#9ca3af;font-size:12px;"> (${fmtBytes(a.size_bytes)})</span>
+          </li>`).join('')}
+      </ul>
+      <p style="margin:8px 0 0;font-size:11px;color:#9ca3af;">Download links expire in 7 days.</p>
     </div>` : ''
 
   const date = new Date(inquiry.created_at).toLocaleString('en-GB', {
@@ -302,6 +357,7 @@ function buildEmailHtml({
       </table>
 
       ${messageBlock}
+      ${attachmentsBlock}
     </div>
 
     <!-- Footer -->
@@ -314,6 +370,12 @@ function buildEmailHtml({
   </div>
 </body>
 </html>`
+}
+
+function fmtBytes(n: number): string {
+  if (n < 1024)        return `${n} B`
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`
+  return `${(n / 1024 / 1024).toFixed(1)} MB`
 }
 
 function esc(s: string): string {

@@ -49,7 +49,7 @@ export async function loadProductConfig(config: WidgetConfig): Promise<FullProdu
   //    rebuilt below from `tenant_texts`.
   const { data: product, error: productError } = await sb
     .from('products')
-    .select('id, name, description, base_price, currency, ar_enabled, ar_placement, form_config, widget_theme, show_price_breakdown, group_into_tabs, preview_defaults')
+    .select('id, name, description, base_price, currency, ar_enabled, ar_placement, form_config, widget_theme, show_price_breakdown, group_into_tabs, uploads_possible, preview_defaults')
     .eq('id', config.productId)
     .eq('status', 'published')
     .single()
@@ -363,15 +363,23 @@ function parsePlanLimitError(err: PostgrestErrorLike): PlanLimitError | null {
   return null
 }
 
+/**
+ * Insert an inquiry and return the (client-generated) id. The id is generated
+ * here rather than read back, because the anon RLS policy on `inquiries` is
+ * INSERT-only (no SELECT) — so a `RETURNING`/`.select()` would come back empty.
+ * The widget needs the id to associate any uploaded files with the inquiry.
+ */
 export async function submitInquiry(
   config: WidgetConfig,
-  payload: InquiryPayload
-): Promise<void> {
+  payload: Omit<InquiryPayload, 'id'>
+): Promise<{ id: string }> {
   const sb = createSupabaseClient(config)
-  const { error } = await sb.from('inquiries').insert(payload as never)
+  const id = crypto.randomUUID()
+  const { error } = await sb.from('inquiries').insert({ ...payload, id } as never)
   if (error) {
     const planErr = parsePlanLimitError(error as PostgrestErrorLike)
     if (planErr) throw planErr
     throw new Error(error.message)
   }
+  return { id }
 }

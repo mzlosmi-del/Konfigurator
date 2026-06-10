@@ -27,6 +27,9 @@ export interface ProductData {
   form_config: FormConfig
   widget_theme: string
   show_price_breakdown: boolean
+  /** When true, the inquiry form lets the customer attach up to 3 images
+   *  (max 20 MB each). Default false. See migration 092. */
+  uploads_possible?: boolean
   /** When true, the widget groups characteristics into tabs by class (only if
    *  the product has >1 class). When false/absent, renders the flat list.
    *  Migration 091. Rows fetched before it default to flat. */
@@ -215,6 +218,9 @@ export type Selection = Record<string, string>
 export type NumericInputs = Record<string, number>
 
 export interface InquiryPayload {
+  /** Generated client-side so the widget knows the row id for file uploads —
+   *  the anon RLS policy has no SELECT, so we cannot read it back after insert. */
+  id: string
   tenant_id: string
   product_id: string
   customer_name: string

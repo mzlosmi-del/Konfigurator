@@ -24,6 +24,7 @@ export type ProductFormValues = {
   unit_of_measure?: string
   show_price_breakdown: boolean
   group_into_tabs: boolean
+  uploads_possible: boolean
 }
 
 interface ProductFormProps {
@@ -48,6 +49,7 @@ export function ProductForm({
     unit_of_measure: z.string().max(50).optional().or(z.literal('')),
     show_price_breakdown: z.boolean(),
     group_into_tabs: z.boolean(),
+    uploads_possible: z.boolean(),
   })
 
   const {
@@ -61,6 +63,7 @@ export function ProductForm({
       base_price:           0,
       show_price_breakdown: true,
       group_into_tabs:      false,
+      uploads_possible:     false,
       ...defaultValues,
     },
   })
@@ -206,6 +209,22 @@ export function ProductForm({
         </label>
       </FormField>
 
+      <FormField
+        label={t('Customer file uploads')}
+        htmlFor="uploads_possible"
+        hint={t('When on, customers can attach up to 3 images (JPG, PNG, GIF, WebP, HEIC, max 20 MB each) to their inquiry.')}
+      >
+        <label className="flex items-center gap-2 text-sm cursor-pointer">
+          <input
+            id="uploads_possible"
+            type="checkbox"
+            className="h-4 w-4 rounded border-input"
+            {...register('uploads_possible')}
+          />
+          {t('Allow file uploads')}
+        </label>
+      </FormField>
+
       <div className="flex justify-end gap-2 pt-2">
         {onCancel && (
           <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>
@@ -232,5 +251,6 @@ export function productToFormValues(p: Product): ProductFormValues {
     unit_of_measure: p.unit_of_measure ?? '',
     show_price_breakdown: p.show_price_breakdown ?? true,
     group_into_tabs: p.group_into_tabs ?? false,
+    uploads_possible: p.uploads_possible ?? false,
   }
 }

@@ -12,6 +12,7 @@ export const PRODUCT_LABELS: Record<string, string> = {
   currency:        'Currency',
   show_price_breakdown: 'Show price breakdown',
   group_into_tabs:      'Group characteristics into tabs',
+  uploads_possible:     'Allow file uploads',
 }
 
 export const CHARACTERISTIC_LABELS: Record<string, string> = {

@@ -1,7 +1,8 @@
 import { h } from 'preact'
 import { useState } from 'preact/hooks'
 import type { WidgetConfig, ConfigLineItem, FormConfig } from '../types'
-import { submitInquiry, PlanLimitError } from '../api'
+import { submitInquiry, PlanLimitError, createSupabaseClient } from '../api'
+import { uploadInquiryFiles, validateFiles, formatBytes, MAX_FILES } from '../uploads'
 import { t } from '../i18n'
 
 interface Props {
@@ -12,6 +13,8 @@ interface Props {
   totalPrice: number
   currency: string
   formConfig?: FormConfig
+  /** When true, render the image-upload control (product.uploads_possible). */
+  uploadsEnabled?: boolean
   onSuccess: () => void
 }
 
@@ -30,11 +33,26 @@ interface FormErrors {
   gdpr?: string
 }
 
-export function InquiryForm({ config, productId, tenantId, lineItems, totalPrice, currency, formConfig = {}, onSuccess }: Props) {
+export function InquiryForm({ config, productId, tenantId, lineItems, totalPrice, currency, formConfig = {}, uploadsEnabled = false, onSuccess }: Props) {
   const [form, setForm] = useState<FormState>({ name: '', email: '', phone: '', company: '', message: '', gdprConsent: false })
   const [errors, setErrors] = useState<FormErrors>({})
   const [submitting, setSubmitting] = useState(false)
   const [serverError, setServerError] = useState<string | null>(null)
+  const [files, setFiles] = useState<File[]>([])
+  const [fileError, setFileError] = useState<string | null>(null)
+
+  function addFiles(incoming: File[]) {
+    setFileError(null)
+    const next = [...files, ...incoming].slice(0, MAX_FILES)
+    const err = validateFiles(next)
+    if (err) { setFileError(err); return }
+    setFiles(next)
+  }
+
+  function removeFile(idx: number) {
+    setFileError(null)
+    setFiles(files.filter((_, i) => i !== idx))
+  }
 
   function validate(): boolean {
     const errs: FormErrors = {}
@@ -50,11 +68,18 @@ export function InquiryForm({ config, productId, tenantId, lineItems, totalPrice
     e.preventDefault()
     if (!validate()) return
 
+    // Validate any attached files up-front so we don't create an inquiry that
+    // we then can't attach the files to.
+    if (uploadsEnabled && files.length > 0) {
+      const fErr = validateFiles(files)
+      if (fErr) { setFileError(fErr); return }
+    }
+
     setSubmitting(true)
     setServerError(null)
 
     try {
-      await submitInquiry(config, {
+      const { id: inquiryId } = await submitInquiry(config, {
         tenant_id: tenantId,
         product_id: productId,
         customer_name: form.name.trim(),
@@ -68,6 +93,20 @@ export function InquiryForm({ config, productId, tenantId, lineItems, totalPrice
         total_price: totalPrice,
         currency,
       })
+
+      // The inquiry row now exists. Attempt file uploads as a best-effort
+      // follow-up: the inquiry is already recorded, so an upload failure must
+      // not block submission — it falls through to the success state.
+      if (uploadsEnabled && files.length > 0) {
+        try {
+          const sb = createSupabaseClient(config)
+          await uploadInquiryFiles(sb, tenantId, inquiryId, files)
+        } catch {
+          // Non-fatal: the company still received the inquiry. Swallow so the
+          // customer sees the thank-you screen rather than a confusing error.
+        }
+      }
+
       onSuccess()
     } catch (err) {
       if (err instanceof PlanLimitError) {
@@ -155,6 +194,46 @@ export function InquiryForm({ config, productId, tenantId, lineItems, totalPrice
               onInput={(e) => setForm(f => ({ ...f, message: (e.target as HTMLTextAreaElement).value }))}
             />
           </div>
+
+          {uploadsEnabled && (
+            <div class="cw-field">
+              <label>{t('Attach images (optional)')}</label>
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/gif,image/webp,image/heic,image/heif"
+                multiple
+                disabled={files.length >= MAX_FILES}
+                onChange={(e) => {
+                  const input = e.target as HTMLInputElement
+                  addFiles(Array.from(input.files ?? []))
+                  // Reset so picking the same file again re-fires onChange.
+                  input.value = ''
+                }}
+              />
+              <span class="cw-field-hint">
+                {t('Allowed formats: JPG, PNG, GIF, WebP, HEIC. Up to 3 files, max 20 MB each.')}
+              </span>
+              {fileError && <span class="cw-field-error">{fileError}</span>}
+              {files.length > 0 && (
+                <ul class="cw-file-list">
+                  {files.map((f, i) => (
+                    <li class="cw-file-item" key={`${f.name}-${i}`}>
+                      <span class="cw-file-name">{f.name}</span>
+                      <span class="cw-file-size">{formatBytes(f.size)}</span>
+                      <button
+                        type="button"
+                        class="cw-file-remove"
+                        onClick={() => removeFile(i)}
+                        aria-label={t('Remove')}
+                      >
+                        \u00d7
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
 
           {formConfig.gdpr_enabled && (
             <div class="cw-field">
