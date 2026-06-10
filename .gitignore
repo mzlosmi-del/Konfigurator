@@ -9,6 +9,9 @@ dist/
 playwright-report/
 test-results/
 
+# Supabase CLI local scratch (linked-project ref, version cache)
+supabase/.temp/
+
 # Claude Code / Superpowers local artifacts
 .claude/
 .superpowers/
