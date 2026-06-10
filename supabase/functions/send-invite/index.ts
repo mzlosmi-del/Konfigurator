@@ -172,16 +172,32 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    // Check if email already a member
+    // Check if email already a member (case-insensitive)
     const { data: existing } = await sb
       .from('profiles')
       .select('id')
       .eq('tenant_id', tenantId)
-      .eq('email', body.email)
+      .ilike('email', body.email)
       .maybeSingle()
 
     if (existing) {
       return new Response(JSON.stringify({ error: 'already_member' }), {
+        status: 409, headers: { ...CORS, 'Content-Type': 'application/json' },
+      })
+    }
+
+    // Check for an existing pending (un-accepted) invitation for this email.
+    // Prevents duplicate invites that would inflate invitation-based member counts.
+    const { data: pendingInvite } = await sb
+      .from('invitations')
+      .select('id')
+      .eq('tenant_id', tenantId)
+      .ilike('email', body.email)
+      .is('accepted_at', null)
+      .maybeSingle()
+
+    if (pendingInvite) {
+      return new Response(JSON.stringify({ error: 'already_invited' }), {
         status: 409, headers: { ...CORS, 'Content-Type': 'application/json' },
       })
     }
@@ -212,6 +228,12 @@ Deno.serve(async (req: Request) => {
       .single()
 
     if (inviteErr || !invite) {
+      // Unique-index race: a pending invite for this email was created concurrently.
+      if ((inviteErr as { code?: string } | null)?.code === '23505') {
+        return new Response(JSON.stringify({ error: 'already_invited' }), {
+          status: 409, headers: { ...CORS, 'Content-Type': 'application/json' },
+        })
+      }
       console.error('send-invite: insert failed', inviteErr)
       return new Response('Failed to create invitation', { status: 500, headers: CORS })
     }

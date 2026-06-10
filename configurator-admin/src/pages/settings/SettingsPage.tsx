@@ -554,7 +554,13 @@ export function SettingsPage() {
       if (res.error) {
         const status = (res.error as { context?: Response }).context?.status
         if (status === 409) {
-          toast({ title: t('Already a member'), description: t('This person is already a member of your workspace.'), variant: 'destructive' })
+          let body: { error?: string } = {}
+          try { body = await (res.error as { context?: Response }).context?.clone().json() } catch { /* ignore */ }
+          if (body.error === 'already_invited') {
+            toast({ title: t('Already invited'), description: t('This person already has a pending invitation.'), variant: 'destructive' })
+          } else {
+            toast({ title: t('Already a member'), description: t('This person is already a member of your workspace.'), variant: 'destructive' })
+          }
           return
         }
         if (status === 400) {
