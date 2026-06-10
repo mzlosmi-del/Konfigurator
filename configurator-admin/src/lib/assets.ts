@@ -141,3 +141,96 @@ export async function uploadAssetFile(
   const { data } = supabase.storage.from(PRODUCT_ASSETS_BUCKET).getPublicUrl(path)
   return data.publicUrl
 }
+
+// ── Visualization assignment table (migration 095) ──────────────────────────
+
+export interface AssignmentConditionInput {
+  characteristic_id: string
+  operator: 'eq' | 'gt' | 'lt'
+  value_id: string | null
+  numeric_value: number | null
+}
+
+export interface AssignmentRow {
+  id: string
+  asset_id: string
+  priority: number
+  conditions: AssignmentConditionInput[]
+}
+
+export async function fetchAssignments(productId: string): Promise<AssignmentRow[]> {
+  const { data, error } = await supabase
+    .from('visualization_assignments')
+    .select('id, asset_id, priority, visualization_assignment_conditions (characteristic_id, operator, value_id, numeric_value)')
+    .eq('product_id', productId)
+    .order('priority', { ascending: true })
+  if (error) throw new Error(error.message)
+  return ((data ?? []) as any[]).map(a => ({
+    id: a.id,
+    asset_id: a.asset_id,
+    priority: a.priority,
+    conditions: ((a.visualization_assignment_conditions ?? []) as any[]).map(c => ({
+      characteristic_id: c.characteristic_id,
+      operator: c.operator,
+      value_id: c.value_id ?? null,
+      numeric_value: c.numeric_value === null || c.numeric_value === undefined ? null : Number(c.numeric_value),
+    })),
+  }))
+}
+
+/** Insert or update one assignment row and replace its conditions wholesale.
+ *  Pass `id: null` to create. Returns the row id. */
+export async function saveAssignment(
+  productId: string,
+  row: { id: string | null; asset_id: string; priority: number; conditions: AssignmentConditionInput[] },
+): Promise<string> {
+  const tenant_id = await getTenantId()
+
+  let assignmentId = row.id
+  if (assignmentId) {
+    const { error } = await supabase
+      .from('visualization_assignments')
+      .update({ asset_id: row.asset_id, priority: row.priority } as unknown as never)
+      .eq('id', assignmentId)
+    if (error) throw new Error(error.message)
+  } else {
+    const { data, error } = await supabase
+      .from('visualization_assignments')
+      .insert({ tenant_id, product_id: productId, asset_id: row.asset_id, priority: row.priority } as any)
+      .select('id')
+      .single()
+    if (error) throw new Error(error.message)
+    assignmentId = (data as { id: string }).id
+  }
+
+  // Replace conditions: delete existing, reinsert current set.
+  const { error: delError } = await supabase
+    .from('visualization_assignment_conditions')
+    .delete()
+    .eq('assignment_id', assignmentId)
+  if (delError) throw new Error(delError.message)
+
+  if (row.conditions.length > 0) {
+    const { error: insError } = await supabase
+      .from('visualization_assignment_conditions')
+      .insert(row.conditions.map(c => ({
+        tenant_id,
+        assignment_id: assignmentId,
+        characteristic_id: c.characteristic_id,
+        operator: c.operator,
+        value_id: c.value_id,
+        numeric_value: c.numeric_value,
+      })) as any)
+    if (insError) throw new Error(insError.message)
+  }
+
+  return assignmentId as string
+}
+
+export async function deleteAssignment(id: string): Promise<void> {
+  const { error } = await supabase
+    .from('visualization_assignments')
+    .delete()
+    .eq('id', id)
+  if (error) throw new Error(error.message)
+}

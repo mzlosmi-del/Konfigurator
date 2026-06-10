@@ -125,6 +125,25 @@ export interface VisualizationAsset {
   mesh_rules: MeshRule[]
 }
 
+/** One condition cell of an assignment row. Absent characteristic = wildcard.
+ *  Select cells: operator 'eq' + value_id. Numeric cells: operator + numeric_value.
+ *  See migration 095. */
+export interface VisualizationAssignmentCondition {
+  characteristic_id: string
+  operator: 'eq' | 'gt' | 'lt'
+  value_id: string | null
+  numeric_value: number | null
+}
+
+/** One ordered row of the per-product assignment table. Lower `priority` is
+ *  evaluated first; ties broken by `id`. Resolves to the asset `asset_id`. */
+export interface VisualizationAssignment {
+  id: string
+  asset_id: string
+  priority: number
+  conditions: VisualizationAssignmentCondition[]
+}
+
 // Configuration rules v2 — JSONB shapes shared with the admin app. See
 // migrations/074_rules_v2.sql for migration notes and the admin types in
 // configurator-admin/src/types/database.ts for the canonical TS source.
@@ -205,6 +224,9 @@ export interface FullProductConfig {
    *  selection, preview and the completion gate. */
   groups: CharacteristicGroup[]
   assets: VisualizationAsset[]
+  /** Ordered assignment table (migration 095). Empty when the product has no
+   *  rows — resolution then falls back to the legacy is_default path. */
+  assignments: VisualizationAssignment[]
   rules: ConfigurationRule[]
   formulas: PricingFormula[]
   removeBranding: boolean

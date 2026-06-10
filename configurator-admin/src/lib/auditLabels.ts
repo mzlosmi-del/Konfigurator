@@ -70,6 +70,12 @@ export const SETTINGS_LABELS: Record<string, string> = {
   logo_url:              'Logo',
 }
 
+export const visualizationAssignmentLabels: Record<string, string> = {
+  priority:   'Priority',
+  asset_id:   'Asset',
+  conditions: 'Conditions',
+}
+
 export const QUOTATION_LABELS: Record<string, string> = {
   reference_number:    'Reference',
   customer_name:       'Customer name',
