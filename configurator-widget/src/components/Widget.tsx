@@ -263,7 +263,7 @@ export function Widget({ config, track, onThemeLoad }: Props) {
     )
   }
 
-  const { product, characteristics, assets, removeBranding, groups } = state.data
+  const { product, characteristics, assets, assignments, removeBranding, groups } = state.data
 
   // Tabs are shown only when the product opts in (group_into_tabs) AND has more
   // than one characteristic class. Otherwise the widget renders the flat list
@@ -316,7 +316,7 @@ export function Widget({ config, track, onThemeLoad }: Props) {
   return (
     <div class="cw-root">
       {/* Product image */}
-      <Visualization assets={assets} selection={selection} previewSelection={previewSelection} numericInputs={numericInputs} arEnabled={product.ar_enabled} arPlacement={product.ar_placement ?? 'floor'} />
+      <Visualization assets={assets} assignments={assignments} selection={selection} previewSelection={previewSelection} numericInputs={numericInputs} arEnabled={product.ar_enabled} arPlacement={product.ar_placement ?? 'floor'} />
 
       <div class="cw-body">
         {/* Product info */}

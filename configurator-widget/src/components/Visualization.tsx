@@ -1,6 +1,6 @@
 import { h } from 'preact'
 import { useState, useEffect, useRef } from 'preact/hooks'
-import type { VisualizationAsset, Selection, NumericInputs, MeshRule, MeshTextureRule } from '../types'
+import type { VisualizationAsset, VisualizationAssignment, Selection, NumericInputs, MeshRule, MeshTextureRule } from '../types'
 import { resolveImage, resolve3DAsset } from '../resolveImage'
 import { t } from '../i18n'
 
@@ -8,6 +8,7 @@ const MODEL_VIEWER_CDN = 'https://ajax.googleapis.com/ajax/libs/model-viewer/3.5
 
 interface Props {
   assets:         VisualizationAsset[]
+  assignments?:   VisualizationAssignment[]
   selection:      Selection
   /** Display-only selection for the 3D viewer: the real selection with each
    *  unset characteristic filled by a default value, so mesh-visibility rules
@@ -733,14 +734,14 @@ function ModelViewer3D({
 
 // ── Visualization wrapper ─────────────────────────────────────────────────────
 
-export function Visualization({ assets, selection, previewSelection, numericInputs = {}, arEnabled = true, arPlacement = 'floor' }: Props) {
+export function Visualization({ assets, assignments = [], selection, previewSelection, numericInputs = {}, arEnabled = true, arPlacement = 'floor' }: Props) {
   // The 3D path uses the preview selection (real selection + filled defaults)
   // so the model resolves a variant and shows its meshes before the customer
   // picks anything. The 2D image path keeps using the real selection — it
   // already falls back to the is_default asset and shouldn't auto-compose.
   const selection3d = previewSelection ?? selection
   const url3d  = resolve3DAsset(assets, selection3d)
-  const urlImg = resolveImage(assets, selection)
+  const urlImg = resolveImage(assets, selection, assignments, numericInputs)
   const [failed, setFailed] = useState(false)
 
   useEffect(() => { setFailed(false) }, [urlImg])
