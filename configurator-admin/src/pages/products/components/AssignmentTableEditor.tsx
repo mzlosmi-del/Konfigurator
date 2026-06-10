@@ -14,6 +14,8 @@ import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
 import { Spinner } from '@/components/ui/spinner'
 import { useToast } from '@/hooks/useToast'
+import { logChange } from '@/lib/auditLog'
+import { useAuthContext } from '@/components/auth/AuthContext'
 
 interface Props {
   productId: string
@@ -45,6 +47,8 @@ function draftConditions(d: DraftRow): AssignmentConditionInput[] {
 
 export function AssignmentTableEditor({ productId, chars, assets }: Props) {
   const { toast } = useToast()
+  const { profile } = useAuthContext()
+  const userName = profile?.email ?? null
   const [loading, setLoading] = useState(true)
   const [rows, setRows] = useState<DraftRow[]>([])
   const [savingId, setSavingId] = useState<string | null>(null)
@@ -101,6 +105,17 @@ export function AssignmentTableEditor({ productId, chars, assets }: Props) {
         conditions: draftConditions(d),
       })
       updateRow(idx, { id: newId })
+      await logChange({
+        entityType: 'visualization_assignment',
+        entityId: newId,
+        changeType: d.id ? 'update' : 'create',
+        diff: {
+          Priority: { old: null, new: d.priority },
+          Asset: { old: null, new: d.asset_id },
+          Conditions: { old: null, new: draftConditions(d) },
+        },
+        changedByName: userName,
+      })
       toast({ title: 'Row saved' })
     } catch (e) {
       toast({ title: 'Save failed', description: (e as Error).message, variant: 'destructive' })
@@ -114,6 +129,12 @@ export function AssignmentTableEditor({ productId, chars, assets }: Props) {
     if (d.id) {
       try { await deleteAssignment(d.id) }
       catch (e) { toast({ title: 'Delete failed', description: (e as Error).message, variant: 'destructive' }); return }
+      await logChange({
+        entityType: 'visualization_assignment',
+        entityId: d.id,
+        changeType: 'delete',
+        changedByName: userName,
+      })
     }
     setRows(prev => prev.filter((_, i) => i !== idx))
   }

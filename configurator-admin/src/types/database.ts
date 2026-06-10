@@ -749,3 +749,4 @@ export type AuditEntityType =
   | 'global_text'
   | 'settings'
   | 'quotation'
+  | 'visualization_assignment'
