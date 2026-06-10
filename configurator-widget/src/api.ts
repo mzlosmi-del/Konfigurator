@@ -5,6 +5,7 @@ import type {
   Characteristic,
   CharacteristicValue,
   VisualizationAsset,
+  VisualizationAssignment,
   ConfigurationRule,
   PricingFormula,
   InquiryPayload,
@@ -116,7 +117,7 @@ export async function loadProductConfig(config: WidgetConfig): Promise<FullProdu
   // Load assets, rules and formulas in parallel with characteristic data.
   // Do NOT return early when characteristicIds is empty — a product may have
   // a default visualization asset with no configurable characteristics.
-  const [charResult, valuesResult, assetsResult, rulesResult, formulasResult, classesResult] = await Promise.all([
+  const [charResult, valuesResult, assetsResult, rulesResult, formulasResult, classesResult, assignmentsResult] = await Promise.all([
     characteristicIds.length > 0
       ? sb.from('characteristics').select('id, name, display_type, sort_order, numeric_min, numeric_max').in('id', characteristicIds)
       : Promise.resolve({ data: [], error: null }),
@@ -145,6 +146,10 @@ export async function loadProductConfig(config: WidgetConfig): Promise<FullProdu
     classIds.length > 0
       ? sb.from('characteristic_classes').select('id, name, name_i18n').in('id', classIds)
       : Promise.resolve({ data: [], error: null }),
+    sb.from('visualization_assignments')
+      .select('id, asset_id, priority, visualization_assignment_conditions (characteristic_id, operator, value_id, numeric_value)')
+      .eq('product_id', config.productId)
+      .order('priority', { ascending: true }),
   ])
 
   if (charResult.error) throw new Error('Failed to load characteristic details')
@@ -153,6 +158,7 @@ export async function loadProductConfig(config: WidgetConfig): Promise<FullProdu
   if (rulesResult.error) throw new Error('Failed to load rules')
   if (formulasResult.error) throw new Error('Failed to load pricing formulas')
   if (classesResult.error) throw new Error('Failed to load characteristic classes')
+  if (assignmentsResult.error) throw new Error('Failed to load visualization assignments')
 
   const charData     = charResult.data
   const valuesData   = valuesResult.data
@@ -286,11 +292,24 @@ export async function loadProductConfig(config: WidgetConfig): Promise<FullProdu
     base_price:       effectiveBasePrice,
   }
 
+  const assignments: VisualizationAssignment[] = (assignmentsResult.data ?? []).map((a: any) => ({
+    id:       a.id as string,
+    asset_id: a.asset_id as string,
+    priority: a.priority as number,
+    conditions: ((a.visualization_assignment_conditions ?? []) as any[]).map(c => ({
+      characteristic_id: c.characteristic_id as string,
+      operator:          c.operator as 'eq' | 'gt' | 'lt',
+      value_id:          (c.value_id ?? null) as string | null,
+      numeric_value:     c.numeric_value === null || c.numeric_value === undefined ? null : Number(c.numeric_value),
+    })),
+  }))
+
   return {
     product: enrichedProduct,
     characteristics,
     groups,
     assets:    (assetsData    ?? []) as VisualizationAsset[],
+    assignments,
     rules:     (rulesData     ?? []) as ConfigurationRule[],
     formulas:  ((formulasData ?? []) as PricingFormula[]).map(f => ({
       ...f,
