@@ -345,6 +345,33 @@ export interface Database {
         Insert: Omit<Database['public']['Tables']['visualization_assets']['Row'], 'id' | 'created_at' | 'updated_at'> & { id?: string }
         Update: Partial<Database['public']['Tables']['visualization_assets']['Insert']>
       }
+      visualization_assignments: {
+        Row: {
+          id: string
+          tenant_id: string
+          product_id: string
+          asset_id: string
+          priority: number
+          created_at: string
+          updated_at: string
+        }
+        Insert: Omit<Database['public']['Tables']['visualization_assignments']['Row'], 'id' | 'created_at' | 'updated_at'> & { id?: string }
+        Update: Partial<Database['public']['Tables']['visualization_assignments']['Insert']>
+      }
+      visualization_assignment_conditions: {
+        Row: {
+          id: string
+          tenant_id: string
+          assignment_id: string
+          characteristic_id: string
+          operator: 'eq' | 'gt' | 'lt'
+          value_id: string | null
+          numeric_value: number | null
+          created_at: string
+        }
+        Insert: Omit<Database['public']['Tables']['visualization_assignment_conditions']['Row'], 'id' | 'created_at'> & { id?: string }
+        Update: Partial<Database['public']['Tables']['visualization_assignment_conditions']['Insert']>
+      }
       configuration_rules: {
         Row: {
           id: string
