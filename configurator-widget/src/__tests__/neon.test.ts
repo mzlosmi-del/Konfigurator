@@ -6,6 +6,7 @@ import {
   neonMaxLength,
   isPerCharColors,
   neonSwatchPalette,
+  resolveValueHex,
   describeNeonColors,
   offeredScenes,
   describeNeonScene,
@@ -195,6 +196,22 @@ describe('neonSwatchPalette', () => {
   it('returns empty for a value-less free-form colour char or no bound char', () => {
     expect(neonSwatchPalette(baseNeon, colorPickerChar)).toEqual([])
     expect(neonSwatchPalette(baseNeon, undefined)).toEqual([])
+  })
+
+  it('resolveValueHex resolves a picked colour for the selected letter', () => {
+    // color picker: the picked value IS the hex
+    expect(resolveValueHex(baseNeon, colorPickerChar, '#00AAFF')).toBe('#00aaff')
+    expect(resolveValueHex(baseNeon, colorPickerChar, 'junk')).toBeNull()
+    // swatch: the picked value is a value id → its hex_color
+    expect(resolveValueHex(baseNeon, swatchChar, 'val-blue')).toBe('#00aaff')
+    // swatch value with no hex → null
+    expect(resolveValueHex(baseNeon, swatchChar, 'val-nohex')).toBeNull()
+    // glowColorMap override wins
+    const neon: NeonConfig = { ...baseNeon, glowColorMap: { 'val-blue': '#123456' } }
+    expect(resolveValueHex(neon, swatchChar, 'val-blue')).toBe('#123456')
+    // no bound char / empty pick → null
+    expect(resolveValueHex(baseNeon, undefined, 'val-blue')).toBeNull()
+    expect(resolveValueHex(baseNeon, swatchChar, '')).toBeNull()
   })
 
   it('builds a palette from a "color"-type char that has preset hex values', () => {

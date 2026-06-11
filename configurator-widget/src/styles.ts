@@ -554,7 +554,8 @@ export const WIDGET_STYLES = `
   }
   .cw-neon-space { white-space: pre; }
 
-  /* Painter: the swatch row shown under the hero in per-character mode. */
+  /* Per-character colouring hint shown under the hero (the colour control that
+     paints the selected letter / whole sign lives in the options list). */
   .cw-neon-painter {
     background: #0c0c12;
     padding: 0 18px 16px;
@@ -563,26 +564,9 @@ export const WIDGET_STYLES = `
   .cw-neon-painter-hint {
     color: #9aa;
     font-size: 11px;
+    line-height: 1.4;
     letter-spacing: 0.02em;
-    margin-bottom: 10px;
   }
-  .cw-neon-swatches {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    justify-content: center;
-  }
-  .cw-neon-swatch {
-    width: 26px;
-    height: 26px;
-    border-radius: 50%;
-    border: 2px solid rgba(255,255,255,0.25);
-    cursor: pointer;
-    padding: 0;
-    transition: transform 0.08s, border-color 0.12s;
-  }
-  .cw-neon-swatch:hover:not(:disabled) { transform: scale(1.12); border-color: rgba(255,255,255,0.7); }
-  .cw-neon-swatch:disabled { opacity: 0.4; cursor: not-allowed; }
 
   /* Background-scene picker: thumbnail row under the hero. Each thumb shows the
      scene art; the label rides along the bottom for clarity. */

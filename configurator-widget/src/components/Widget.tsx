@@ -10,7 +10,7 @@ import { Visualization } from './Visualization'
 import { CharacteristicInput } from './CharacteristicInput'
 import { NeonPreview } from './NeonPreview'
 import { InquiryForm } from './InquiryForm'
-import { isNeonEnabled, resolveGlowHex, isPerCharColors, neonSwatchPalette, describeNeonColors, offeredScenes, describeNeonScene } from '../neon'
+import { isNeonEnabled, resolveGlowHex, resolveValueHex, isPerCharColors, describeNeonColors, offeredScenes, describeNeonScene } from '../neon'
 import { getNeonFont } from '../neonFonts'
 import { getNeonScene, neonSceneBackground } from '../neonScenes'
 import { ensureNeonFonts } from '../fonts'
@@ -117,6 +117,27 @@ export function Widget({ config, track, onThemeLoad }: Props) {
     }))
   }
 
+  // Unified colour control: when the customer changes the bound colour
+  // characteristic AND a single letter is selected on a per-char neon text,
+  // route the chosen colour to ONLY that letter instead of the whole word.
+  // Returns true when it handled the change (so the caller skips the normal
+  // global colour update). `picked` is a hex (color picker) or a value id.
+  function paintSelectedLetterFromColorChar(colorCharId: string, picked: string): boolean {
+    if (state.phase !== 'ready') return false
+    for (const char of state.data.characteristics) {
+      if (!isPerCharColors(char)) continue
+      if (char.neon_config!.colorCharId !== colorCharId) continue
+      const index = neonSelectedChar[char.id]
+      if (index == null) return false           // no letter selected → whole-word
+      const colorChar = state.data.characteristics.find(c => c.id === colorCharId)
+      const hex = resolveValueHex(char.neon_config!, colorChar, picked)
+      if (!hex) return false
+      handlePaintNeonChar(char.id, hex)
+      return true
+    }
+    return false
+  }
+
   function handleSelectNeonScene(charId: string, sceneKey: string) {
     setNeonScene(prev => ({ ...prev, [charId]: sceneKey }))
   }
@@ -124,6 +145,9 @@ export function Widget({ config, track, onThemeLoad }: Props) {
   function handleSelect(charId: string, valueId: string) {
     if (state.phase !== 'ready') return
     track('characteristic_changed', { char_id: charId, value_id: valueId })
+    // If a letter is selected on a per-char neon bound to this colour/swatch
+    // char, paint only that letter and leave the global selection untouched.
+    if (valueId && paintSelectedLetterFromColorChar(charId, valueId)) return
     // Empty valueId = deselect (used by boolean characteristics when the
     // checkbox is unchecked).
     const next: Selection = { ...selection }
@@ -179,6 +203,9 @@ export function Widget({ config, track, onThemeLoad }: Props) {
   function handleColorInput(charId: string, value: string) {
     if (state.phase !== 'ready') return
     track('characteristic_changed', { char_id: charId })
+    // If a letter is selected on a per-char neon bound to this colour char,
+    // paint only that letter and leave the global glow untouched.
+    if (paintSelectedLetterFromColorChar(charId, value)) return
     const nextColors = { ...colorInputs, [charId]: value }
     setColorInputs(nextColors)
     // Re-evaluate rules so colour selection can satisfy select_eq-style
@@ -443,8 +470,8 @@ export function Widget({ config, track, onThemeLoad }: Props) {
           glowHex,
           fontKey,
           perChar,
-          // Palette the customer paints from, and the live per-char state.
-          palette:       perChar ? neonSwatchPalette(neon, colorChar) : [],
+          // Live per-char state. Painting now happens via the bound colour
+          // control (whole word, or the selected letter) — no separate palette.
           charColors:    neonCharColors[neonHeroChar.id] ?? {},
           selectedIndex: neonSelectedChar[neonHeroChar.id] ?? null,
           // Offered background scenes and the currently-chosen one.
@@ -529,26 +556,14 @@ export function Widget({ config, track, onThemeLoad }: Props) {
                 })}
               </div>
             )}
-            {/* Per-character painter: pick a character above, then a colour. */}
-            {neonHero.perChar && neonHero.palette.length > 0 && (
+            {/* Per-character colouring hint: the colour control below now paints
+                the selected letter, or the whole sign when nothing is selected. */}
+            {neonHero.perChar && (
               <div class="cw-neon-painter">
                 <div class="cw-neon-painter-hint">
                   {neonHero.selectedIndex != null
-                    ? t('Pick a colour for the selected letter')
-                    : t('Tap a letter above to colour it')}
-                </div>
-                <div class="cw-neon-swatches">
-                  {neonHero.palette.map(sw => (
-                    <button
-                      key={sw.valueId}
-                      type="button"
-                      class="cw-neon-swatch"
-                      title={sw.label}
-                      disabled={neonHero.selectedIndex == null}
-                      style={`background:${sw.hex}`}
-                      onClick={() => handlePaintNeonChar(neonHero.charId, sw.hex)}
-                    />
-                  ))}
+                    ? t('Choose a colour below — it applies to the selected letter. Tap the letter again for the whole sign.')
+                    : t('Tap a letter to colour just that one, or choose a colour for the whole sign.')}
                 </div>
               </div>
             )}

@@ -51,6 +51,27 @@ export function resolveGlowHex(
   return normalizeHex(value?.hex_color) ?? fallback
 }
 
+/** Resolve the glow hex for one freshly-chosen value on the bound colour char,
+ *  independent of the global selection state. Used to paint a single selected
+ *  letter the colour the customer just picked.
+ *
+ *  `picked` is the raw value from the control: a hex string for a 'color'
+ *  free-form picker, or a characteristic_value id for swatch/select/radio/
+ *  toggle. Returns the resolved hex, or null when it can't resolve one. */
+export function resolveValueHex(
+  neon: NeonConfig,
+  colorChar: Characteristic | undefined,
+  picked: string,
+): string | null {
+  if (!colorChar || !picked) return null
+  if (colorChar.display_type === 'color') return normalizeHex(picked)
+  // swatch/select/radio/toggle: `picked` is a value id.
+  const override = normalizeHex(neon.glowColorMap?.[picked])
+  if (override) return override
+  const value = colorChar.values.find(v => v.id === picked)
+  return normalizeHex(value?.hex_color)
+}
+
 /** Accept a #rgb / #rrggbb string; return it lowercased, or null if it isn't a
  *  valid hex colour. Guards against junk in glowColorMap / hex_color. */
 export function normalizeHex(hex: string | null | undefined): string | null {
