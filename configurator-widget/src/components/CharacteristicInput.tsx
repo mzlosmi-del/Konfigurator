@@ -1,17 +1,29 @@
 import { h } from 'preact'
-import type { Characteristic, CharacteristicValue, NumericInputs } from '../types'
+import type { Characteristic, CharacteristicValue, NumericInputs, TextInputs, ColorInputs } from '../types'
 import { isNumericInRange } from '../types'
 import type { RuleEffect } from '../rules'
-import { t, tSelect, tNumericRange, pickTranslation, type Lang } from '../i18n'
+import { t, tSelect, tNumericRange, tTextLength, pickTranslation, type Lang } from '../i18n'
+import { NeonPreview } from './NeonPreview'
+import { isNeonEnabled, neonMaxLength } from '../neon'
+import { getNeonFont } from '../neonFonts'
 
 interface Props {
   characteristic: Characteristic
   selectedValueId: string | undefined
   ruleEffect: RuleEffect
   numericInputs: NumericInputs
+  textInputs: TextInputs
+  colorInputs: ColorInputs
   onChange: (charId: string, valueId: string) => void
   onNumericInput: (charId: string, value: number) => void
+  onTextInput: (charId: string, value: string) => void
+  onColorInput: (charId: string, value: string) => void
   lang: Lang
+  /** Neon preview (only meaningful for a neon-enabled 'text' characteristic).
+   *  When absent the text field renders plainly, exactly as before. */
+  neonGlowHex?: string
+  neonFontKey?: string
+  onNeonFontChange?: (charId: string, fontKey: string) => void
 }
 
 function formatModifier(mod: number): string {
@@ -33,9 +45,16 @@ export function CharacteristicInput({
   selectedValueId,
   ruleEffect,
   numericInputs,
+  textInputs,
+  colorInputs,
   onChange,
   onNumericInput,
+  onTextInput,
+  onColorInput,
   lang,
+  neonGlowHex,
+  neonFontKey,
+  onNeonFontChange,
 }: Props) {
   const { display_type, id } = characteristic
   const isLocked = id in ruleEffect.lockedValues
@@ -74,6 +93,105 @@ export function CharacteristicInput({
         {outOfRange && (
           <div class="cw-number-error">{tNumericRange(numeric_min, numeric_max)}</div>
         )}
+      </div>
+    )
+  }
+
+  // ── Text (free-text, length-priced) ──────────────────────────────────────────
+  // The typed string lives in textInputs; its character count is mirrored into
+  // numericInputs (see Widget.handleTextInput) so formulas/rules can price by
+  // length. numeric_min/numeric_max are reused as min/max allowed length.
+  if (display_type === 'text') {
+    const value = textInputs[id] ?? ''
+    const { numeric_min, numeric_max } = characteristic
+    const outOfRange = value.length > 0 && !isNumericInRange(value.length, numeric_min, numeric_max)
+    const pricePerChar = characteristic.price_per_char ?? 0
+
+    // Neon mode: a glowing live preview + an optional font picker sit above the
+    // very same textarea. When neon is off this whole block is skipped and the
+    // field renders exactly as it always has. The maxLength cap, char count and
+    // pricing are unchanged — neon is purely presentation.
+    const neon       = isNeonEnabled(characteristic) ? characteristic.neon_config! : null
+    const neonLabel  = neon?.label?.trim() ? neon.label : t('Your sign text')
+    const label      = neon ? neonLabel : charName
+    const maxLen     = neon ? neonMaxLength(characteristic) : (numeric_max ?? undefined)
+    const fontKeys   = (neon?.fonts ?? []).filter(k => getNeonFont(k))
+    const activeFont = neonFontKey ?? fontKeys[0]
+
+    return (
+      <div>
+        <div class="cw-char-label">{label}</div>
+        {neon && (
+          <NeonPreview
+            text={value}
+            placeholder={t('Your text')}
+            glowHex={neonGlowHex ?? '#ff2d95'}
+            fontKey={activeFont}
+          />
+        )}
+        {neon && fontKeys.length > 1 && (
+          <div class="cw-neon-fonts">
+            {fontKeys.map(k => {
+              const f = getNeonFont(k)!
+              return (
+                <button
+                  key={k}
+                  type="button"
+                  class={`cw-neon-font-btn${activeFont === k ? ' selected' : ''}`}
+                  style={`font-family:${f.css}`}
+                  onClick={() => onNeonFontChange?.(id, k)}
+                >
+                  {f.family}
+                </button>
+              )
+            })}
+          </div>
+        )}
+        <textarea
+          class={`cw-textarea${outOfRange ? ' error' : ''}`}
+          value={value}
+          maxLength={maxLen ?? undefined}
+          rows={neon ? 2 : 3}
+          onInput={(e) => onTextInput(id, (e.target as HTMLTextAreaElement).value)}
+        />
+        <div class="cw-char-counter">
+          <span>
+            {value.length}{maxLen != null ? ` / ${maxLen}` : ''}
+          </span>
+          {pricePerChar !== 0 && (
+            <span class={modifierClass(pricePerChar)}>
+              {formatModifier(pricePerChar)}/{t('char')}
+            </span>
+          )}
+        </div>
+        {outOfRange && (
+          <div class="cw-number-error">{tTextLength(numeric_min, numeric_max)}</div>
+        )}
+      </div>
+    )
+  }
+
+  // ── Color (free-form hex picker, flat-priced) ────────────────────────────────
+  if (display_type === 'color') {
+    const value    = colorInputs[id] ?? ''
+    const modifier = characteristic.color_price_modifier ?? 0
+    return (
+      <div>
+        <div class="cw-char-label">{charName}</div>
+        <div class="cw-color-row">
+          <input
+            type="color"
+            class="cw-color-input"
+            value={value || '#000000'}
+            onInput={(e) => onColorInput(id, (e.target as HTMLInputElement).value)}
+          />
+          {value
+            ? <span class="cw-color-hex">{value}</span>
+            : <span class="cw-color-placeholder">{t('Pick a color')}</span>}
+          {value && modifier !== 0 && (
+            <span class={modifierClass(modifier)}>{formatModifier(modifier)}</span>
+          )}
+        </div>
       </div>
     )
   }

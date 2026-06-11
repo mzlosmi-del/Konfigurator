@@ -34,7 +34,8 @@ import { LibraryToolbar } from './LibraryToolbar'
 import { ClassRail } from './ClassRail'
 import { ClassDetailHeader } from './ClassDetailHeader'
 import type { LibraryView, TypeFilter } from './types'
-import type { Characteristic, CharacteristicClass, CharacteristicValue } from '@/types/database'
+import type { Characteristic, CharacteristicClass, CharacteristicValue, NeonConfig } from '@/types/database'
+import type { ColorCharOption } from './NeonConfigEditor'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -329,6 +330,28 @@ export function LibraryPage() {
     }
   }
 
+  async function handleUpdatePricing(char: Characteristic, patch: { price_per_char?: number; color_price_modifier?: number }) {
+    try {
+      const updated = await updateCharacteristic(char.id, patch)
+      const diff = computeDiff(char as unknown as Record<string, unknown>, updated as unknown as Record<string, unknown>, CHARACTERISTIC_LABELS)
+      logChange({ entityType: 'characteristic', entityId: updated.id, entityName: updated.name, changeType: 'update', diff, changedByName: userName })
+      setChars(prev => prev.map(c => c.id === char.id ? updated : c))
+    } catch {
+      toast({ title: t('Failed to update price'), variant: 'destructive' })
+    }
+  }
+
+  async function handleUpdateNeonConfig(char: Characteristic, neon_config: NeonConfig | null) {
+    try {
+      const updated = await updateCharacteristic(char.id, { neon_config })
+      const diff = computeDiff(char as unknown as Record<string, unknown>, updated as unknown as Record<string, unknown>, CHARACTERISTIC_LABELS)
+      logChange({ entityType: 'characteristic', entityId: updated.id, entityName: updated.name, changeType: 'update', diff, changedByName: userName })
+      setChars(prev => prev.map(c => c.id === char.id ? updated : c))
+    } catch {
+      toast({ title: t('Failed to update neon preview'), variant: 'destructive' })
+    }
+  }
+
   async function handleDeleteChar() {
     if (!toDelete) return
     setDeleting(true)
@@ -431,6 +454,22 @@ export function LibraryPage() {
       ? t('Unassigned')
       : activeClass?.name ?? ''
 
+  // Colour-bearing characteristics that can drive a neon glow. A 'swatch' or
+  // other select-style char exposes its values (with hex_color); a free-form
+  // 'color' char has no values. The neon editor binds by characteristic id; at
+  // runtime the widget resolves it against whatever chars the product loads.
+  const neonColorChars: ColorCharOption[] = useMemo(
+    () => characteristics
+      .filter(c => c.display_type === 'swatch' || c.display_type === 'select' || c.display_type === 'radio' || c.display_type === 'toggle' || c.display_type === 'color')
+      .map(c => ({
+        id: c.id,
+        name: c.name,
+        display_type: c.display_type,
+        values: (values[c.id] ?? []).map(v => ({ id: v.id, label: v.label, hex_color: v.hex_color })),
+      })),
+    [characteristics, values],
+  )
+
   const charRows = (
     <div className="space-y-1.5">
       {visibleChars.map(char => (
@@ -449,6 +488,9 @@ export function LibraryPage() {
           onUpdateDescriptionI18n={i18n => handleUpdateCharDescriptionI18n(char, i18n)}
           onChangeType={type => handleChangeType(char, type)}
           onUpdateBounds={(min, max) => handleUpdateBounds(char, min, max)}
+          onUpdatePricing={patch => handleUpdatePricing(char, patch)}
+          onUpdateNeonConfig={next => handleUpdateNeonConfig(char, next)}
+          neonColorChars={neonColorChars}
           onDelete={() => setToDelete(char)}
           onAssignToClass={classId => handleAssign(classId, char.id)}
           onRemoveFromClass={activeClass ? (classId => handleRemoveMember(classId, char.id)) : undefined}

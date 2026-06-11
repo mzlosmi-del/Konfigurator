@@ -438,6 +438,121 @@ export const WIDGET_STYLES = `
   .cw-number-input.error:focus { border-color: #dc2626; box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.12); }
   .cw-number-error { margin-top: 4px; font-size: 12px; color: #dc2626; }
 
+  /* Text input (multi-line) */
+  .cw-textarea {
+    width: 100%;
+    padding: 9px 12px;
+    border: 1px solid var(--cw-border);
+    border-radius: var(--cw-radius-sm);
+    font-size: 14px;
+    font-family: var(--cw-font);
+    color: var(--cw-text);
+    background: var(--cw-bg);
+    resize: vertical;
+    line-height: 1.4;
+    box-sizing: border-box;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  .cw-textarea:hover { border-color: var(--cw-text); }
+  .cw-textarea:focus { outline: none; border-color: var(--cw-text); box-shadow: 0 0 0 3px var(--cw-surface-alt); }
+  .cw-textarea.error { border-color: #dc2626; }
+  .cw-textarea.error:focus { border-color: #dc2626; box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.12); }
+  .cw-char-counter {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 4px;
+    font-size: 11px;
+    color: var(--cw-text-muted);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ── Neon text preview (migration 096) ──────────────────────────────────────
+     The dark panel + layered text-shadow glow. The tube colour comes from the
+     inline --cw-neon-glow custom property set per-render by NeonPreview, so the
+     glow updates live without re-injecting CSS. All scoped to the shadow root. */
+  .cw-neon-panel {
+    background: #0c0c12;
+    background-image: radial-gradient(120% 100% at 50% 0%, #16161f 0%, #0a0a0f 70%);
+    border: 1px solid #1f1f29;
+    border-radius: var(--cw-radius-sm);
+    padding: 28px 18px;
+    margin-bottom: 10px;
+    min-height: 96px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+  .cw-neon-text {
+    --cw-neon-glow: #ff2d95;
+    font-size: 34px;
+    line-height: 1.25;
+    text-align: center;
+    word-break: break-word;
+    color: #fff5fb;
+    /* White-ish inner core + increasing-blur halos in the tube colour. */
+    text-shadow:
+      0 0 2px #ffffff,
+      0 0 6px var(--cw-neon-glow),
+      0 0 12px var(--cw-neon-glow),
+      0 0 24px var(--cw-neon-glow),
+      0 0 42px var(--cw-neon-glow);
+  }
+  .cw-neon-text--placeholder { opacity: 0.45; }
+
+  .cw-neon-fonts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 10px;
+  }
+  .cw-neon-font-btn {
+    padding: 6px 12px;
+    font-size: 15px;
+    line-height: 1.1;
+    border: 1px solid var(--cw-border-input);
+    border-radius: var(--cw-radius-sm);
+    background: var(--cw-bg);
+    color: var(--cw-text);
+    cursor: pointer;
+    transition: border-color 0.12s, background 0.12s;
+  }
+  .cw-neon-font-btn:hover { border-color: var(--cw-text); }
+  .cw-neon-font-btn.selected {
+    border-color: var(--cw-text);
+    background: var(--cw-surface-alt);
+  }
+
+  /* Colour picker */
+  .cw-color-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .cw-color-input {
+    width: 44px;
+    height: 36px;
+    padding: 2px;
+    border: 1px solid var(--cw-border);
+    border-radius: var(--cw-radius-sm);
+    background: var(--cw-bg);
+    cursor: pointer;
+  }
+  .cw-color-input:hover { border-color: var(--cw-text); }
+  .cw-color-hex {
+    font-size: 13px;
+    font-family: var(--cw-font);
+    color: var(--cw-text);
+    font-variant-numeric: tabular-nums;
+    text-transform: uppercase;
+  }
+  .cw-color-placeholder {
+    font-size: 13px;
+    font-family: var(--cw-font);
+    color: var(--cw-text-muted);
+  }
+
   /* Locked value display */
   .cw-locked-value {
     display: flex;

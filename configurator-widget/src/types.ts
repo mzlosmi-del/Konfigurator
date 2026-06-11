@@ -49,16 +49,41 @@ export interface CharacteristicValue {
   hex_color?: string | null
 }
 
+/** Live neon-text-preview config for a 'text' characteristic (migration 096).
+ *  Absent/null or `enabled !== true` ⇒ the field renders as a plain text input
+ *  exactly as before. Opt-in and additive: the typed string's character count
+ *  still drives price through the existing text channel; this only controls the
+ *  visual glow preview. Mirrors the admin's NeonConfig in database.ts. */
+export interface NeonConfig {
+  enabled: boolean
+  label?: string
+  maxLength?: number | null
+  fonts: string[]
+  colorCharId?: string | null
+  glowColorMap?: Record<string, string>
+  defaultGlowHex?: string
+}
+
 export interface Characteristic {
   id: string
   name: string
   name_i18n?: Record<string, string>
-  display_type: 'select' | 'radio' | 'swatch' | 'toggle' | 'number' | 'boolean'
+  display_type: 'select' | 'radio' | 'swatch' | 'toggle' | 'number' | 'boolean' | 'text' | 'color'
   sort_order: number
   values: CharacteristicValue[]
-  /** Optional bounds for 'number' characteristics (migration 088). */
+  /**
+   * Optional bounds for 'number' characteristics (migration 088).
+   * Reused as min/max allowed character length for 'text' characteristics (migration 089).
+   */
   numeric_min?: number | null
   numeric_max?: number | null
+  /** Per-character price for 'text' characteristics (migration 089). */
+  price_per_char?: number
+  /** Flat fee applied when a colour is chosen for 'color' characteristics (migration 089). */
+  color_price_modifier?: number
+  /** Live neon-text-preview config for 'text' characteristics (migration 096).
+   *  Null/absent ⇒ plain text field (feature off). */
+  neon_config?: NeonConfig | null
 }
 
 /** True when `value` satisfies the optional min/max bounds. A null/undefined
@@ -236,8 +261,15 @@ export interface FullProductConfig {
 // Selected state: charId → valueId (for select/radio/swatch/toggle types)
 export type Selection = Record<string, string>
 
-// Numeric inputs: charId → number (for 'number' display_type characteristics)
+// Numeric inputs: charId → number (for 'number' display_type characteristics,
+// and the character-count of 'text' characteristics)
 export type NumericInputs = Record<string, number>
+
+// Text inputs: charId → typed string (for 'text' display_type characteristics)
+export type TextInputs = Record<string, string>
+
+// Colour inputs: charId → chosen hex (for 'color' display_type characteristics)
+export type ColorInputs = Record<string, string>
 
 export interface InquiryPayload {
   /** Generated client-side so the widget knows the row id for file uploads —

@@ -45,8 +45,30 @@ export const MULTI_ROW_SLOTS = new Set<string>([
   'terms_line',
   'product', 'specification', 'note', 'terms',
 ])
-export type DisplayType = 'select' | 'radio' | 'swatch' | 'toggle' | 'number' | 'boolean'
+export type DisplayType = 'select' | 'radio' | 'swatch' | 'toggle' | 'number' | 'boolean' | 'text' | 'color'
 export type AssetType = 'image' | 'render' | '3d_model'
+
+/** Live neon-text-preview config for a `display_type = 'text'` characteristic
+ *  (migration 096). Stored in `characteristics.neon_config` (nullable JSONB).
+ *  NULL or `enabled !== true` ⇒ the characteristic renders as a plain text
+ *  field exactly as before — the feature is strictly opt-in and additive. The
+ *  typed string's character count still drives price through the existing text
+ *  channel; this config only controls the visual glow preview. */
+export interface NeonConfig {
+  enabled: boolean
+  /** Optional custom label text (falls back to the i18n default "Your sign text"). */
+  label?: string
+  /** UI max length for the input (default 30). `numeric_max` remains the priced/validation bound. */
+  maxLength?: number | null
+  /** Subset of the bundled font keys offered to the customer; the first is the default. */
+  fonts: string[]
+  /** Sibling colour/swatch characteristic whose selected value drives the glow colour. */
+  colorCharId?: string | null
+  /** Optional per-value glow-hex overrides, keyed by characteristic_value id. */
+  glowColorMap?: Record<string, string>
+  /** Fallback glow colour when no bound value resolves to a hex. */
+  defaultGlowHex?: string
+}
 // Configuration rules v2 — see migrations/074_rules_v2.sql.
 //
 // Each rule has a flat ALL/ANY predicate list and an array of effects.
@@ -286,9 +308,19 @@ export interface Database {
           name: string
           display_type: DisplayType
           sort_order: number
-          /** Optional bounds for `display_type = 'number'` characteristics (migration 088). */
+          /**
+           * Optional bounds for `display_type = 'number'` characteristics (migration 088).
+           * Reused as min/max allowed character length for `display_type = 'text'` (migration 089).
+           */
           numeric_min: number | null
           numeric_max: number | null
+          /** Per-character price for `display_type = 'text'` characteristics (migration 089). */
+          price_per_char: number
+          /** Flat fee applied when a colour is chosen for `display_type = 'color'` (migration 089). */
+          color_price_modifier: number
+          /** Live neon-text-preview config for `display_type = 'text'` (migration 096).
+           *  NULL ⇒ feature off; the characteristic renders as a plain text field. */
+          neon_config: NeonConfig | null
           /** In-memory translations populated from `tenant_texts`. */
           name_i18n?:        Record<string, string>
           description_i18n?: Record<string, string>

@@ -446,7 +446,7 @@ export async function createCharacteristic(
 export async function updateCharacteristic(
   id: string,
   /** i18n maps now live in `tenant_texts`; only scalar columns are persisted here. */
-  input: Partial<Pick<Characteristic, 'name' | 'display_type' | 'numeric_min' | 'numeric_max'>>
+  input: Partial<Pick<Characteristic, 'name' | 'display_type' | 'numeric_min' | 'numeric_max' | 'price_per_char' | 'color_price_modifier' | 'neon_config'>>
 ): Promise<Characteristic> {
   const sanitised = { ...input } as Record<string, unknown>
   delete sanitised.name_i18n

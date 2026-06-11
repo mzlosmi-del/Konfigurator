@@ -676,7 +676,11 @@ export function VisualizationPanel({ productId, arEnabled = true, onArToggle, ar
         <p className="text-sm text-muted-foreground mb-3">
           {t('Map combinations of characteristic values to an image. Rows are checked top-to-bottom by priority; the first matching row wins. An empty cell matches any value. If no row matches, the default asset is used.')}
         </p>
-        <AssignmentTableEditor productId={productId} chars={chars} assets={assets} />
+        <AssignmentTableEditor
+          productId={productId}
+          chars={chars.filter(c => c.display_type !== 'text' && c.display_type !== 'color')}
+          assets={assets}
+        />
       </div>
 
       <ConfirmDialog

@@ -10,6 +10,9 @@ const sr: Record<string, string> = {
   'Base price':                            'Osnovna cena',
   'Price breakdown':                       'Pregled cene',
   'Request a quote':                       'Zatraži ponudu',
+  // Neon text preview (migration 096)
+  'Your sign text':                        'Tekst vašeg natpisa',
+  'Your text':                             'Vaš tekst',
   'Select all options to continue':        'Izaberite sve opcije da biste nastavili',
   'This is an estimated price. The official quote will be provided by the company after your inquiry.':
     'Ovo je procenjena cena. Zvaničnu ponudu će vam dostaviti kompanija nakon vašeg upita.',
@@ -64,6 +67,18 @@ export function tNumericRange(min: number | null | undefined, max: number | null
     return en ? `Value must be at least ${min}` : `Vrednost mora biti najmanje ${min}`
   }
   return en ? `Value must be at most ${max}` : `Vrednost mora biti najviše ${max}`
+}
+
+// Out-of-range message for 'text' characteristics (min/max character length).
+export function tTextLength(min: number | null | undefined, max: number | null | undefined): string {
+  const en = _lang === 'en'
+  if (min != null && max != null) {
+    return en ? `Must be between ${min} and ${max} characters` : `Mora imati između ${min} i ${max} karaktera`
+  }
+  if (min != null) {
+    return en ? `Must be at least ${min} characters` : `Mora imati najmanje ${min} karaktera`
+  }
+  return en ? `Must be at most ${max} characters` : `Mora imati najviše ${max} karaktera`
 }
 
 // Widget *user* languages that are actually translated and selectable today.

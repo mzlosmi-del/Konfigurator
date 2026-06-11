@@ -119,7 +119,7 @@ export async function loadProductConfig(config: WidgetConfig): Promise<FullProdu
   // a default visualization asset with no configurable characteristics.
   const [charResult, valuesResult, assetsResult, rulesResult, formulasResult, classesResult, assignmentsResult] = await Promise.all([
     characteristicIds.length > 0
-      ? sb.from('characteristics').select('id, name, display_type, sort_order, numeric_min, numeric_max').in('id', characteristicIds)
+      ? sb.from('characteristics').select('id, name, display_type, sort_order, numeric_min, numeric_max, price_per_char, color_price_modifier, neon_config').in('id', characteristicIds)
       : Promise.resolve({ data: [], error: null }),
     characteristicIds.length > 0
       ? sb.from('characteristic_values')

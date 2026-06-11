@@ -1,6 +1,6 @@
 import { h } from 'preact'
 import { useState, useEffect, useMemo, useRef } from 'preact/hooks'
-import type { FullProductConfig, Selection, NumericInputs, WidgetConfig, ConfigLineItem, Characteristic } from '../types'
+import type { FullProductConfig, Selection, NumericInputs, TextInputs, ColorInputs, WidgetConfig, ConfigLineItem, Characteristic } from '../types'
 import { isNumericInRange } from '../types'
 import { loadProductConfig } from '../api'
 import { evaluateRules, calculatePrice, buildOptionBreakdown, sanitizeSelection, applyDefaultValues, applyNumericDefaults } from '../rules'
@@ -9,6 +9,9 @@ import { t, getLang, setLang, ENABLED_LANGS, OTHER_LANGS, pickTranslation, type 
 import { Visualization } from './Visualization'
 import { CharacteristicInput } from './CharacteristicInput'
 import { InquiryForm } from './InquiryForm'
+import { isNeonEnabled, resolveGlowHex } from '../neon'
+import { getNeonFont } from '../neonFonts'
+import { ensureNeonFonts } from '../fonts'
 
 interface Props {
   config:       WidgetConfig
@@ -26,6 +29,11 @@ export function Widget({ config, track, onThemeLoad }: Props) {
   const [state, setState] = useState<State>({ phase: 'loading' })
   const [selection, setSelection] = useState<Selection>({})
   const [numericInputs, setNumericInputs] = useState<NumericInputs>({})
+  const [textInputs, setTextInputs] = useState<TextInputs>({})
+  const [colorInputs, setColorInputs] = useState<ColorInputs>({})
+  // Per-neon-characteristic selected font key (charId → font key). Empty until
+  // the customer picks one; the input then falls back to the first enabled font.
+  const [neonFonts, setNeonFonts] = useState<Record<string, string>>({})
   const [showForm, setShowForm] = useState(false)
   const [activeTab, setActiveTab] = useState(0)
   const [lang, setLangState] = useState<Lang>(getLang())
@@ -60,6 +68,26 @@ export function Widget({ config, track, onThemeLoad }: Props) {
         setState({ phase: 'error', message: err.message })
       })
   }, [config.productId])
+
+  // Lazy-load the neon web fonts: only when the product actually has a
+  // neon-enabled text characteristic. Injected once into document.head (the
+  // helper dedupes), so non-neon products fetch nothing extra.
+  useEffect(() => {
+    if (state.phase !== 'ready') return
+    const keys = new Set<string>()
+    for (const char of state.data.characteristics) {
+      if (isNeonEnabled(char)) {
+        for (const k of char.neon_config?.fonts ?? []) {
+          if (getNeonFont(k)) keys.add(k)
+        }
+      }
+    }
+    if (keys.size > 0) ensureNeonFonts([...keys])
+  }, [state])
+
+  function handleNeonFontChange(charId: string, fontKey: string) {
+    setNeonFonts(prev => ({ ...prev, [charId]: fontKey }))
+  }
 
   function handleSelect(charId: string, valueId: string) {
     if (state.phase !== 'ready') return
@@ -107,6 +135,28 @@ export function Widget({ config, track, onThemeLoad }: Props) {
     setNumericInputs(finalNumeric)
   }
 
+  // Text characteristics: store the typed string, and mirror its character
+  // count into numericInputs so length-based formulas/rules react exactly like
+  // a 'number' characteristic would.
+  function handleTextInput(charId: string, value: string) {
+    if (state.phase !== 'ready') return
+    setTextInputs(prev => ({ ...prev, [charId]: value }))
+    handleNumericInput(charId, value.length)
+  }
+
+  function handleColorInput(charId: string, value: string) {
+    if (state.phase !== 'ready') return
+    track('characteristic_changed', { char_id: charId })
+    const nextColors = { ...colorInputs, [charId]: value }
+    setColorInputs(nextColors)
+    // Re-evaluate rules so colour selection can satisfy select_eq-style
+    // predicates in the future; current rule predicates don't read colours,
+    // but keeping this consistent avoids stale ruleEffect.
+    const effect = evaluateRules(state.data.rules, selection, numericInputs)
+    prevDefaultsRef.current        = effect.defaultValues
+    prevNumericDefaultsRef.current = effect.defaultNumericValues
+  }
+
   // ── Derived state ───────────────────────────────────────────────────────────
   const ruleEffect = useMemo(() => {
     if (state.phase !== 'ready') {
@@ -114,6 +164,22 @@ export function Widget({ config, track, onThemeLoad }: Props) {
     }
     return evaluateRules(state.data.rules, selection, numericInputs)
   }, [state, selection, numericInputs])
+
+  // Built-in per-character text charges + flat colour fees. Formula-driven
+  // text-length pricing flows through calculateFormulaTotal (length lives in
+  // numericInputs); these are the formula-free built-ins.
+  const textColorAdj = useMemo(() => {
+    if (state.phase !== 'ready') return 0
+    let extra = 0
+    for (const char of state.data.characteristics) {
+      if (char.display_type === 'text') {
+        extra += (textInputs[char.id]?.length ?? 0) * (char.price_per_char ?? 0)
+      } else if (char.display_type === 'color') {
+        if (colorInputs[char.id]) extra += char.color_price_modifier ?? 0
+      }
+    }
+    return extra
+  }, [state, textInputs, colorInputs])
 
   const totalPrice = useMemo(() => {
     if (state.phase !== 'ready') return 0
@@ -124,8 +190,8 @@ export function Widget({ config, track, onThemeLoad }: Props) {
       numericInputs,
       characteristics: state.data.characteristics,
     })
-    return Math.max(0, base + formulaAdj)
-  }, [state, selection, numericInputs, ruleEffect])
+    return Math.max(0, base + formulaAdj + textColorAdj)
+  }, [state, selection, numericInputs, ruleEffect, textColorAdj])
 
   // Per-component breakdown shown above the total price
   const priceBreakdown = useMemo(() => {
@@ -153,6 +219,22 @@ export function Widget({ config, track, onThemeLoad }: Props) {
         }
         continue
       }
+      // Text: store the typed string; price is the per-character built-in.
+      if (char.display_type === 'text') {
+        const text = textInputs[char.id] ?? ''
+        if (text.length > 0) {
+          items.push({ characteristic_name: charName, value_label: text, price_modifier: text.length * (char.price_per_char ?? 0) })
+        }
+        continue
+      }
+      // Color: store the chosen hex; price is the flat colour modifier.
+      if (char.display_type === 'color') {
+        const hex = colorInputs[char.id]
+        if (hex) {
+          items.push({ characteristic_name: charName, value_label: hex, price_modifier: char.color_price_modifier ?? 0 })
+        }
+        continue
+      }
       if (!selection[char.id]) continue
       const v = char.values.find(val => val.id === selection[char.id])
       if (!v) continue
@@ -166,7 +248,7 @@ export function Widget({ config, track, onThemeLoad }: Props) {
     }
 
     return items
-  }, [state, selection, numericInputs, lang])
+  }, [state, selection, numericInputs, textInputs, colorInputs, lang])
 
   const allSelected = useMemo(() => {
     if (state.phase !== 'ready') return false
@@ -179,9 +261,16 @@ export function Widget({ config, track, onThemeLoad }: Props) {
       // Boolean characteristics are always optional — leaving the box
       // unchecked must not block submission.
       if (c.display_type === 'boolean') return true
+      // Text/colour are optional, but if text is entered it must respect the
+      // min/max character-length bounds.
+      if (c.display_type === 'text') {
+        const text = textInputs[c.id] ?? ''
+        return text.length === 0 || isNumericInRange(text.length, c.numeric_min, c.numeric_max)
+      }
+      if (c.display_type === 'color') return true
       return !!selection[c.id]
     })
-  }, [state, selection, numericInputs])
+  }, [state, selection, numericInputs, textInputs])
 
   // ── Renders ─────────────────────────────────────────────────────────────────
 
@@ -347,18 +436,34 @@ export function Widget({ config, track, onThemeLoad }: Props) {
         {/* Characteristics — filtered to the active tab when tabs are shown. */}
         {visibleChars.length > 0 && (
           <div class="cw-characteristics">
-            {visibleChars.map(char => (
-              <CharacteristicInput
-                key={char.id}
-                characteristic={char}
-                selectedValueId={selection[char.id]}
-                ruleEffect={ruleEffect}
-                numericInputs={numericInputs}
-                onChange={handleSelect}
-                onNumericInput={handleNumericInput}
-                lang={lang}
-              />
-            ))}
+            {visibleChars.map(char => {
+              // Resolve the live glow colour for neon-enabled text characteristics
+              // from the bound sibling colour/swatch characteristic. Non-neon
+              // characteristics ignore these props entirely.
+              const neon = isNeonEnabled(char) ? char.neon_config! : null
+              const glowHex = neon
+                ? resolveGlowHex(neon, neon.colorCharId ? charById.get(neon.colorCharId) : undefined, selection, colorInputs)
+                : undefined
+              return (
+                <CharacteristicInput
+                  key={char.id}
+                  characteristic={char}
+                  selectedValueId={selection[char.id]}
+                  ruleEffect={ruleEffect}
+                  numericInputs={numericInputs}
+                  textInputs={textInputs}
+                  colorInputs={colorInputs}
+                  onChange={handleSelect}
+                  onNumericInput={handleNumericInput}
+                  onTextInput={handleTextInput}
+                  onColorInput={handleColorInput}
+                  lang={lang}
+                  neonGlowHex={glowHex}
+                  neonFontKey={neonFonts[char.id]}
+                  onNeonFontChange={handleNeonFontChange}
+                />
+              )
+            })}
           </div>
         )}
 
@@ -377,6 +482,17 @@ export function Widget({ config, track, onThemeLoad }: Props) {
               ? ''
               : pickTranslation(value.label_i18n, lang, value.label)
             rows.push({ label: valueLabel ? `${charName}: ${valueLabel}` : charName, amount: opt.amount })
+          }
+          // Built-in text (per-character) and colour (flat) charges.
+          for (const char of characteristics) {
+            const charName = pickTranslation(char.name_i18n, lang, char.name)
+            if (char.display_type === 'text') {
+              const amount = (textInputs[char.id]?.length ?? 0) * (char.price_per_char ?? 0)
+              if (amount !== 0) rows.push({ label: charName, amount })
+            } else if (char.display_type === 'color') {
+              const amount = colorInputs[char.id] ? (char.color_price_modifier ?? 0) : 0
+              if (amount !== 0) rows.push({ label: charName, amount })
+            }
           }
           for (const f of priceBreakdown.formulas) {
             if (f.amount === 0) continue

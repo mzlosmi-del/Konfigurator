@@ -24,7 +24,9 @@ interface Props {
 const ARITH_OPS: RuleArithOp[] = ['add', 'subtract', 'multiply', 'divide']
 
 export function NumExprInput({ value, onChange, chars, lang, allowNest = true }: Props) {
-  const numericChars = chars.filter(c => c.display_type === 'number')
+  // 'text' contributes its character length to the numeric channel, so it is a
+  // valid numeric-input source alongside 'number'.
+  const numericChars = chars.filter(c => c.display_type === 'number' || c.display_type === 'text')
 
   if (value.type === 'number') {
     return (

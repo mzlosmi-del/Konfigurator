@@ -324,6 +324,10 @@ export function QuotationFormPage() {
     for (const char of characteristics) {
       if (char.display_type === 'number') {
         numericInputs[char.id] = Number(selection[char.id] ?? 0)
+      } else if (char.display_type === 'text') {
+        numericInputs[char.id] = (selection[char.id] ?? '').length
+      } else if (char.display_type === 'color') {
+        // not a value-id selection; priced via the flat built-in
       } else if (selection[char.id]) {
         cleanSelection[char.id] = selection[char.id]
       }
@@ -364,6 +368,38 @@ export function QuotationFormPage() {
               value_label:         rawVal,
               price_modifier:      0,
             })
+            continue
+          }
+          // Text: the typed string is the value; price is the per-character built-in.
+          if (char.display_type === 'text') {
+            const text = li.selection[char.id]
+            if (text === undefined || text === '') continue
+            const modifier = text.length * Number(char.price_per_char ?? 0)
+            config.push({
+              characteristic_id:   char.id,
+              characteristic_name: char.name,
+              characteristic_description_i18n: descI18n,
+              value_id:            text,
+              value_label:         text,
+              price_modifier:      modifier,
+            })
+            unitPrice += modifier
+            continue
+          }
+          // Color: the chosen hex is the value; price is the flat built-in.
+          if (char.display_type === 'color') {
+            const hex = li.selection[char.id]
+            if (hex === undefined || hex === '') continue
+            const modifier = Number(char.color_price_modifier ?? 0)
+            config.push({
+              characteristic_id:   char.id,
+              characteristic_name: char.name,
+              characteristic_description_i18n: descI18n,
+              value_id:            hex,
+              value_label:         hex,
+              price_modifier:      modifier,
+            })
+            unitPrice += modifier
             continue
           }
           const valueId = li.selection[char.id]
@@ -783,6 +819,10 @@ function buildFormulaCtxLocal(
   for (const char of characteristics) {
     if (char.display_type === 'number') {
       numericInputs[char.id] = Number(selection[char.id] ?? 0)
+    } else if (char.display_type === 'text') {
+      numericInputs[char.id] = (selection[char.id] ?? '').length
+    } else if (char.display_type === 'color') {
+      // not a value-id selection; priced via the flat built-in
     } else if (selection[char.id]) {
       cleanSelection[char.id] = selection[char.id]
     }
@@ -804,6 +844,14 @@ function LineItemRow({
     : Number(product?.base_price ?? 0)
   for (const char of details) {
     if (char.display_type === 'number') continue
+    if (char.display_type === 'text') {
+      unitPrice += (item.selection[char.id] ?? '').length * Number(char.price_per_char ?? 0)
+      continue
+    }
+    if (char.display_type === 'color') {
+      if (item.selection[char.id]) unitPrice += Number(char.color_price_modifier ?? 0)
+      continue
+    }
     const valueId = item.selection[char.id]
     if (!valueId) continue
     const v = char.characteristic_values.find(v => v.id === valueId)

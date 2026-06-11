@@ -15,7 +15,7 @@ const CLASSES_COLS: ColumnSpec[] = [
 
 const CHARACTERISTICS_COLS: ColumnSpec[] = [
   { header: 'key',          width: 22, required: true,  instructions: 'Unique identifier within this sheet' },
-  { header: 'display_type', width: 16, required: true,  instructions: 'One of: select, radio, swatch, toggle, number, boolean' },
+  { header: 'display_type', width: 16, required: true,  instructions: 'One of: select, radio, swatch, toggle, number, boolean, text, color' },
   { header: 'class_keys',   width: 28, required: false, instructions: 'Comma-separated Class keys (M:N). Leave blank if unattached.' },
   { header: 'sort_order',   width: 12, required: false, instructions: 'Optional ordering (number)' },
 ]

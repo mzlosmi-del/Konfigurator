@@ -12,7 +12,7 @@ export const SHEET_NAMES = {
 } as const
 
 export const DISPLAY_TYPES: readonly DisplayType[] = [
-  'select', 'radio', 'swatch', 'toggle', 'number', 'boolean',
+  'select', 'radio', 'swatch', 'toggle', 'number', 'boolean', 'text', 'color',
 ]
 
 export const PRODUCT_STATUSES: readonly ProductStatus[] = ['draft', 'published', 'archived']

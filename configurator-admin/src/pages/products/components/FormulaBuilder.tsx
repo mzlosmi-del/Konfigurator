@@ -246,6 +246,7 @@ function CharPicker({ value, chars, onChange, lang }: {
           ].join(' ')}
         >
           {pickTranslation(c.name_i18n as Record<string,string> | null, lang, c.name)}
+          {c.display_type === 'text' && <span className="opacity-60"> ({t('length')})</span>}
         </button>
       ))}
     </div>
@@ -324,8 +325,10 @@ export function FormulaBuilder({ node, onChange, characteristics, valuesMap, oth
     return () => window.removeEventListener('langchange', handler)
   }, [])
 
-  const selectChars  = characteristics.filter(c => c.display_type !== 'number')
-  const numberChars  = characteristics.filter(c => c.display_type === 'number')
+  // value-id-bearing chars (modifier / is_selected). text/color have no value rows.
+  const selectChars  = characteristics.filter(c => !['number', 'text', 'color'].includes(c.display_type))
+  // numeric-input chars: 'number' entered value, plus 'text' character length.
+  const numberChars  = characteristics.filter(c => c.display_type === 'number' || c.display_type === 'text')
   const firstCharId  = selectChars[0]?.id ?? characteristics[0]?.id ?? ''
   const firstValueId = valuesMap[firstCharId]?.[0]?.id ?? ''
   const firstNumId   = numberChars[0]?.id ?? ''

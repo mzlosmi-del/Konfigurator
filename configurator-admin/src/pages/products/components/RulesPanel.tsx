@@ -441,7 +441,8 @@ function PredicateRow({
   lang:      string
 }) {
   if (value.type === 'select_eq' || value.type === 'select_neq') {
-    const selectChars = chars.filter(c => c.display_type !== 'number')
+    // value-id predicates need characteristics that have value rows.
+    const selectChars = chars.filter(c => !['number', 'text', 'color'].includes(c.display_type))
     return (
       <div className="flex items-center gap-2 flex-wrap">
         <Select
@@ -564,8 +565,8 @@ function EffectRow({
   valuesMap: ValuesMap
   lang:      string
 }) {
-  const numericChars = chars.filter(c => c.display_type === 'number')
-  const selectChars  = chars.filter(c => c.display_type !== 'number')
+  const numericChars = chars.filter(c => c.display_type === 'number' || c.display_type === 'text')
+  const selectChars  = chars.filter(c => !['number', 'text', 'color'].includes(c.display_type))
 
   function changeKind(kind: RuleEffectKind) {
     onChange(emptyEffect(kind))

@@ -22,6 +22,9 @@ export const CHARACTERISTIC_LABELS: Record<string, string> = {
   sort_order:   'Sort order',
   numeric_min:  'Minimum value',
   numeric_max:  'Maximum value',
+  price_per_char:       'Price per character',
+  color_price_modifier: 'Color price',
+  neon_config:          'Neon preview',
 }
 
 export const CHARACTERISTIC_VALUE_LABELS: Record<string, string> = {

@@ -48,6 +48,8 @@ export function ConfigureProductDialog({
     const ni: Record<string, number> = {}
     for (const char of characteristics) {
       if (char.display_type === 'number') ni[char.id] = Number(sel[char.id] ?? 0)
+      // Text length feeds the numeric channel so formulas/rules can price by it.
+      else if (char.display_type === 'text') ni[char.id] = (sel[char.id] ?? '').length
     }
     return ni
   }, [characteristics])
@@ -85,6 +87,11 @@ export function ConfigureProductDialog({
     for (const char of characteristics) {
       if (char.display_type === 'number') {
         numericInputs[char.id] = Number(selection[char.id] ?? 0)
+      } else if (char.display_type === 'text') {
+        // Text length feeds formulas; the string itself is not a value-id selection.
+        numericInputs[char.id] = (selection[char.id] ?? '').length
+      } else if (char.display_type === 'color') {
+        // Colour is not a value-id selection; priced via the flat built-in below.
       } else if (selection[char.id]) {
         cleanSelection[char.id] = selection[char.id]
       }
@@ -92,6 +99,16 @@ export function ConfigureProductDialog({
     let price = Number(basePrice)
     for (const char of characteristics) {
       if (char.display_type === 'number') continue
+      // Text built-in per-character charge.
+      if (char.display_type === 'text') {
+        price += (selection[char.id] ?? '').length * Number(char.price_per_char ?? 0)
+        continue
+      }
+      // Colour built-in flat fee when a colour is chosen.
+      if (char.display_type === 'color') {
+        if (selection[char.id]) price += Number(char.color_price_modifier ?? 0)
+        continue
+      }
       const valueId = cleanSelection[char.id]
       if (!valueId) continue
       const val = char.characteristic_values.find(v => v.id === valueId)
@@ -154,8 +171,57 @@ export function ConfigureProductDialog({
           {characteristics.map(char => {
             const isNumber  = char.display_type === 'number'
             const isBoolean = char.display_type === 'boolean'
+            const isText    = char.display_type === 'text'
+            const isColor   = char.display_type === 'color'
             const lockedValueId = ruleEffect.lockedValues[char.id]
             const lockedNumeric = ruleEffect.lockedNumericValues[char.id]
+
+            if (isText) {
+              const text = selection[char.id] ?? ''
+              const perChar = Number(char.price_per_char ?? 0)
+              return (
+                <div key={char.id} className="space-y-1.5">
+                  <label className="text-sm font-medium">{char.name}</label>
+                  <textarea
+                    rows={3}
+                    value={text}
+                    maxLength={char.numeric_max ?? undefined}
+                    onChange={e => handleNumericInput(char.id, e.target.value)}
+                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  />
+                  <div className="text-xs text-muted-foreground tabular-nums">
+                    {text.length}{char.numeric_max != null ? ` / ${char.numeric_max}` : ''}
+                    {perChar !== 0 && ` · ${perChar > 0 ? '+' : ''}${perChar.toFixed(2)}/${t('char')}`}
+                  </div>
+                </div>
+              )
+            }
+
+            if (isColor) {
+              const hex      = selection[char.id] ?? ''
+              const modifier = Number(char.color_price_modifier ?? 0)
+              return (
+                <div key={char.id} className="space-y-1.5">
+                  <label className="text-sm font-medium">{char.name}</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="color"
+                      value={hex || '#000000'}
+                      onChange={e => handleNumericInput(char.id, e.target.value)}
+                      className="h-9 w-12 rounded-md border border-input bg-background p-1 cursor-pointer"
+                    />
+                    {hex
+                      ? <span className="text-sm tabular-nums uppercase">{hex}</span>
+                      : <span className="text-sm text-muted-foreground">{t('Pick a color')}</span>}
+                    {hex && modifier !== 0 && (
+                      <span className={`text-xs ${modifier > 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                        ({modifier > 0 ? '+' : ''}{modifier.toFixed(2)})
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )
+            }
 
             if (isNumber) {
               const isLocked = char.id in ruleEffect.lockedNumericValues

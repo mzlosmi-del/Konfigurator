@@ -11,7 +11,8 @@ import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
 import { CharacteristicValuesEditor } from '@/pages/products/components/CharacteristicValuesEditor'
 import { AssignAutocomplete } from '@/components/library/AssignAutocomplete'
-import type { Characteristic, CharacteristicClass, CharacteristicValue } from '@/types/database'
+import { NeonConfigEditor, type ColorCharOption } from '@/pages/library/NeonConfigEditor'
+import type { Characteristic, CharacteristicClass, CharacteristicValue, NeonConfig } from '@/types/database'
 import { t } from '@/i18n'
 
 // ─── Numeric bounds editor ───────────────────────────────────────────────────
@@ -23,10 +24,12 @@ function NumericBoundsEditor({
   numericMin,
   numericMax,
   onSave,
+  label = t('Allowed range'),
 }: {
   numericMin: number | null
   numericMax: number | null
   onSave: (min: number | null, max: number | null) => void
+  label?: string
 }) {
   const [minStr, setMinStr] = useState(numericMin != null ? String(numericMin) : '')
   const [maxStr, setMaxStr] = useState(numericMax != null ? String(numericMax) : '')
@@ -56,7 +59,7 @@ function NumericBoundsEditor({
   return (
     <div>
       <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1.5">
-        {t('Allowed range')}
+        {label}
       </p>
       <div className="flex items-center gap-2">
         <Input
@@ -85,6 +88,46 @@ function NumericBoundsEditor({
   )
 }
 
+// ─── Single price field editor (text per-character / colour flat fee) ────────
+// Commit on blur, mirroring NumericBoundsEditor. Empty input is treated as 0.
+
+function PriceFieldEditor({
+  label,
+  value,
+  onSave,
+}: {
+  label: string
+  value: number
+  onSave: (v: number) => void
+}) {
+  const [str, setStr] = useState(value ? String(value) : '')
+
+  function commit() {
+    const trimmed = str.trim()
+    const n = trimmed === '' ? 0 : parseFloat(trimmed)
+    const next = Number.isNaN(n) ? 0 : n
+    setStr(next ? String(next) : '')
+    if (next !== value) onSave(next)
+  }
+
+  return (
+    <div>
+      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1.5">
+        {label}
+      </p>
+      <Input
+        type="number"
+        step="0.01"
+        className="w-32 h-8"
+        placeholder="0"
+        value={str}
+        onChange={e => setStr(e.target.value)}
+        onBlur={commit}
+      />
+    </div>
+  )
+}
+
 // ─── DraggableChar row ────────────────────────────────────────────────────────
 
 export interface DraggableCharProps {
@@ -104,6 +147,12 @@ export interface DraggableCharProps {
   onUpdateDescriptionI18n: (i18n: Record<string, string>) => void
   onChangeType: (type: Characteristic['display_type']) => void
   onUpdateBounds: (min: number | null, max: number | null) => void
+  /** Persist the per-type price fields (text per-character / colour flat fee). */
+  onUpdatePricing: (patch: { price_per_char?: number; color_price_modifier?: number }) => void
+  /** Persist the live-neon-preview config (text characteristics only). null = off. */
+  onUpdateNeonConfig: (next: NeonConfig | null) => void
+  /** Colour/swatch characteristics that can drive the neon glow colour. */
+  neonColorChars: ColorCharOption[]
   onDelete: () => void
   onAssignToClass: (classId: string) => void
   onRemoveFromClass?: (classId: string) => void
@@ -174,6 +223,9 @@ function CharRowShell({
   onUpdateDescriptionI18n,
   onChangeType,
   onUpdateBounds,
+  onUpdatePricing,
+  onUpdateNeonConfig,
+  neonColorChars,
   onDelete,
   onAssignToClass,
   onRemoveFromClass,
@@ -271,6 +323,8 @@ function CharRowShell({
           <option value="toggle">{t('Toggle')}</option>
           <option value="number">{t('Number')}</option>
           <option value="boolean">{t('Boolean')}</option>
+          <option value="text">{t('Text')}</option>
+          <option value="color">{t('Color')}</option>
         </Select>
 
         {/* Class membership tags + type-to-assign input */}
@@ -360,18 +414,51 @@ function CharRowShell({
             />
           )}
 
-          {/* Values editor */}
-          <div>
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
-              {t('Values')}
-            </p>
-            <CharacteristicValuesEditor
-              characteristicId={char.id}
-              tenantId={tenantId}
-              values={values}
-              onChange={onValuesChange}
+          {/* Text — character-length bounds + per-character price + neon preview */}
+          {char.display_type === 'text' && (
+            <>
+              <NumericBoundsEditor
+                label={t('Allowed length (characters)')}
+                numericMin={char.numeric_min}
+                numericMax={char.numeric_max}
+                onSave={onUpdateBounds}
+              />
+              <PriceFieldEditor
+                label={t('Price per character')}
+                value={char.price_per_char ?? 0}
+                onSave={v => onUpdatePricing({ price_per_char: v })}
+              />
+              <NeonConfigEditor
+                config={char.neon_config ?? null}
+                onSave={onUpdateNeonConfig}
+                colorChars={neonColorChars}
+              />
+            </>
+          )}
+
+          {/* Color — flat fee applied when a colour is chosen */}
+          {char.display_type === 'color' && (
+            <PriceFieldEditor
+              label={t('Color price')}
+              value={char.color_price_modifier ?? 0}
+              onSave={v => onUpdatePricing({ color_price_modifier: v })}
             />
-          </div>
+          )}
+
+          {/* Values editor — text/color have no preset values */}
+          {char.display_type !== 'text' && char.display_type !== 'color' && (
+            <div>
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
+                {t('Values')}
+              </p>
+              <CharacteristicValuesEditor
+                characteristicId={char.id}
+                tenantId={tenantId}
+                values={values}
+                onChange={onValuesChange}
+              />
+            </div>
+          )}
         </div>
       )}
     </div>
