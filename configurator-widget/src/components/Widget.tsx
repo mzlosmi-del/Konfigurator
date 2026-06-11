@@ -8,9 +8,11 @@ import { calculateFormulaTotal, calculateFormulaBreakdown } from '../formulaEngi
 import { t, getLang, setLang, ENABLED_LANGS, OTHER_LANGS, pickTranslation, type Lang } from '../i18n'
 import { Visualization } from './Visualization'
 import { CharacteristicInput } from './CharacteristicInput'
+import { NeonPreview } from './NeonPreview'
 import { InquiryForm } from './InquiryForm'
-import { isNeonEnabled, resolveGlowHex } from '../neon'
+import { isNeonEnabled, resolveGlowHex, isPerCharColors, neonSwatchPalette, describeNeonColors, offeredScenes, describeNeonScene } from '../neon'
 import { getNeonFont } from '../neonFonts'
+import { getNeonScene, neonSceneBackground } from '../neonScenes'
 import { ensureNeonFonts } from '../fonts'
 
 interface Props {
@@ -34,6 +36,14 @@ export function Widget({ config, track, onThemeLoad }: Props) {
   // Per-neon-characteristic selected font key (charId → font key). Empty until
   // the customer picks one; the input then falls back to the first enabled font.
   const [neonFonts, setNeonFonts] = useState<Record<string, string>>({})
+  // Per-character glow colours for per-char-colour neon chars:
+  //   neonCharColors[charId][charIndex] = hex.  Absent index ⇒ default glow.
+  const [neonCharColors, setNeonCharColors] = useState<Record<string, Record<number, string>>>({})
+  // Which character index is currently selected for painting, per neon char.
+  const [neonSelectedChar, setNeonSelectedChar] = useState<Record<string, number | null>>({})
+  // Chosen background scene per neon char (charId → scene key). Absent ⇒ the
+  // first offered scene (or the plain panel when none are offered).
+  const [neonScene, setNeonScene] = useState<Record<string, string>>({})
   const [showForm, setShowForm] = useState(false)
   const [activeTab, setActiveTab] = useState(0)
   const [lang, setLangState] = useState<Lang>(getLang())
@@ -87,6 +97,28 @@ export function Widget({ config, track, onThemeLoad }: Props) {
 
   function handleNeonFontChange(charId: string, fontKey: string) {
     setNeonFonts(prev => ({ ...prev, [charId]: fontKey }))
+  }
+
+  // Per-character colouring: select a character to paint, then paint it.
+  function handleSelectNeonChar(charId: string, index: number) {
+    setNeonSelectedChar(prev => ({
+      ...prev,
+      // Clicking the already-selected character deselects it (toggle).
+      [charId]: prev[charId] === index ? null : index,
+    }))
+  }
+
+  function handlePaintNeonChar(charId: string, hex: string) {
+    const index = neonSelectedChar[charId]
+    if (index == null) return
+    setNeonCharColors(prev => ({
+      ...prev,
+      [charId]: { ...(prev[charId] ?? {}), [index]: hex },
+    }))
+  }
+
+  function handleSelectNeonScene(charId: string, sceneKey: string) {
+    setNeonScene(prev => ({ ...prev, [charId]: sceneKey }))
   }
 
   function handleSelect(charId: string, valueId: string) {
@@ -223,7 +255,24 @@ export function Widget({ config, track, onThemeLoad }: Props) {
       if (char.display_type === 'text') {
         const text = textInputs[char.id] ?? ''
         if (text.length > 0) {
-          items.push({ characteristic_name: charName, value_label: text, price_modifier: text.length * (char.price_per_char ?? 0) })
+          // For neon, append readable notes so the shop can reproduce the sign:
+          // the chosen background scene and any per-character colours. Visual
+          // only — price is unchanged.
+          let valueLabel = text
+          if (isNeonEnabled(char)) {
+            const notes: string[] = []
+            const scenes = offeredScenes(char.neon_config!)
+            if (scenes.length > 0) {
+              const sceneLabel = describeNeonScene(neonScene[char.id] ?? scenes[0])
+              if (sceneLabel) notes.push(`Background: ${sceneLabel}`)
+            }
+            if (isPerCharColors(char)) {
+              const colourNote = describeNeonColors(text, neonCharColors[char.id])
+              if (colourNote) notes.push(colourNote)
+            }
+            if (notes.length > 0) valueLabel = `${text} (${notes.join('; ')})`
+          }
+          items.push({ characteristic_name: charName, value_label: valueLabel, price_modifier: text.length * (char.price_per_char ?? 0) })
         }
         continue
       }
@@ -248,7 +297,7 @@ export function Widget({ config, track, onThemeLoad }: Props) {
     }
 
     return items
-  }, [state, selection, numericInputs, textInputs, colorInputs, lang])
+  }, [state, selection, numericInputs, textInputs, colorInputs, neonCharColors, neonScene, lang])
 
   const allSelected = useMemo(() => {
     if (state.phase !== 'ready') return false
@@ -369,6 +418,42 @@ export function Widget({ config, track, onThemeLoad }: Props) {
     return g.characteristicIds.map(id => charById.get(id)).filter(Boolean) as Characteristic[]
   }, [showTabs, groups, activeTab, characteristics, charById])
 
+  // When the product has a neon-enabled text characteristic, its glowing live
+  // preview becomes the hero visual — it replaces the image/3D <Visualization>
+  // at the top of the widget. The text input + font picker still render inline
+  // among the characteristics (their inline glow is suppressed so it only shows
+  // once, up top). Spans the full characteristics array so the hero is stable
+  // regardless of the active tab. Plain const (not a hook) to keep hook order
+  // unconditional on this code path.
+  const neonHeroChar = characteristics.find(isNeonEnabled)
+  const neonHero = neonHeroChar
+    ? (() => {
+        const neon     = neonHeroChar.neon_config!
+        const colorChar = neon.colorCharId ? charById.get(neon.colorCharId) : undefined
+        const glowHex  = resolveGlowHex(neon, colorChar, selection, colorInputs)
+        const fontKeys = (neon.fonts ?? []).filter(k => getNeonFont(k))
+        const fontKey  = neonFonts[neonHeroChar.id] ?? fontKeys[0]
+        const perChar  = isPerCharColors(neonHeroChar)
+        const scenes   = offeredScenes(neon)
+        const sceneKey = neonScene[neonHeroChar.id] ?? scenes[0]
+        return {
+          charId:      neonHeroChar.id,
+          text:        textInputs[neonHeroChar.id] ?? '',
+          placeholder: t('Your text'),
+          glowHex,
+          fontKey,
+          perChar,
+          // Palette the customer paints from, and the live per-char state.
+          palette:       perChar ? neonSwatchPalette(neon, colorChar) : [],
+          charColors:    neonCharColors[neonHeroChar.id] ?? {},
+          selectedIndex: neonSelectedChar[neonHeroChar.id] ?? null,
+          // Offered background scenes and the currently-chosen one.
+          scenes,
+          sceneKey,
+        }
+      })()
+    : null
+
   // Display-only selection for the 3D preview: before the customer picks
   // anything, mesh-visibility rules would hide every configurable mesh and the
   // model would look empty. Fill each unset characteristic with one value —
@@ -404,8 +489,74 @@ export function Widget({ config, track, onThemeLoad }: Props) {
 
   return (
     <div class="cw-root">
-      {/* Product image */}
-      <Visualization assets={assets} assignments={assignments} selection={selection} previewSelection={previewSelection} numericInputs={numericInputs} arEnabled={product.ar_enabled} arPlacement={product.ar_placement ?? 'floor'} />
+      {/* Hero visual: the neon glow preview takes the place of the product
+          image/3D when a neon text characteristic is present; otherwise the
+          normal visualization renders unchanged. */}
+      {neonHero
+        ? (
+          <div class="cw-neon-hero">
+            <NeonPreview
+              text={neonHero.text}
+              placeholder={neonHero.placeholder}
+              glowHex={neonHero.glowHex}
+              fontKey={neonHero.fontKey}
+              perChar={neonHero.perChar}
+              charColors={neonHero.charColors}
+              selectedIndex={neonHero.selectedIndex}
+              onSelectChar={(i) => handleSelectNeonChar(neonHero.charId, i)}
+              sceneKey={neonHero.sceneKey}
+            />
+            {/* Background-scene picker: thumbnails that swap the backdrop live. */}
+            {neonHero.scenes.length > 0 && (
+              <div class="cw-neon-scenes" role="group" aria-label={t('Background')}>
+                {neonHero.scenes.map(key => {
+                  const sc = getNeonScene(key)
+                  if (!sc) return null
+                  const bg = neonSceneBackground(key)
+                  const selected = neonHero.sceneKey === key
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      class={`cw-neon-scene-btn${selected ? ' selected' : ''}`}
+                      title={sc.label}
+                      style={bg ? `background-image:${bg};` : ''}
+                      onClick={() => handleSelectNeonScene(neonHero.charId, key)}
+                    >
+                      <span class="cw-neon-scene-name">{sc.label}</span>
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+            {/* Per-character painter: pick a character above, then a colour. */}
+            {neonHero.perChar && neonHero.palette.length > 0 && (
+              <div class="cw-neon-painter">
+                <div class="cw-neon-painter-hint">
+                  {neonHero.selectedIndex != null
+                    ? t('Pick a colour for the selected letter')
+                    : t('Tap a letter above to colour it')}
+                </div>
+                <div class="cw-neon-swatches">
+                  {neonHero.palette.map(sw => (
+                    <button
+                      key={sw.valueId}
+                      type="button"
+                      class="cw-neon-swatch"
+                      title={sw.label}
+                      disabled={neonHero.selectedIndex == null}
+                      style={`background:${sw.hex}`}
+                      onClick={() => handlePaintNeonChar(neonHero.charId, sw.hex)}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )
+        : (
+          <Visualization assets={assets} assignments={assignments} selection={selection} previewSelection={previewSelection} numericInputs={numericInputs} arEnabled={product.ar_enabled} arPlacement={product.ar_placement ?? 'floor'} />
+        )}
 
       <div class="cw-body">
         {/* Product info */}
@@ -461,6 +612,9 @@ export function Widget({ config, track, onThemeLoad }: Props) {
                   neonGlowHex={glowHex}
                   neonFontKey={neonFonts[char.id]}
                   onNeonFontChange={handleNeonFontChange}
+                  /* The hero char's glow shows at the top; suppress its inline
+                     duplicate (input + font picker still render). */
+                  showInlineNeonPreview={!neonHeroChar || char.id !== neonHeroChar.id}
                 />
               )
             })}

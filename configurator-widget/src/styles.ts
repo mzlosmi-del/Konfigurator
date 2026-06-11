@@ -472,6 +472,7 @@ export const WIDGET_STYLES = `
      inline --cw-neon-glow custom property set per-render by NeonPreview, so the
      glow updates live without re-injecting CSS. All scoped to the shadow root. */
   .cw-neon-panel {
+    position: relative;
     background: #0c0c12;
     background-image: radial-gradient(120% 100% at 50% 0%, #16161f 0%, #0a0a0f 70%);
     border: 1px solid #1f1f29;
@@ -484,8 +485,20 @@ export const WIDGET_STYLES = `
     justify-content: center;
     overflow: hidden;
   }
+  /* Background scene: an absolutely-filled layer behind the glow text. The
+     text (a sibling that follows in source order) sits above it. */
+  .cw-neon-scene {
+    position: absolute;
+    inset: 0;
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    z-index: 0;
+  }
   .cw-neon-text {
     --cw-neon-glow: #ff2d95;
+    position: relative;
+    z-index: 1;
     font-size: 34px;
     line-height: 1.25;
     text-align: center;
@@ -500,6 +513,115 @@ export const WIDGET_STYLES = `
       0 0 42px var(--cw-neon-glow);
   }
   .cw-neon-text--placeholder { opacity: 0.45; }
+
+  /* Hero variant: the neon glow takes the place of the product image/3D at the
+     top of the widget. Fills the width, matches the visual's rounded top, and
+     overrides the inline panel's compact framing with a taller hero canvas. */
+  .cw-neon-hero {
+    width: 100%;
+    border-top-left-radius: var(--cw-radius);
+    border-top-right-radius: var(--cw-radius);
+    overflow: hidden;
+  }
+  .cw-neon-hero .cw-neon-panel {
+    border: none;
+    border-radius: 0;
+    margin-bottom: 0;
+    min-height: 0;
+    aspect-ratio: 16/9;
+    padding: 32px 24px;
+  }
+  .cw-neon-hero .cw-neon-text { font-size: 42px; }
+
+  /* Per-character colouring: each letter is its own clickable glowing span. */
+  .cw-neon-text--perchar { cursor: default; }
+  .cw-neon-char {
+    cursor: pointer;
+    color: #fff5fb;
+    transition: transform 0.08s;
+    text-shadow:
+      0 0 2px #ffffff,
+      0 0 6px var(--cw-neon-glow),
+      0 0 12px var(--cw-neon-glow),
+      0 0 24px var(--cw-neon-glow),
+      0 0 42px var(--cw-neon-glow);
+  }
+  .cw-neon-char:hover { transform: translateY(-2px); }
+  .cw-neon-char.selected {
+    outline: 2px dashed rgba(255,255,255,0.6);
+    outline-offset: 3px;
+    border-radius: 3px;
+  }
+  .cw-neon-space { white-space: pre; }
+
+  /* Painter: the swatch row shown under the hero in per-character mode. */
+  .cw-neon-painter {
+    background: #0c0c12;
+    padding: 0 18px 16px;
+    text-align: center;
+  }
+  .cw-neon-painter-hint {
+    color: #9aa;
+    font-size: 11px;
+    letter-spacing: 0.02em;
+    margin-bottom: 10px;
+  }
+  .cw-neon-swatches {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: center;
+  }
+  .cw-neon-swatch {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    border: 2px solid rgba(255,255,255,0.25);
+    cursor: pointer;
+    padding: 0;
+    transition: transform 0.08s, border-color 0.12s;
+  }
+  .cw-neon-swatch:hover:not(:disabled) { transform: scale(1.12); border-color: rgba(255,255,255,0.7); }
+  .cw-neon-swatch:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* Background-scene picker: thumbnail row under the hero. Each thumb shows the
+     scene art; the label rides along the bottom for clarity. */
+  .cw-neon-scenes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: center;
+    background: #0c0c12;
+    padding: 0 16px 16px;
+  }
+  .cw-neon-scene-btn {
+    position: relative;
+    width: 88px;
+    height: 50px;
+    border-radius: var(--cw-radius-sm);
+    border: 2px solid rgba(255,255,255,0.2);
+    background: #0a0a0f center / cover no-repeat;
+    cursor: pointer;
+    padding: 0;
+    overflow: hidden;
+    transition: transform 0.08s, border-color 0.12s;
+  }
+  .cw-neon-scene-btn:hover { transform: translateY(-2px); border-color: rgba(255,255,255,0.55); }
+  .cw-neon-scene-btn.selected { border-color: #fff; }
+  .cw-neon-scene-name {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    padding: 2px 4px;
+    font-size: 9px;
+    line-height: 1.2;
+    color: #fff;
+    background: rgba(0,0,0,0.55);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
 
   .cw-neon-fonts {
     display: flex;

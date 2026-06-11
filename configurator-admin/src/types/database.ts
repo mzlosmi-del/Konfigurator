@@ -68,6 +68,13 @@ export interface NeonConfig {
   glowColorMap?: Record<string, string>
   /** Fallback glow colour when no bound value resolves to a hex. */
   defaultGlowHex?: string
+  /** When true, customers can paint each character a different colour (picked
+   *  from the bound colour swatches) by clicking it in the live preview.
+   *  Default off ⇒ the whole text glows in one colour. */
+  perCharColors?: boolean
+  /** Background-scene keys (from the bundled scene catalogue) the customer may
+   *  pick as a backdrop behind the glow. Empty/absent ⇒ no scene picker. */
+  backgrounds?: string[]
 }
 // Configuration rules v2 — see migrations/074_rules_v2.sql.
 //

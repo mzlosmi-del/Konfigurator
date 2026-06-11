@@ -3,6 +3,7 @@ import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
 import type { NeonConfig, Characteristic } from '@/types/database'
 import { NEON_FONTS } from '@/lib/neonFonts'
+import { NEON_SCENES } from '@/lib/neonScenes'
 import { normalizeNeonConfig, DEFAULT_NEON_GLOW as DEFAULT_GLOW } from '@/lib/neonConfig'
 import { t } from '@/i18n'
 
@@ -129,6 +130,42 @@ export function NeonConfigEditor({ config, onSave, colorChars }: Props) {
             </p>
           </div>
 
+          {/* Offered background scenes — which backdrops the customer may pick */}
+          <div>
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1.5">
+              {t('Offered backgrounds')}
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {NEON_SCENES.map(s => {
+                const on = (draft.backgrounds ?? []).includes(s.key)
+                return (
+                  <button
+                    key={s.key}
+                    type="button"
+                    className={[
+                      'px-2.5 py-1 rounded-md border text-xs transition-colors',
+                      on
+                        ? 'border-fuchsia-500 bg-fuchsia-100 text-fuchsia-900'
+                        : 'border-input bg-background text-muted-foreground hover:border-foreground',
+                    ].join(' ')}
+                    onClick={() => {
+                      const current = draft.backgrounds ?? []
+                      const backgrounds = on
+                        ? current.filter(k => k !== s.key)
+                        : [...current, s.key]
+                      patch({ backgrounds })
+                    }}
+                  >
+                    {s.label}
+                  </button>
+                )
+              })}
+            </div>
+            <p className="text-[11px] text-muted-foreground mt-1">
+              {t('Customers pick a backdrop behind the sign. Leave empty for a plain dark panel.')}
+            </p>
+          </div>
+
           {/* Glow colour source */}
           <div>
             <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1.5">
@@ -145,6 +182,22 @@ export function NeonConfigEditor({ config, onSave, colorChars }: Props) {
               ))}
             </Select>
           </div>
+
+          {/* Per-character colouring — lets customers paint each letter from the
+              bound colour swatches. Needs a bound colour characteristic. */}
+          <label
+            className={`flex items-center gap-2 select-none ${draft.colorCharId ? 'cursor-pointer' : 'opacity-50 cursor-not-allowed'}`}
+            title={draft.colorCharId ? '' : t('Bind a colour characteristic above to enable this')}
+          >
+            <input
+              type="checkbox"
+              className="h-4 w-4 accent-fuchsia-600"
+              checked={draft.perCharColors === true}
+              disabled={!draft.colorCharId}
+              onChange={e => patch({ perCharColors: e.target.checked })}
+            />
+            <span className="text-sm">{t('Allow a different colour per character')}</span>
+          </label>
 
           {/* Default / fallback glow colour */}
           <div>

@@ -29,9 +29,22 @@ describe('normalizeNeonConfig (backward-compat)', () => {
       colorCharId: 'char-colour',
       glowColorMap: { 'val-red': '#ff0000' },
       defaultGlowHex: '#00ffcc',
+      perCharColors: true,
+      backgrounds: ['bar-wall', 'studio'],
     }
     const n = normalizeNeonConfig(cfg)
     expect(n).toEqual(cfg)
+  })
+
+  it('defaults perCharColors to false and backgrounds to [] when absent', () => {
+    expect(normalizeNeonConfig(null).perCharColors).toBe(false)
+    expect(normalizeNeonConfig(null).backgrounds).toEqual([])
+    expect(normalizeNeonConfig({ enabled: true, fonts: ['pacifico'] }).backgrounds).toEqual([])
+  })
+
+  it('drops unknown background scene keys', () => {
+    const cfg: NeonConfig = { enabled: true, fonts: ['pacifico'], backgrounds: ['bar-wall', 'nope', 'gate'] }
+    expect(normalizeNeonConfig(cfg).backgrounds).toEqual(['bar-wall', 'gate'])
   })
 })
 

@@ -24,6 +24,10 @@ interface Props {
   neonGlowHex?: string
   neonFontKey?: string
   onNeonFontChange?: (charId: string, fontKey: string) => void
+  /** When false, the inline glow preview is hidden (the glow shows as the hero
+   *  visual at the top of the widget instead). The text input + font picker
+   *  still render. Defaults to true. */
+  showInlineNeonPreview?: boolean
 }
 
 function formatModifier(mod: number): string {
@@ -55,6 +59,7 @@ export function CharacteristicInput({
   neonGlowHex,
   neonFontKey,
   onNeonFontChange,
+  showInlineNeonPreview = true,
 }: Props) {
   const { display_type, id } = characteristic
   const isLocked = id in ruleEffect.lockedValues
@@ -121,7 +126,7 @@ export function CharacteristicInput({
     return (
       <div>
         <div class="cw-char-label">{label}</div>
-        {neon && (
+        {neon && showInlineNeonPreview && (
           <NeonPreview
             text={value}
             placeholder={t('Your text')}

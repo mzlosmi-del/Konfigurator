@@ -4,6 +4,11 @@ import {
   resolveGlowHex,
   normalizeHex,
   neonMaxLength,
+  isPerCharColors,
+  neonSwatchPalette,
+  describeNeonColors,
+  offeredScenes,
+  describeNeonScene,
   DEFAULT_NEON_HEX,
 } from '../neon'
 import type { Characteristic, NeonConfig, Selection, ColorInputs } from '../types'
@@ -160,5 +165,73 @@ describe('character count parity with existing text type', () => {
       text.length * (c.price_per_char ?? pricePerChar)
     expect(priceOf(neon)).toBe(priceOf(plain))
     expect(priceOf(neon)).toBe(24)
+  })
+})
+
+// ─── Per-character colouring ──────────────────────────────────────────────────
+
+describe('isPerCharColors', () => {
+  it('is false unless neon is enabled AND perCharColors is true', () => {
+    expect(isPerCharColors(neonTextChar(null))).toBe(false)
+    expect(isPerCharColors(neonTextChar({ enabled: true, fonts: ['pacifico'] }))).toBe(false)
+    expect(isPerCharColors(neonTextChar({ enabled: false, fonts: [], perCharColors: true }))).toBe(false)
+    expect(isPerCharColors(neonTextChar({ enabled: true, fonts: ['pacifico'], perCharColors: true }))).toBe(true)
+  })
+})
+
+describe('neonSwatchPalette', () => {
+  it('builds a palette from the bound swatch values, dropping ones with no hex', () => {
+    const palette = neonSwatchPalette(baseNeon, swatchChar)
+    expect(palette.map(s => s.valueId)).toEqual(['val-pink', 'val-blue']) // val-nohex dropped
+    expect(palette[0]).toEqual({ valueId: 'val-pink', label: 'Pink', hex: '#ff00aa' })
+  })
+
+  it('applies glowColorMap overrides', () => {
+    const neon: NeonConfig = { ...baseNeon, glowColorMap: { 'val-pink': '#123456' } }
+    const palette = neonSwatchPalette(neon, swatchChar)
+    expect(palette.find(s => s.valueId === 'val-pink')?.hex).toBe('#123456')
+  })
+
+  it('returns empty for a free-form colour char or no bound char', () => {
+    expect(neonSwatchPalette(baseNeon, colorPickerChar)).toEqual([])
+    expect(neonSwatchPalette(baseNeon, undefined)).toEqual([])
+  })
+})
+
+describe('describeNeonColors (inquiry/PDF note)', () => {
+  it('lists only painted characters, skipping spaces and defaults', () => {
+    const text = 'JO E'
+    const colors = { 0: '#ff0000', 3: '#00ff00' } // J and E painted; space at 2 ignored
+    expect(describeNeonColors(text, colors)).toBe('J=#ff0000, E=#00ff00')
+  })
+
+  it('returns empty string when nothing was painted', () => {
+    expect(describeNeonColors('JOE', {})).toBe('')
+    expect(describeNeonColors('JOE', undefined)).toBe('')
+  })
+})
+
+// ─── Background scenes ────────────────────────────────────────────────────────
+
+describe('offeredScenes', () => {
+  it('filters to known scene keys, dropping unknowns', () => {
+    const neon: NeonConfig = { ...baseNeon, backgrounds: ['bar-wall', 'nope', 'gate'] }
+    expect(offeredScenes(neon)).toEqual(['bar-wall', 'gate'])
+  })
+
+  it('is empty when no backgrounds are configured', () => {
+    expect(offeredScenes(baseNeon)).toEqual([])
+  })
+})
+
+describe('describeNeonScene', () => {
+  it('returns the label for a known scene', () => {
+    expect(describeNeonScene('bar-wall')).toBe('Bar wall')
+  })
+  it('returns empty for none / unknown / absent', () => {
+    expect(describeNeonScene('none')).toBe('')
+    expect(describeNeonScene('nope')).toBe('')
+    expect(describeNeonScene(undefined)).toBe('')
+    expect(describeNeonScene(null)).toBe('')
   })
 })

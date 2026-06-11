@@ -62,6 +62,14 @@ export interface NeonConfig {
   colorCharId?: string | null
   glowColorMap?: Record<string, string>
   defaultGlowHex?: string
+  /** When true, the customer can paint each character a different colour by
+   *  clicking it in the preview and choosing from the bound colour swatches.
+   *  Default off ⇒ the whole text glows in the single resolved colour. */
+  perCharColors?: boolean
+  /** Background-scene keys (from the bundled neonScenes catalogue) the customer
+   *  may pick as a backdrop behind the glow. Empty/absent ⇒ no scene picker;
+   *  the glow renders on the default dark panel. */
+  backgrounds?: string[]
 }
 
 export interface Characteristic {

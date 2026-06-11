@@ -13,6 +13,9 @@ const sr: Record<string, string> = {
   // Neon text preview (migration 096)
   'Your sign text':                        'Tekst vašeg natpisa',
   'Your text':                             'Vaš tekst',
+  'Tap a letter above to colour it':       'Dodirnite slovo iznad da ga obojite',
+  'Pick a colour for the selected letter': 'Izaberite boju za izabrano slovo',
+  'Background':                            'Pozadina',
   'Select all options to continue':        'Izaberite sve opcije da biste nastavili',
   'This is an estimated price. The official quote will be provided by the company after your inquiry.':
     'Ovo je procenjena cena. Zvaničnu ponudu će vam dostaviti kompanija nakon vašeg upita.',

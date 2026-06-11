@@ -1,9 +1,11 @@
 import type { NeonConfig } from '@/types/database'
 import { NEON_FONTS } from '@/lib/neonFonts'
+import { NEON_SCENES } from '@/lib/neonScenes'
 
 export const DEFAULT_NEON_GLOW = '#ff2d95'
 
 const VALID_FONT_KEYS = new Set(NEON_FONTS.map(f => f.key))
+const VALID_SCENE_KEYS = new Set(NEON_SCENES.map(s => s.key))
 
 /** Turn a possibly-null/partial stored config into a complete editable draft.
  *  Used by the editor so partial DB rows (or null) become a stable shape. */
@@ -16,6 +18,8 @@ export function normalizeNeonConfig(config: NeonConfig | null | undefined): Neon
     colorCharId:    config?.colorCharId ?? null,
     glowColorMap:   config?.glowColorMap ?? {},
     defaultGlowHex: config?.defaultGlowHex ?? DEFAULT_NEON_GLOW,
+    perCharColors:  config?.perCharColors === true,
+    backgrounds:    (config?.backgrounds ?? []).filter(k => VALID_SCENE_KEYS.has(k)),
   }
 }
 
