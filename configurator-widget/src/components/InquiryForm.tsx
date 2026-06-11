@@ -139,7 +139,7 @@ export function InquiryForm({ config, productId, tenantId, lineItems, totalPrice
             <label>{t('Your name *')}</label>
             <input
               type="text"
-              placeholder={t('Ivan Horvat')}
+              placeholder={t('John Smith')}
               value={form.name}
               onInput={(e) => setForm(f => ({ ...f, name: (e.target as HTMLInputElement).value }))}
               autocomplete="name"
@@ -151,7 +151,7 @@ export function InquiryForm({ config, productId, tenantId, lineItems, totalPrice
             <label>{t('Email address *')}</label>
             <input
               type="email"
-              placeholder={t('ivan@example.com')}
+              placeholder={t('john@example.co.uk')}
               value={form.email}
               onInput={(e) => setForm(f => ({ ...f, email: (e.target as HTMLInputElement).value }))}
               autocomplete="email"
@@ -164,7 +164,7 @@ export function InquiryForm({ config, productId, tenantId, lineItems, totalPrice
               <label>{t('Phone number')}</label>
               <input
                 type="tel"
-                placeholder="+385 91 234 5678"
+                placeholder="07700 900123"
                 value={form.phone}
                 onInput={(e) => setForm(f => ({ ...f, phone: (e.target as HTMLInputElement).value }))}
                 autocomplete="tel"
@@ -177,7 +177,7 @@ export function InquiryForm({ config, productId, tenantId, lineItems, totalPrice
               <label>{t('Company name')}</label>
               <input
                 type="text"
-                placeholder={t('Acme d.o.o.')}
+                placeholder={t('Acme Ltd')}
                 value={form.company}
                 onInput={(e) => setForm(f => ({ ...f, company: (e.target as HTMLInputElement).value }))}
                 autocomplete="organization"

@@ -24,9 +24,9 @@ const sr: Record<string, string> = {
 
   // Inquiry form
   'Your name *':                           'Vaše ime *',
-  'Ivan Horvat':                           'Petar Petrović',
+  'John Smith':                            'Petar Petrović',
   'Email address *':                       'E-mail adresa *',
-  'ivan@example.com':                      'petar@primer.com',
+  'john@example.co.uk':                    'petar@primer.com',
   'Message (optional)':                    'Poruka (opciono)',
   'Any additional details or questions…': 'Dodatni detalji ili pitanja…',
   'Name is required':                      'Ime je obavezno',
