@@ -192,9 +192,28 @@ describe('neonSwatchPalette', () => {
     expect(palette.find(s => s.valueId === 'val-pink')?.hex).toBe('#123456')
   })
 
-  it('returns empty for a free-form colour char or no bound char', () => {
+  it('returns empty for a value-less free-form colour char or no bound char', () => {
     expect(neonSwatchPalette(baseNeon, colorPickerChar)).toEqual([])
     expect(neonSwatchPalette(baseNeon, undefined)).toEqual([])
+  })
+
+  it('builds a palette from a "color"-type char that has preset hex values', () => {
+    // Regression: a bound characteristic typed `color` but carrying preset
+    // hex-coloured values must still yield a paint palette — otherwise the
+    // per-character painter shows no swatches and every letter falls back to
+    // the single global glow colour. (Demo product "Custom Neon Sign".)
+    const colorWithValues: Characteristic = {
+      id: 'char-colorvals',
+      name: 'Color',
+      display_type: 'color',
+      sort_order: 0,
+      values: [
+        { id: 'val-red',  label: 'Red',  price_modifier: 0, sort_order: 0, hex_color: '#ff0000' },
+        { id: 'val-blue', label: 'Blue', price_modifier: 0, sort_order: 1, hex_color: '#0040ff' },
+      ],
+    }
+    const palette = neonSwatchPalette(baseNeon, colorWithValues)
+    expect(palette.map(s => s.hex)).toEqual(['#ff0000', '#0040ff'])
   })
 })
 

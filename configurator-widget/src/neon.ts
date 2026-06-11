@@ -84,13 +84,16 @@ export interface NeonSwatch {
 }
 
 /** The palette the customer paints from in per-character mode: the bound
- *  colour/swatch characteristic's values, each resolved to a hex (glowColorMap
- *  override → value.hex_color), dropping values with no usable colour. */
+ *  characteristic's values, each resolved to a hex (glowColorMap override →
+ *  value.hex_color), dropping values with no usable colour. Works for any bound
+ *  characteristic that carries hex-coloured values (swatch, select, radio,
+ *  toggle, AND a 'color' picker that has preset values) — a characteristic with
+ *  no hex values simply yields an empty palette. */
 export function neonSwatchPalette(
   neon: NeonConfig,
   colorChar: Characteristic | undefined,
 ): NeonSwatch[] {
-  if (!colorChar || colorChar.display_type === 'color') return []
+  if (!colorChar) return []
   const out: NeonSwatch[] = []
   for (const v of colorChar.values) {
     const hex = normalizeHex(neon.glowColorMap?.[v.id]) ?? normalizeHex(v.hex_color)
