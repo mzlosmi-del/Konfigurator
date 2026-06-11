@@ -175,6 +175,24 @@ export function LibraryPage() {
     return base.filter(c => byType(c) && byName(c))
   }, [activeView, characteristics, assignedIds, memberships, search, typeFilter])
 
+  // Colour-bearing characteristics that can drive a neon glow. A 'swatch' or
+  // other select-style char exposes its values (with hex_color); a free-form
+  // 'color' char has no values. The neon editor binds by characteristic id; at
+  // runtime the widget resolves it against whatever chars the product loads.
+  // NB: declared here (with the other derived-data hooks) and BEFORE the
+  // `if (loading)` early return so the hook order stays stable across renders.
+  const neonColorChars: ColorCharOption[] = useMemo(
+    () => characteristics
+      .filter(c => c.display_type === 'swatch' || c.display_type === 'select' || c.display_type === 'radio' || c.display_type === 'toggle' || c.display_type === 'color')
+      .map(c => ({
+        id: c.id,
+        name: c.name,
+        display_type: c.display_type,
+        values: (values[c.id] ?? []).map(v => ({ id: v.id, label: v.label, hex_color: v.hex_color })),
+      })),
+    [characteristics, values],
+  )
+
   // ── Drag handling ───────────────────────────────────────────────────────────
 
   function handleDragStart({ active }: DragStartEvent) {
@@ -453,22 +471,6 @@ export function LibraryPage() {
     : activeView === 'unassigned'
       ? t('Unassigned')
       : activeClass?.name ?? ''
-
-  // Colour-bearing characteristics that can drive a neon glow. A 'swatch' or
-  // other select-style char exposes its values (with hex_color); a free-form
-  // 'color' char has no values. The neon editor binds by characteristic id; at
-  // runtime the widget resolves it against whatever chars the product loads.
-  const neonColorChars: ColorCharOption[] = useMemo(
-    () => characteristics
-      .filter(c => c.display_type === 'swatch' || c.display_type === 'select' || c.display_type === 'radio' || c.display_type === 'toggle' || c.display_type === 'color')
-      .map(c => ({
-        id: c.id,
-        name: c.name,
-        display_type: c.display_type,
-        values: (values[c.id] ?? []).map(v => ({ id: v.id, label: v.label, hex_color: v.hex_color })),
-      })),
-    [characteristics, values],
-  )
 
   const charRows = (
     <div className="space-y-1.5">
