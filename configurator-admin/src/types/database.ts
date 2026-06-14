@@ -202,6 +202,8 @@ export interface Database {
           paid_until:          string | null
           current_period_end:  string | null
           cancel_at_period_end: boolean
+          tokens_granted:      number
+          tokens_spent:        number
           created_at: string
           updated_at: string
         }
@@ -437,10 +439,13 @@ export interface Database {
           total_price: number | null
           currency: string
           status: InquiryStatus
+          token_locked: boolean
+          tokens_charged: number
           created_at: string
           updated_at: string
         }
-        Insert: Omit<Database['public']['Tables']['inquiries']['Row'], 'id' | 'created_at' | 'updated_at'> & { id?: string }
+        Insert: Omit<Database['public']['Tables']['inquiries']['Row'], 'id' | 'created_at' | 'updated_at' | 'token_locked' | 'tokens_charged'>
+          & { id?: string; token_locked?: boolean; tokens_charged?: number }
         Update: Partial<Database['public']['Tables']['inquiries']['Insert']>
       }
       product_classes: {
@@ -615,12 +620,14 @@ export interface Database {
           responded_ip:        string | null
           responded_user_agent: string | null
           lang:                OutputLang
+          tokens_charged_at:   string | null
+          tokens_charged:      number
           created_at: string
           updated_at: string
         }
         Insert: Omit<
           Database['public']['Tables']['quotations']['Row'],
-          'id' | 'created_at' | 'updated_at' | 'public_token' | 'responded_at' | 'responded_ip' | 'responded_user_agent' | 'lang'
+          'id' | 'created_at' | 'updated_at' | 'public_token' | 'responded_at' | 'responded_ip' | 'responded_user_agent' | 'lang' | 'tokens_charged_at' | 'tokens_charged'
         > & {
           id?:                   string
           public_token?:         string | null
@@ -628,6 +635,8 @@ export interface Database {
           responded_ip?:         string | null
           responded_user_agent?: string | null
           lang?:                 OutputLang
+          tokens_charged_at?:    string | null
+          tokens_charged?:       number
         }
         Update: Partial<Database['public']['Tables']['quotations']['Insert']>
       }

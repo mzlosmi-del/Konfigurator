@@ -38,6 +38,7 @@ import {
 import { useToast } from '@/hooks/useToast'
 import { Toaster } from '@/components/ui/toast'
 import { useCanEdit } from '@/hooks/usePermission'
+import { useTokenBalance } from '@/hooks/useTokenBalance'
 import { t } from '@/i18n'
 import { type OutputLang, asOutputLang } from '@/lib/languages'
 import { logChange } from '@/lib/auditLog'
@@ -50,6 +51,13 @@ export function QuotationDetailPage() {
   const { tenant, profile } = useAuthContext()
   const userName = profile?.email ?? null
   const canEdit = useCanEdit('quotations')
+  const { refresh: refreshTokens } = useTokenBalance()
+
+  // Token gate: required cost vs remaining balance for this quotation. Loaded
+  // server-side via quotation_token_quote so the UI can gray the output buttons
+  // before a charge is attempted. `alreadyCharged` quotations re-print for free.
+  const [tokenQuote, setTokenQuote] = useState<{ required: number; remaining: number; alreadyCharged: boolean } | null>(null)
+  const insufficient = !!tokenQuote && !tokenQuote.alreadyCharged && tokenQuote.required > tokenQuote.remaining
 
   const [quotation,      setQuotation]      = useState<Quotation | null>(null)
   const [loading,        setLoading]        = useState(true)
@@ -80,6 +88,13 @@ export function QuotationDetailPage() {
   const [rejectionNote,       setRejectionNote]       = useState('')
   const [confirmingRejection, setConfirmingRejection] = useState(false)
 
+  async function loadTokenQuote(quotationId: string) {
+    const { data, error } = await supabase.rpc('quotation_token_quote' as never, { p_quotation_id: quotationId } as never)
+    if (error) { setTokenQuote(null); return }
+    const row = (Array.isArray(data) ? data[0] : data) as { required: number; remaining: number; already_charged: boolean } | undefined
+    if (row) setTokenQuote({ required: row.required, remaining: row.remaining, alreadyCharged: row.already_charged })
+  }
+
   useEffect(() => {
     if (!id) return
     setLoading(true)
@@ -87,6 +102,7 @@ export function QuotationDetailPage() {
       .then(([q, reasons]) => { setQuotation(q); setRejectionReasons(reasons) })
       .catch(() => toast({ title: t('Failed to load quotation'), variant: 'destructive' }))
       .finally(() => setLoading(false))
+    loadTokenQuote(id)
   }, [id, toast])
 
   async function buildTenantProfile(): Promise<TenantProfile> {
@@ -223,6 +239,19 @@ export function QuotationDetailPage() {
 
   async function handleLayoutConfirm(sections: PdfSection[], lang: OutputLang, template: PdfTemplate, format: ExportFormat) {
     if (!id || !quotation) return
+    // Token gate: when out of tokens, no output (PDF/preview/XLSX/DOCX) may be
+    // produced. Drafts are still saved elsewhere — this only blocks generation.
+    if (insufficient) {
+      setLayoutOpen(false)
+      toast({
+        title: t('Insufficient tokens'),
+        description: t('{required} required, {remaining} left')
+          .replace('{required}', String(tokenQuote?.required ?? 0))
+          .replace('{remaining}', String(tokenQuote?.remaining ?? 0)),
+        variant: 'destructive',
+      })
+      return
+    }
     setGeneratingPdf(true)
     try {
       // The dialog lets the operator toggle individual product-text sections
@@ -273,6 +302,29 @@ export function QuotationDetailPage() {
       openPdfBlob(bytes)
 
       if (!isPreview) {
+        // Charge tokens once, server-side, before committing the confirmed PDF.
+        // Idempotent: a re-confirm of an already-charged quotation is free.
+        const { error: chargeErr } = await supabase
+          .rpc('charge_quotation_tokens' as never, { p_quotation_id: id } as never)
+        if (chargeErr) {
+          // P0001 carries DETAIL json { required, remaining }.
+          let required = tokenQuote?.required ?? 0
+          let remaining = tokenQuote?.remaining ?? 0
+          const detail = (chargeErr as { details?: string }).details
+          if (detail) {
+            try { const d = JSON.parse(detail); required = d.required ?? required; remaining = d.remaining ?? remaining } catch { /* ignore */ }
+          }
+          setLayoutOpen(false)
+          toast({
+            title: t('Insufficient tokens'),
+            description: t('{required} required, {remaining} left')
+              .replace('{required}', String(required)).replace('{remaining}', String(remaining)),
+            variant: 'destructive',
+          })
+          await loadTokenQuote(id)
+          return
+        }
+
         // Confirm path: upload PDF AND flip status atomically. From here the
         // quotation is locked — the saved PDF is the only one that can be reprinted.
         const url     = await uploadQuotationPdf(id, quotation.tenant_id, bytes)
@@ -287,6 +339,9 @@ export function QuotationDetailPage() {
         })
         setQuotation(updated)
         toast({ title: t('Quotation confirmed') })
+        // Reflect the spend in the global balance and the local quote.
+        void refreshTokens()
+        void loadTokenQuote(id)
       }
     } catch (err) {
       toast({ title: t('Failed to generate document'), description: String(err), variant: 'destructive' })
@@ -423,7 +478,8 @@ export function QuotationDetailPage() {
               variant="outline"
               onClick={handleGenerateTechSpec}
               loading={generatingTechSpec}
-              title={t('Generate a Word document with the technical specification of the products on this quotation.')}
+              disabled={insufficient}
+              title={insufficient ? t('Insufficient tokens') : t('Generate a Word document with the technical specification of the products on this quotation.')}
             >
               <FileText className="h-4 w-4 mr-1.5" />
               {t('Technical spec')}
@@ -434,6 +490,7 @@ export function QuotationDetailPage() {
               quotation={quotation}
               buildTenantProfile={buildTenantProfile}
               lang={asOutputLang(quotation.lang)}
+              disabled={insufficient}
               onError={msg => toast({ title: t('Failed to generate document'), description: msg, variant: 'destructive' })}
             />
             {canEdit && (quotation.status === 'confirmed' || quotation.status === 'sent') && quotation.pdf_url && (
@@ -453,11 +510,11 @@ export function QuotationDetailPage() {
                   <Pencil className="h-4 w-4 mr-1.5" />
                   {t('Edit')}
                 </Button>
-                <Button variant="outline" onClick={() => handleOpenPdfDialog('preview')} loading={generatingPdf && pdfMode === 'preview'}>
+                <Button variant="outline" onClick={() => handleOpenPdfDialog('preview')} loading={generatingPdf && pdfMode === 'preview'} disabled={insufficient} title={insufficient ? t('Insufficient tokens') : undefined}>
                   <FileText className="h-4 w-4 mr-1.5" />
                   {t('Preview PDF')}
                 </Button>
-                <Button onClick={() => handleOpenPdfDialog('confirm')} loading={generatingPdf && pdfMode === 'confirm'}>
+                <Button onClick={() => handleOpenPdfDialog('confirm')} loading={generatingPdf && pdfMode === 'confirm'} disabled={insufficient} title={insufficient ? t('Insufficient tokens') : undefined}>
                   <FileText className="h-4 w-4 mr-1.5" />
                   {t('Confirm & Generate PDF')}
                 </Button>
@@ -482,7 +539,12 @@ export function QuotationDetailPage() {
               className="w-52"
             >
               <option value={quotation.status}>{t(STATUS_LABELS[quotation.status as QuotationStatus])}</option>
-              {STATUS_TRANSITIONS[quotation.status as QuotationStatus].map(s => (
+              {STATUS_TRANSITIONS[quotation.status as QuotationStatus]
+                // When out of tokens, forbid advancing an in-preparation quotation
+                // to confirmed/sent via the dropdown — that would issue an output
+                // without charging. Drafts and other transitions stay available.
+                .filter(s => !(insufficient && quotation.status === 'in_preparation' && (s === 'confirmed' || s === 'sent')))
+                .map(s => (
                 <option key={s} value={s}>{t(STATUS_LABELS[s])}</option>
               ))}
             </Select>
@@ -502,6 +564,21 @@ export function QuotationDetailPage() {
             </Badge>
           )}
         </div>
+
+        {/* ── Out-of-tokens banner ───────────────────────────────────────── */}
+        {insufficient && (
+          <div className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+            <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+            <div>
+              <div className="font-medium">{t('Out of tokens — confirm and exports are disabled.')}</div>
+              <div className="text-xs mt-0.5">
+                {t('{required} required, {remaining} left')
+                  .replace('{required}', String(tokenQuote?.required ?? 0))
+                  .replace('{remaining}', String(tokenQuote?.remaining ?? 0))}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* ── Source inquiry link ────────────────────────────────────────── */}
         {quotation.source_inquiry_id && (

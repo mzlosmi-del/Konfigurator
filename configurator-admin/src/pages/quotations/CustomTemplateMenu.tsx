@@ -28,9 +28,10 @@ interface Props {
   buildTenantProfile:  () => Promise<TenantProfile>
   lang:                OutputLang
   onError:             (message: string) => void
+  disabled?:           boolean
 }
 
-export function CustomTemplateMenu({ quotation, buildTenantProfile, lang, onError }: Props) {
+export function CustomTemplateMenu({ quotation, buildTenantProfile, lang, onError, disabled }: Props) {
   const [open, setOpen]           = useState(false)
   const [loading, setLoading]     = useState(false)
   const [templates, setTemplates] = useState<DocumentTemplateRow[] | null>(null)
@@ -91,7 +92,7 @@ export function CustomTemplateMenu({ quotation, buildTenantProfile, lang, onErro
 
   return (
     <div className="relative" ref={ref}>
-      <Button variant="outline" onClick={toggle}>
+      <Button variant="outline" onClick={toggle} disabled={disabled} title={disabled ? t('Insufficient tokens') : undefined}>
         <LayoutTemplate className="h-4 w-4 mr-1.5" />
         {t('Custom templates')}
         <ChevronDown className="h-3.5 w-3.5 ml-1" />

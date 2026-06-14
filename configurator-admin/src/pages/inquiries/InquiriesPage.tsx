@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Inbox, Circle } from 'lucide-react'
+import { Inbox, Circle, Lock } from 'lucide-react'
 import { fetchInquiries, timeAgo } from '@/lib/inquiries'
 import type { Inquiry, InquiryStatus } from '@/types/database'
 import { PageHeader } from '@/components/layout/PageHeader'
@@ -105,9 +105,16 @@ export function InquiriesPage() {
       id: 'customer_name', label: t('Customer'), sortable: true,
       sortValue: r => r.customer_name,
       render: row => (
-        <div>
-          <p className={`font-medium ${row.status === 'new' ? '' : 'font-normal'}`}>{row.customer_name}</p>
-          <p className="text-xs text-muted-foreground">{row.customer_email}</p>
+        <div className="flex items-center gap-2">
+          {row.token_locked && (
+            <span title={t('Out of tokens — top up to view this inquiry.')}>
+              <Lock className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+            </span>
+          )}
+          <div className={row.token_locked ? 'opacity-60' : ''}>
+            <p className={`font-medium ${row.status === 'new' ? '' : 'font-normal'}`}>{row.customer_name}</p>
+            {!row.token_locked && <p className="text-xs text-muted-foreground">{row.customer_email}</p>}
+          </div>
         </div>
       ),
     },
@@ -152,12 +159,14 @@ export function InquiriesPage() {
     },
     {
       id: 'status', label: t('Status'), sortable: true,
-      sortValue: r => r.status,
-      render: row => (
-        <Badge variant={statusVariant[row.status]} className="capitalize">
-          {t(row.status)}
-        </Badge>
-      ),
+      sortValue: r => r.token_locked ? 'locked' : r.status,
+      render: row => row.token_locked
+        ? <Badge variant="warning">{t('Locked')}</Badge>
+        : (
+          <Badge variant={statusVariant[row.status]} className="capitalize">
+            {t(row.status)}
+          </Badge>
+        ),
     },
     {
       id: 'created_at', label: t('Received'), align: 'right', sortable: true,

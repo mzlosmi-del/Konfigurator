@@ -1,16 +1,19 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Shield, AlertTriangle, Building2 } from 'lucide-react'
 import { useAuthContext } from '@/components/auth/AuthContext'
 import {
   fetchTenantOverview,
   setTenantPlan,
+  setTenantTokens,
+  fetchTokenLedger,
   isSuperAdminEmail,
   isoToDateInput,
   dateInputToIso,
   shiftDays,
   daysUntil,
   type TenantOverviewRow,
+  type TokenLedgerEntry,
 } from '@/lib/superAdmin'
 import { planLabel, limitDisplay, type Plan, type PlanLimits } from '@/lib/planLimits'
 import { supabase } from '@/lib/supabase'
@@ -193,6 +196,7 @@ export function SuperAdminTenantsPage() {
                     <th className="px-3 py-2 text-right font-medium text-muted-foreground">{t('Inquiries (mo)')}</th>
                     <th className="px-3 py-2 text-right font-medium text-muted-foreground">{t('Members')}</th>
                     <th className="px-3 py-2 text-right font-medium text-muted-foreground">{t('AI (mo)')}</th>
+                    <th className="px-3 py-2 text-right font-medium text-muted-foreground">{t('Tokens')}</th>
                     <th className="px-3 py-2"></th>
                   </tr>
                 </thead>
@@ -216,6 +220,10 @@ export function SuperAdminTenantsPage() {
                       <td className="px-3 py-2 text-right tabular-nums">{row.inquiries_this_month}</td>
                       <td className="px-3 py-2 text-right tabular-nums">{row.members_count}</td>
                       <td className="px-3 py-2 text-right tabular-nums">{row.ai_setup_this_month}</td>
+                      <td className={`px-3 py-2 text-right tabular-nums ${row.tokens_remaining <= 0 ? 'text-destructive font-medium' : ''}`}>
+                        {row.tokens_remaining.toLocaleString()}
+                        <span className="text-muted-foreground"> / {row.tokens_granted.toLocaleString()}</span>
+                      </td>
                       <td className="px-3 py-2 text-right">
                         <Button size="sm" variant="outline" onClick={() => setEditing(row)}>{t('Edit')}</Button>
                       </td>
@@ -262,6 +270,14 @@ function TenantEditDialog({ tenant, onClose, onSaved, onError, onSuccess }: Tena
   const [saving, setSaving] = useState(false)
   const [limits, setLimits] = useState<PlanLimits | null>(null)
 
+  // Token state (granted/spent reflect the latest applied grant so the gauge updates live)
+  const [granted, setGranted] = useState<number>(tenant.tokens_granted)
+  const spent = tenant.tokens_spent
+  const [tokenAmount, setTokenAmount] = useState<string>('')
+  const [tokenMode, setTokenMode] = useState<'add' | 'set'>('add')
+  const [applyingTokens, setApplyingTokens] = useState(false)
+  const [ledger, setLedger] = useState<TokenLedgerEntry[]>([])
+
   // Load plan limits for the *selected* plan so usage gauges reflect the
   // target tier as the operator changes the dropdown.
   useEffect(() => {
@@ -274,6 +290,30 @@ function TenantEditDialog({ tenant, onClose, onSaved, onError, onSuccess }: Tena
       .then(({ data }) => { if (alive && data) setLimits(data as PlanLimits) })
     return () => { alive = false }
   }, [plan])
+
+  // Load the consumption log for this tenant.
+  const loadLedger = useCallback(() => {
+    fetchTokenLedger(tenant.id).then(setLedger).catch(() => setLedger([]))
+  }, [tenant.id])
+
+  useEffect(() => { loadLedger() }, [loadLedger])
+
+  async function applyTokens() {
+    const amount = Number(tokenAmount)
+    if (!Number.isFinite(amount) || (tokenMode === 'add' && amount === 0)) return
+    setApplyingTokens(true)
+    try {
+      await setTenantTokens(tenant.id, amount, tokenMode)
+      setGranted(tokenMode === 'set' ? amount : g => g + amount)
+      setTokenAmount('')
+      loadLedger()
+      onSuccess()
+    } catch (e) {
+      onError(e instanceof Error ? e.message : t('Failed to update tokens'))
+    } finally {
+      setApplyingTokens(false)
+    }
+  }
 
   function bumpDays(n: number) {
     setPaidUntil(prev => shiftDays(prev, n))
@@ -363,6 +403,64 @@ function TenantEditDialog({ tenant, onClose, onSaved, onError, onSuccess }: Tena
             <UsageLine label={t('Members')}         used={tenant.members_count}        max={limits?.team_members_max} />
             <UsageLine label={t('AI setups (mo)')}  used={tenant.ai_setup_this_month}  max={limits?.ai_setup_per_month} />
           </div>
+
+          {/* Token balance + grant */}
+          <div className="rounded-md border bg-muted/20 p-3 space-y-3">
+            <div className="text-xs font-medium text-muted-foreground">{t('Token balance')}</div>
+            <UsageLine label={t('Spent')} used={spent} max={granted} />
+            <div className="grid grid-cols-3 gap-2 text-xs">
+              <div><span className="text-muted-foreground">{t('Granted')}: </span><span className="tabular-nums">{granted.toLocaleString()}</span></div>
+              <div><span className="text-muted-foreground">{t('Spent')}: </span><span className="tabular-nums">{spent.toLocaleString()}</span></div>
+              <div><span className="text-muted-foreground">{t('Remaining')}: </span><span className={`tabular-nums ${granted - spent <= 0 ? 'text-destructive font-medium' : ''}`}>{(granted - spent).toLocaleString()}</span></div>
+            </div>
+            <div className="flex flex-wrap items-end gap-2">
+              <Select
+                value={tokenMode}
+                onChange={e => setTokenMode(e.target.value as 'add' | 'set')}
+                className="w-28"
+              >
+                <option value="add">{t('Add tokens')}</option>
+                <option value="set">{t('Set balance')}</option>
+              </Select>
+              <Input
+                type="number"
+                value={tokenAmount}
+                onChange={e => setTokenAmount(e.target.value)}
+                placeholder="0"
+                className="w-40 flex-1 min-w-[8rem]"
+              />
+              <Button
+                size="sm"
+                onClick={applyTokens}
+                disabled={applyingTokens || tokenAmount.trim() === ''}
+              >
+                {applyingTokens ? t('Saving…') : t('Apply')}
+              </Button>
+            </div>
+          </div>
+
+          {/* Recent token activity */}
+          {ledger.length > 0 && (
+            <div className="rounded-md border p-3 space-y-1">
+              <div className="text-xs font-medium text-muted-foreground mb-1.5">{t('Recent token activity')}</div>
+              <div className="max-h-48 overflow-y-auto divide-y">
+                {ledger.map(e => (
+                  <div key={e.id} className="flex items-center justify-between py-1.5 text-xs">
+                    <div className="flex items-center gap-2">
+                      <span className="text-muted-foreground">{new Date(e.created_at).toLocaleString()}</span>
+                      <span>{t(e.reason)}</span>
+                    </div>
+                    <div className="flex items-center gap-3 tabular-nums">
+                      <span className={e.delta > 0 ? 'text-emerald-600' : e.delta < 0 ? 'text-destructive' : 'text-muted-foreground'}>
+                        {e.delta > 0 ? '+' : ''}{e.delta.toLocaleString()}
+                      </span>
+                      <span className="text-muted-foreground">{e.balance_after.toLocaleString()}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="rounded-md border p-3 text-xs space-y-1">
             <div className="grid grid-cols-[10rem_1fr] gap-1">

@@ -1682,6 +1682,28 @@ const sr: Record<string, string> = {
   'From inquiry':                          'Iz upita',
   'Open source inquiry':                   'Otvori izvorni upit',
   'Responded':                             'Odgovoreno',
+
+  // Token billing
+  'Tokens':                                'Tokeni',
+  'Token balance':                         'Stanje tokena',
+  'Granted':                               'Dodeljeno',
+  'Spent':                                 'Potrošeno',
+  'Remaining':                             'Preostalo',
+  'Add tokens':                            'Dodaj tokene',
+  'Set balance':                           'Postavi stanje',
+  'Apply':                                 'Primeni',
+  'Recent token activity':                 'Nedavna aktivnost tokena',
+  'inquiry':                               'upit',
+  'grant':                                 'dodela',
+  'inquiry_locked':                        'upit zaključan',
+  'Insufficient tokens':                   'Nedovoljno tokena',
+  'Out of tokens — confirm and exports are disabled.': 'Nema tokena — potvrda i izvoz su onemogućeni.',
+  '{required} required, {remaining} left': 'potrebno {required}, preostalo {remaining}',
+  'This inquiry is locked':                'Ovaj upit je zaključan',
+  'You were out of tokens when it arrived. Ask your administrator to top up to view details and convert it.': 'Niste imali tokena kada je stigao. Zatražite od administratora da dopuni kako biste videli detalje i pretvorili ga u ponudu.',
+  'Out of tokens — top up to view this inquiry.': 'Nema tokena — dopunite da biste videli ovaj upit.',
+  'Tokens topped up':                      'Tokeni dopunjeni',
+  'Failed to update tokens':               'Ažuriranje tokena nije uspelo',
 }
 
 // German (Deutsch) translations for the admin. Mirrors the `sr` keys for the
@@ -2884,6 +2906,28 @@ const de: Record<string, string> = {
   'From inquiry':                          'Aus Anfrage',
   'Open source inquiry':                   'Ursprüngliche Anfrage öffnen',
   'Responded':                             'Beantwortet',
+
+  // Token billing
+  'Tokens':                                'Tokens',
+  'Token balance':                         'Token-Guthaben',
+  'Granted':                               'Zugeteilt',
+  'Spent':                                 'Verbraucht',
+  'Remaining':                             'Verbleibend',
+  'Add tokens':                            'Tokens hinzufügen',
+  'Set balance':                           'Guthaben festlegen',
+  'Apply':                                 'Anwenden',
+  'Recent token activity':                 'Letzte Token-Aktivität',
+  'inquiry':                               'Anfrage',
+  'grant':                                 'Zuteilung',
+  'inquiry_locked':                        'Anfrage gesperrt',
+  'Insufficient tokens':                   'Nicht genügend Tokens',
+  'Out of tokens — confirm and exports are disabled.': 'Keine Tokens — Bestätigen und Export sind deaktiviert.',
+  '{required} required, {remaining} left': '{required} erforderlich, {remaining} übrig',
+  'This inquiry is locked':                'Diese Anfrage ist gesperrt',
+  'You were out of tokens when it arrived. Ask your administrator to top up to view details and convert it.': 'Bei Eingang waren keine Tokens vorhanden. Bitten Sie Ihren Administrator um Aufladung, um Details zu sehen und sie umzuwandeln.',
+  'Out of tokens — top up to view this inquiry.': 'Keine Tokens — laden Sie auf, um diese Anfrage zu sehen.',
+  'Tokens topped up':                      'Tokens aufgeladen',
+  'Failed to update tokens':               'Tokens konnten nicht aktualisiert werden',
 }
 
 export const LANGS = ['en', 'sr', 'de'] as const

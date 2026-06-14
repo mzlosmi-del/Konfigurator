@@ -99,6 +99,7 @@ export async function createQuotation(
     Quotation,
     'id' | 'tenant_id' | 'created_at' | 'updated_at'
     | 'public_token' | 'responded_at' | 'responded_ip' | 'responded_user_agent' | 'lang'
+    | 'tokens_charged_at' | 'tokens_charged'
   >,
 ): Promise<Quotation> {
   const { data, error } = await supabase

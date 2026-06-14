@@ -24,6 +24,20 @@ export interface TenantOverviewRow {
   members_count:          number
   inquiries_this_month:   number
   ai_setup_this_month:    number
+  tokens_granted:         number
+  tokens_spent:           number
+  tokens_remaining:       number
+}
+
+export interface TokenLedgerEntry {
+  id:            string
+  delta:         number
+  reason:        string
+  ref_type:      string | null
+  ref_id:        string | null
+  balance_after: number
+  note:          string | null
+  created_at:    string
 }
 
 export async function fetchTenantOverview(): Promise<TenantOverviewRow[]> {
@@ -43,6 +57,35 @@ export async function setTenantPlan(
     p_paid_until: paidUntil,
   } as never)
   if (error) throw error
+}
+
+/** Assign tokens to a tenant. mode 'add' tops up; 'set' overwrites the grant.
+ *  Returns the tenant's new remaining balance. */
+export async function setTenantTokens(
+  tenantId: string,
+  amount: number,
+  mode: 'add' | 'set',
+): Promise<number> {
+  const { data, error } = await supabase.rpc('admin_grant_tokens' as never, {
+    p_tenant_id: tenantId,
+    p_amount:    amount,
+    p_mode:      mode,
+  } as never)
+  if (error) throw error
+  return (data ?? 0) as number
+}
+
+/** Recent token ledger entries for a tenant, newest first. */
+export async function fetchTokenLedger(
+  tenantId: string,
+  limit = 50,
+): Promise<TokenLedgerEntry[]> {
+  const { data, error } = await supabase.rpc('admin_token_ledger' as never, {
+    p_tenant_id: tenantId,
+    p_limit:     limit,
+  } as never)
+  if (error) throw error
+  return (data ?? []) as TokenLedgerEntry[]
 }
 
 /** Day offset between two ISO timestamps; positive = future, negative = past. */

@@ -190,6 +190,8 @@ export const quotation: Quotation = {
   responded_ip:         null,
   responded_user_agent: null,
   lang:                 'en',
+  tokens_charged_at:    null,
+  tokens_charged:       0,
   created_at:           '2026-05-01T10:00:00.000Z',
   updated_at:           '2026-05-01T10:00:00.000Z',
 }

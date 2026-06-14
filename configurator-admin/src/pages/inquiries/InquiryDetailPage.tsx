@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, Mail, ExternalLink, FileText, ArrowRight, Paperclip, Download } from 'lucide-react'
+import { ArrowLeft, Mail, ExternalLink, FileText, ArrowRight, Paperclip, Download, Lock } from 'lucide-react'
 import { fetchInquiry, updateInquiryStatus } from '@/lib/inquiries'
 import { listInquiryAttachments, getInquiryAttachmentUrl, formatBytes } from '@/lib/inquiryAttachments'
 import { supabase } from '@/lib/supabase'
@@ -74,6 +74,10 @@ export function InquiryDetailPage() {
       setLinkedQuotationId((linkedQ.data as { id: string } | null)?.id ?? null)
       setAttachments(atts)
 
+      // Token-locked inquiries are notification-only: don't auto-mark read
+      // (preserve the "new" signal) and don't reveal details below.
+      if (data.token_locked) return
+
       // Auto-mark as read when opened
       if (data.status === 'new') {
         const updated = await updateInquiryStatus(inquiryId, 'read')
@@ -134,6 +138,47 @@ export function InquiryDetailPage() {
         <Button variant="link" className="mt-2 p-0" onClick={() => navigate('/inquiries')}>
           {t('Back to inquiries')}
         </Button>
+      </div>
+    )
+  }
+
+  // Token-locked: arrived while the tenant was out of tokens. Show a notice
+  // only — no configuration, customer details, message, or convert action.
+  if (inquiry.token_locked) {
+    return (
+      <div className="animate-fade-in">
+        <PageHeader
+          title={t('This inquiry is locked')}
+          description={
+            <span className="flex items-center gap-2">
+              <Badge variant="warning">{t('Locked')}</Badge>
+              <span className="text-sm text-muted-foreground">
+                {new Date(inquiry.created_at).toLocaleString()}
+              </span>
+            </span>
+          }
+        />
+        <div className="px-6 pt-4">
+          <button
+            onClick={() => navigate('/inquiries')}
+            className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            {t('All inquiries')}
+          </button>
+        </div>
+        <div className="p-6 max-w-2xl">
+          <Card>
+            <CardContent className="py-8 text-center space-y-2">
+              <Lock className="h-8 w-8 text-muted-foreground/50 mx-auto" />
+              <p className="font-medium text-sm">{t('This inquiry is locked')}</p>
+              <p className="text-sm text-muted-foreground">
+                {t('You were out of tokens when it arrived. Ask your administrator to top up to view details and convert it.')}
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+        <Toaster toasts={toasts} onDismiss={dismiss} />
       </div>
     )
   }
