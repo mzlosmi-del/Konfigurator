@@ -531,10 +531,12 @@ export function SettingsPage() {
   const [revokingId,    setRevokingId]    = useState<string | null>(null)
 
   useEffect(() => {
-    supabase.from('profiles').select('id, email, role').then(({ data }) => {
-      if (data) setMembers(data as TeamMember[])
-    })
     if (tenant) {
+      // Filter by tenant_id explicitly — RLS lets super admins read profiles
+      // across all tenants, so relying on RLS alone would over-count members.
+      supabase.from('profiles').select('id, email, role')
+        .eq('tenant_id', tenant.id)
+        .then(({ data }) => { if (data) setMembers(data as TeamMember[]) })
       supabase.from('invitations').select('id, email, role, expires_at')
         .eq('tenant_id', tenant.id).is('accepted_at', null)
         .gt('expires_at', new Date().toISOString())
