@@ -1,6 +1,28 @@
 import { useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { createClient } from '@supabase/supabase-js'
+import type { TenantText } from '@/types/database'
+
+// The public page header must match the language the embedded widget shows.
+// The widget reads `localStorage['lang']` (default 'sr'), so mirror that here.
+function widgetLang(): 'en' | 'sr' {
+  if (typeof localStorage === 'undefined') return 'sr'
+  return localStorage.getItem('lang') === 'en' ? 'en' : 'sr'
+}
+
+// Resolve one product text slot using the SAME rule as the widget's
+// `pickTranslation`: the chosen language's row only, else the raw column.
+// We deliberately do NOT cross-fall between sr/en here — the English column is
+// the canonical fallback, so an EN view never shows SR text and vice versa.
+function pickProductText(
+  rows: TenantText[],
+  slot: string,
+  lang: 'en' | 'sr',
+  column: string | null,
+): string | null {
+  const hit = rows.find(r => r.slot === slot && r.language === lang && r.content?.trim())
+  return hit ? hit.content : column
+}
 
 const SUPABASE_URL      = import.meta.env.VITE_SUPABASE_URL      ?? ''
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY ?? ''
@@ -30,6 +52,11 @@ export function PublicPreviewPage() {
   const { slug } = useParams<{ slug: string }>()
   const [product, setProduct] = useState<Product | null>(null)
   const [tenant,  setTenant]  = useState<Tenant  | null>(null)
+  // Translated product name/description (tenant_texts), resolved for the
+  // widget's language with the English column as fallback. Defaults to the
+  // raw columns until the text rows load.
+  const [name, setName] = useState<string>('')
+  const [description, setDescription] = useState<string | null>(null)
   const [showBranding, setShowBranding] = useState(true)
   const [whiteLabel,   setWhiteLabel]   = useState(false)
   const [notFound, setNotFound] = useState(false)
@@ -49,6 +76,26 @@ export function PublicPreviewPage() {
       .then(async ({ data: prod }) => {
         if (!prod) { setNotFound(true); return }
         setProduct(prod as Product)
+        // Seed with the raw columns so the header shows immediately, then
+        // override with the translated text once the rows arrive below.
+        setName(prod.name)
+        setDescription(prod.description)
+
+        // Resolve the product name/description in the widget's language,
+        // falling back to the English column when no translation exists.
+        anonClient
+          .from('tenant_texts')
+          .select('level, reference_id, slot, language, content')
+          .eq('tenant_id', prod.tenant_id)
+          .eq('level', 'product')
+          .eq('reference_id', prod.id)
+          .in('slot', ['name', 'description'])
+          .then(({ data: textRows }) => {
+            const rows = (textRows ?? []) as TenantText[]
+            const lang = widgetLang()
+            setName(pickProductText(rows, 'name', lang, prod.name) ?? prod.name)
+            setDescription(pickProductText(rows, 'description', lang, prod.description))
+          })
 
         const [{ data: ten }, { data: limits }] = await Promise.all([
           anonClient.from('tenants').select('name, plan, favicon_url, public_page_title').eq('id', prod.tenant_id).single(),
@@ -117,9 +164,9 @@ export function PublicPreviewPage() {
             {tenant.name}
           </p>
         )}
-        <h1 style={{ fontSize: '1.6rem', fontWeight: 700, marginBottom: '8px' }}>{product.name}</h1>
-        {product.description && (
-          <p style={{ fontSize: '.95rem', color: '#555', marginBottom: '24px', lineHeight: 1.5 }}>{product.description}</p>
+        <h1 style={{ fontSize: '1.6rem', fontWeight: 700, marginBottom: '8px' }}>{name || product.name}</h1>
+        {(description ?? product.description) && (
+          <p style={{ fontSize: '.95rem', color: '#555', marginBottom: '24px', lineHeight: 1.5 }}>{description ?? product.description}</p>
         )}
 
         <div

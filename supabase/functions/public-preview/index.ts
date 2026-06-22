@@ -50,7 +50,25 @@ Deno.serve(async (req: Request) => {
     const showBranding = !(limits?.remove_branding ?? false)
     const whiteLabel   = limits?.white_label ?? false
 
-    return new Response(buildPage(product, tenant, showBranding, whiteLabel), {
+    // Resolve the product name/description in the widget's default language.
+    // This is server-rendered with no localStorage, so it mirrors the widget's
+    // built-in default ('sr'); the English columns remain the fallback.
+    const { data: textRows } = await supabase
+      .from('tenant_texts')
+      .select('slot, language, content')
+      .eq('tenant_id', product.tenant_id)
+      .eq('level', 'product')
+      .eq('reference_id', product.id)
+      .in('slot', ['name', 'description'])
+
+    const rows = (textRows ?? []) as { slot: string; language: string; content: string }[]
+    const localized = {
+      ...product,
+      name:        pickProductText(rows, 'name', 'sr', product.name),
+      description: pickProductText(rows, 'description', 'sr', product.description),
+    }
+
+    return new Response(buildPage(localized, tenant, showBranding, whiteLabel), {
       headers: { ...CORS, 'Content-Type': 'text/html; charset=utf-8' },
     })
 
@@ -64,6 +82,21 @@ Deno.serve(async (req: Request) => {
     throw err
   }
 })
+
+// Resolve one product text slot using the SAME rule as the widget's
+// `pickTranslation`: the chosen language's row only, else the raw column. No
+// cross-language fallback — the English column is the canonical fallback, so an
+// SR view never shows leftover EN text and vice versa. SSR has no localStorage,
+// so the language mirrors the widget's built-in default ('sr').
+function pickProductText(
+  rows: { slot: string; language: string; content: string }[],
+  slot: string,
+  language: string,
+  column: string | null,
+): string | null {
+  const hit = rows.find(r => r.slot === slot && r.language === language && r.content.trim())
+  return hit ? hit.content : column
+}
 
 // ── HTML builders ─────────────────────────────────────────────────────────────
 
