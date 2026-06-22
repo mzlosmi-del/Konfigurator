@@ -18,6 +18,13 @@ const sr: Record<string, string> = {
   'Choose a colour below — it applies to the selected letter. Tap the letter again for the whole sign.':
     'Izaberite boju ispod — primenjuje se na izabrano slovo. Dodirnite slovo ponovo za ceo natpis.',
   'Background':                            'Pozadina',
+  // Neon background scenes (labels from neonScenes.ts — keys stay English, the
+  // label is translated through t() at the display points).
+  'None (dark)':                           'Bez pozadine (tamno)',
+  'Bar wall':                              'Zid bara',
+  'Storefront':                            'Izlog',
+  'Gate at night':                         'Kapija noću',
+  'Studio wall':                           'Studijski zid',
   'Select all options to continue':        'Izaberite sve opcije da biste nastavili',
   'This is an estimated price. The official quote will be provided by the company after your inquiry.':
     'Ovo je procenjena cena. Zvaničnu ponudu će vam dostaviti kompanija nakon vašeg upita.',
@@ -59,6 +66,26 @@ const sr: Record<string, string> = {
   'Included':                              'Uključeno',
   'No image available':                    'Nema dostupne slike',
   'Product visualization':                 'Vizualizacija proizvoda',
+  'Pick a color':                          'Izaberite boju',
+  'char':                                  'znak',
+
+  // Inquiry form (additional)
+  'You must accept to continue':           'Morate prihvatiti da biste nastavili',
+  'I agree to the processing of my personal data.':
+    'Slažem se sa obradom mojih ličnih podataka.',
+  'Phone number':                          'Broj telefona',
+  'Company name':                          'Naziv kompanije',
+  'Acme Ltd':                              'Preduzeće d.o.o.',
+  'Privacy policy':                        'Politika privatnosti',
+
+  // Visualization (AR + 3D controls)
+  'View in AR':                            'Prikaži u AR-u',
+  'AR ready — point at a wall to place':   'AR spreman — uperite u zid da postavite',
+  'AR ready — point at the floor to place':'AR spreman — uperite u pod da postavite',
+  'Pause animation':                       'Pauziraj animaciju',
+  'Play animation':                        'Pusti animaciju',
+  'Collapse exploded view':                'Sklopi rastavljeni prikaz',
+  'Expand parts':                          'Rastavi delove',
 }
 
 // Numeric bounds validation message. Built here (not as a flat key) because it

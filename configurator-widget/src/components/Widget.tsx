@@ -291,7 +291,7 @@ export function Widget({ config, track, onThemeLoad }: Props) {
             const scenes = offeredScenes(char.neon_config!)
             if (scenes.length > 0) {
               const sceneLabel = describeNeonScene(neonScene[char.id] ?? scenes[0])
-              if (sceneLabel) notes.push(`Background: ${sceneLabel}`)
+              if (sceneLabel) notes.push(`${t('Background')}: ${t(sceneLabel)}`)
             }
             if (isPerCharColors(char)) {
               const colourNote = describeNeonColors(text, neonCharColors[char.id])
@@ -541,16 +541,17 @@ export function Widget({ config, track, onThemeLoad }: Props) {
                   if (!sc) return null
                   const bg = neonSceneBackground(key)
                   const selected = neonHero.sceneKey === key
+                  const sceneLabel = t(sc.label)
                   return (
                     <button
                       key={key}
                       type="button"
                       class={`cw-neon-scene-btn${selected ? ' selected' : ''}`}
-                      title={sc.label}
+                      title={sceneLabel}
                       style={bg ? `background-image:${bg};` : ''}
                       onClick={() => handleSelectNeonScene(neonHero.charId, key)}
                     >
-                      <span class="cw-neon-scene-name">{sc.label}</span>
+                      <span class="cw-neon-scene-name">{sceneLabel}</span>
                     </button>
                   )
                 })}
