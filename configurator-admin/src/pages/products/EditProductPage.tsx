@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useParams, Link } from 'react-router-dom'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, ShieldAlert } from 'lucide-react'
 import { fetchProduct, updateProduct } from '@/lib/products'
 import { setEntityI18nText } from '@/lib/texts'
 import type { Product } from '@/types/database'
@@ -25,6 +25,7 @@ import { computeDiff, logChange } from '@/lib/auditLog'
 import { PRODUCT_LABELS } from '@/lib/auditLabels'
 import { useAuthContext } from '@/components/auth/AuthContext'
 import { AuditHistory } from '@/components/audit-log/AuditHistory'
+import { isSuperAdminEmail } from '@/lib/superAdmin'
 
 type Tab = 'details' | 'characteristics' | 'rules' | 'formulas' | 'visualization' | 'form' | 'embed' | 'texts' | 'history'
 
@@ -59,6 +60,12 @@ export function EditProductPage() {
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<Tab>('details')
 
+  // Super-admin (sales@configureout.com) can read/write across tenants. Warn
+  // clearly when they are editing a product that belongs to a different tenant
+  // than their own, so god-mode edits are never accidental.
+  const isCrossTenantSuperAdmin =
+    isSuperAdminEmail(profile?.email) && !!product && !!tenant && product.tenant_id !== tenant.id
+
   const load = useCallback(() => {
     if (!id) return
     fetchProduct(id)
@@ -85,15 +92,18 @@ export function EditProductPage() {
         uploads_possible: values.uploads_possible,
       })
       // i18n maps are persisted in `tenant_texts`. The legacy JSONB columns
-      // were dropped by migration 078.
-      if (tenant?.id) {
+      // were dropped by migration 078. Scope the text rows to the PRODUCT's
+      // tenant (not the editor's) so a cross-tenant super-admin edit writes the
+      // translations to the owning tenant, not their own.
+      const textTenantId = product.tenant_id
+      if (textTenantId) {
         await Promise.all([
           setEntityI18nText({
-            tenant_id: tenant.id, level: 'product', reference_id: product.id, slot: 'name',
+            tenant_id: textTenantId, level: 'product', reference_id: product.id, slot: 'name',
             i18n: values.name_i18n ?? { en: values.name ?? '' },
           }),
           setEntityI18nText({
-            tenant_id: tenant.id, level: 'product', reference_id: product.id, slot: 'description',
+            tenant_id: textTenantId, level: 'product', reference_id: product.id, slot: 'description',
             i18n: values.description_i18n ?? { en: values.description ?? '' },
           }),
         ])
@@ -185,6 +195,18 @@ export function EditProductPage() {
           {t('All products')}
         </button>
       </div>
+
+      {/* Super-admin cross-tenant edit warning */}
+      {isCrossTenantSuperAdmin && (
+        <div className="px-4 pt-4 md:px-6">
+          <div className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-700/60 dark:bg-amber-950/40 dark:text-amber-200">
+            <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>
+              {t('You are editing another tenant’s product as super-admin. Changes apply to their account.')}
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="px-4 pt-4 md:px-6">
